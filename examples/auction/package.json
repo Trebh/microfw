@@ -1,0 +1,29 @@
+{
+  "name": "@mufw/example-auction",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "dev:client": "vite",
+    "dev:server": "tsx src/server.ts",
+    "test:live": "tsx test/live.ts"
+  },
+  "dependencies": {
+    "effect": "^4.0.5",
+    "@mufw/core": "workspace:*",
+    "@mufw/rpc": "workspace:*",
+    "@mufw/view-uhtml": "workspace:*",
+    "@mufw/devtools": "workspace:*",
+    "@mufw/test": "workspace:*",
+    "@effect/platform-node": "^4.0.5",
+    "@effect/platform-browser": "^4.0.5",
+    "uhtml": "^4.7.1",
+    "@statelyai/inspect": "^0.7.2",
+    "vite": "^8.3.0",
+    "tsx": "^4.20.0"
+  },
+  "devDependencies": {
+    "xstate": "^5.33.3"
+  }
+}

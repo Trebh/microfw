@@ -1,0 +1,17 @@
+{
+  "name": "@mufw/view-uhtml",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "effect": "^4.0.5",
+    "@mufw/core": "workspace:*",
+    "uhtml": "^4.7.1"
+  }
+}

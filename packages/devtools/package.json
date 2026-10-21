@@ -1,0 +1,21 @@
+{
+  "name": "@mufw/devtools",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "effect": "^4.0.5",
+    "@mufw/core": "workspace:*",
+    "uhtml": "^4.7.1",
+    "@statelyai/inspect": "^0.7.2"
+  },
+  "devDependencies": {
+    "xstate": "^5.33.3"
+  }
+}
