@@ -46,7 +46,7 @@ visible end to end.
 
 Near term (see [docs/TODO.md](docs/TODO.md) for the list):
 
-- Close the parse-don't-validate gaps at the example's boundaries (URL, form input, environment).
+- Close the parse-don't-validate gaps at the example's boundaries (URL query, form input) and take identity from an authenticated session, not from intents.
 - Run DOM-triggered effects with the application's services rather than the default runtime.
 - A browser driver for `@mufw/test`, so paths can be replayed by clicking the real UI.
 - Persistence of the model and multi-instance synchronisation of proposals.

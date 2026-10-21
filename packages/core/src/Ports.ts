@@ -10,10 +10,16 @@ export interface IntentEnvelope<I> {
   readonly origin: IntentOrigin
 }
 
+/** The local queue between intents and the actions drain. */
 export interface IntentBusShape<D extends AnyDefinition> {
   dispatch(intent: IntentOf<D>): Effect.Effect<void>
   dispatchAuto(intent: IntentOf<D>): Effect.Effect<void>
   readonly intents: Stream.Stream<IntentEnvelope<IntentOf<D>>>
+}
+
+/** Where user intents enter the loop: the local bus, or a server that runs the actions itself. */
+export interface IntentPortShape<D extends AnyDefinition> {
+  dispatch(intent: IntentOf<D>): Effect.Effect<void>
 }
 
 export interface ActionRunnerShape<D extends AnyDefinition> {
@@ -35,6 +41,9 @@ export interface HistoryPortShape<D extends AnyDefinition> {
 export interface IntentBus<D extends AnyDefinition> {
   readonly "~mufw/IntentBus": D
 }
+export interface IntentPort<D extends AnyDefinition> {
+  readonly "~mufw/IntentPort": D
+}
 export interface ActionRunner<D extends AnyDefinition> {
   readonly "~mufw/ActionRunner": D
 }
@@ -47,6 +56,7 @@ export interface HistoryPort<D extends AnyDefinition> {
 
 export interface Ports<D extends AnyDefinition> {
   readonly IntentBus: Context.Service<IntentBus<D>, IntentBusShape<D>>
+  readonly IntentPort: Context.Service<IntentPort<D>, IntentPortShape<D>>
   readonly ActionRunner: Context.Service<ActionRunner<D>, ActionRunnerShape<D>>
   readonly ModelPort: Context.Service<ModelPort<D>, ModelPortShape<D>>
   readonly HistoryPort: Context.Service<HistoryPort<D>, HistoryPortShape<D>>
@@ -55,6 +65,7 @@ export interface Ports<D extends AnyDefinition> {
 /** Service keys of one definition; their ids are prefixed with the definition's name. */
 export const makePorts = <D extends AnyDefinition>(def: D): Ports<D> => ({
   IntentBus: Context.Service<IntentBus<D>, IntentBusShape<D>>(`${def.name}/IntentBus`),
+  IntentPort: Context.Service<IntentPort<D>, IntentPortShape<D>>(`${def.name}/IntentPort`),
   ActionRunner: Context.Service<ActionRunner<D>, ActionRunnerShape<D>>(`${def.name}/ActionRunner`),
   ModelPort: Context.Service<ModelPort<D>, ModelPortShape<D>>(`${def.name}/ModelPort`),
   HistoryPort: Context.Service<HistoryPort<D>, HistoryPortShape<D>>(`${def.name}/HistoryPort`)

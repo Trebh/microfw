@@ -20,13 +20,13 @@ flowchart LR
   end
   subgraph Core["@mufw/core"]
     Def["SamDefinition<br/>pure acceptors · reactors · state · nap<br/>effectful actions"]
-    Ports["Ports<br/>IntentBus · ActionRunner · ModelPort · HistoryPort"]
+    Ports["Ports<br/>IntentPort · IntentBus · ActionRunner · ModelPort · HistoryPort"]
     Def --- Ports
   end
   subgraph Driven adapters
     Local["Local layers<br/>layerModelLocal · layerActionRunnerLocal"]
-    Remote["@mufw/rpc<br/>layerModelRemote · layerHistoryRemote · layerActionRunnerRemote"]
-    Domain["Domain services<br/>e.g. CreditCheck.layerLive"]
+    Remote["@mufw/rpc<br/>layerIntentPortRemote · layerModelRemote · layerHistoryRemote · layerActionRunnerRemote"]
+    Domain["Domain service adapters<br/>e.g. layerCreditCheckTable"]
     Devtools["@mufw/devtools<br/>layerPanel · layerStately"]
   end
   View --> Ports
@@ -42,14 +42,15 @@ flowchart LR
 |---|---|
 | Domain | The `SamDefinition`: schemas plus pure acceptors, reactors, `state`, `nap` |
 | Application services | The definition's `actions`: the only effectful part, they turn intents into proposals |
-| Driving ports | `IntentBus.dispatch`, `ModelPort.present` |
+| Driving ports | `IntentPort.dispatch`, `ModelPort.present` |
 | Driven ports | `ActionRunner`, `ModelPort`, `HistoryPort`, and domain services the actions require (`CreditCheck`) |
 | Driving adapters | the uhtml view, test drivers, RPC handlers on the server |
-| Driven adapters | local layers, remote RPC layers, `CreditCheck.layerLive`/`layerPermissive`, devtools |
-| Composition root | the app entry points: `examples/auction/src/client.ts`, `server.ts`, `test/live.ts` |
+| Driven adapters | local layers, remote RPC layers, `layerCreditCheckTable`/`layerCreditCheckPermissive`, devtools |
+| Composition roots | one per deployment: `examples/auction/src/client/<page>.ts`, `server.ts`, `test/live.ts` |
 
 Ports are Effect service keys (`Context.Service`) created per definition by `makePorts(def)`;
-adapters are `Layer`s. Choosing a placement is choosing layers at the composition root.
+adapters are `Layer`s. Choosing a placement is choosing layers in a deployment's composition root;
+only the demo page chooses at runtime.
 
 ## Packages and dependency direction
 
@@ -78,7 +79,7 @@ Code stays inside `Effect`/`Stream`/`Layer` across every package. Effects are ru
 
 | Boundary | Where | How |
 |---|---|---|
-| Browser process | `examples/auction/src/client.ts` | `BrowserRuntime.runMain(Layer.launch(App))` |
+| Browser page | `examples/auction/src/client/app.ts` (`runPage`, called by each page's entry point) | `BrowserRuntime.runMain(Layer.launch(page))` |
 | Node server | `examples/auction/src/server.ts` | `Layer.launch(...).pipe(NodeRuntime.runMain)` |
 | Live path test | `examples/auction/test/live.ts` | `NodeRuntime.runMain(program)` |
 | DOM events | `layerMount` dispatch, `layerPanel` row click | `Effect.runFork` of a context-free effect (see TODO) |
@@ -101,9 +102,18 @@ Each entry states the choice and the constraint behind it.
   call widens them to `string`.
 - **Ports are function-style service keys with per-definition identifiers** (`IntentBus<D>` …),
   so their types can be named and the same framework can host several definitions.
-- **`Dispatch` returns the proposal and the caller presents it.** Actions never need to know where
-  the model is; with both parts remote that costs two round-trips.
-- **The RPC client is a service (`Client<D>`) shared by the three remote ports**, provided either
+- **Placement is per deployment, not per request.** Each page has its own entry point that calls
+  one placement module; the server's served RPCs come from `Config`. A placement chosen by the
+  visitor would let the visitor choose what the server trusts.
+- **A server that owns the actions receives intents (`Submit`), not proposals.** Serving `Present`
+  to an untrusted client lets it apply any proposal and bypass every rule enforced by the actions.
+- **`Dispatch` returns the proposal and the caller presents it.** It serves a client-side model with
+  server-side actions; actions never need to know where the model is.
+- **`IntentPort` is separate from `IntentBus`.** The view only submits intents; with the actions on
+  the server there is no local queue to put them in.
+- **Domain services are ports; their implementations are adapters in separate modules**
+  (`CreditCheck` vs `layerCreditCheckTable`), so a browser bundle never contains server secrets.
+- **The RPC client is a service (`Client<D>`) shared by the remote ports**, provided either
   over a transport (`layerClient`) or in-process (`layerClientTest`, backed by `RpcTest`).
 - **The RPC group is typed by hand (`SamRpcs<D>`).** Inferring it through a generic `D` widens the
   schemas to `any`, which leaks `any` into the services every server layer requires.

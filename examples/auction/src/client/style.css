@@ -1,0 +1,11 @@
+body { font-family: system-ui, sans-serif; margin: 2rem; max-width: 40rem; }
+header { display: flex; gap: 1rem; align-items: baseline; }
+.badge { padding: 0.1rem 0.5rem; border-radius: 0.5rem; background: #ddd; }
+.badge.open { background: #cfc; }
+.badge.closing { background: #fd9; }
+.badge.sold { background: #fbb; }
+.rejection { color: #c00; min-height: 1.2em; }
+footer { color: #666; font-size: 0.85rem; }
+.mufw-history li { cursor: pointer; font-family: ui-monospace, monospace; font-size: 0.85rem; }
+.mufw-history li.mufw-latest { font-weight: bold; background: #eef; }
+pre { background: #f6f6f6; padding: 0.5rem; font-size: 0.75rem; max-height: 20rem; overflow: auto; }

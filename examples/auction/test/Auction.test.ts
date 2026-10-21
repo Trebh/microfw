@@ -2,7 +2,7 @@ import { assert, describe, it } from "@effect/vitest"
 import { Effect, Option } from "effect"
 import { TestClock } from "effect/testing"
 import { acceptBid, acceptClose, Auction, type Model, nap, type Representation, state } from "../src/domain/Auction.ts"
-import { CreditCheck } from "../src/domain/CreditCheck.ts"
+import { layerCreditCheckTable } from "../src/adapters/creditCheckTable.ts"
 
 const base: Model = {
   item: "Vintage synth",
@@ -86,7 +86,7 @@ describe("nap", () => {
 
 describe("PlaceBid action", () => {
   const placeBid = (bidder: string, amount: number) =>
-    Auction.actions.PlaceBid({ _tag: "PlaceBid", bidder, amount }).pipe(Effect.provide(CreditCheck.layerLive))
+    Auction.actions.PlaceBid({ _tag: "PlaceBid", bidder, amount }).pipe(Effect.provide(layerCreditCheckTable))
 
   it.effect("rejects a bid over the bidder's credit limit", () =>
     Effect.gen(function*() {

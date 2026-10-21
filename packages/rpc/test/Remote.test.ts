@@ -1,18 +1,80 @@
 import { assert, describe, it } from "@effect/vitest"
 import { ActionFailure, layerLoopLocal, NoSuchStep } from "@mufw/core"
-import { Deferred, Effect, Fiber, Layer, Option, Stream } from "effect"
+import { Deferred, Effect, Exit, Fiber, Layer, Option, Stream } from "effect"
+import { RpcClient, RpcServer } from "effect/rpc"
 import { Counter, Ports } from "../../core/test/fixtures/Counter.ts"
-import { makeRpc } from "../src/index.ts"
+import { makeRpc, type SamClient } from "../src/index.ts"
 
 const Rpc = makeRpc(Counter, Ports)
 
-const Remote = Layer.mergeAll(Rpc.layerModelRemote, Rpc.layerHistoryRemote, Rpc.layerActionRunnerRemote).pipe(
+const Loop = layerLoopLocal(Counter, Ports)
+
+const Remote = Layer.mergeAll(
+  Rpc.layerIntentPortRemote,
+  Rpc.layerModelRemote,
+  Rpc.layerHistoryRemote,
+  Rpc.layerActionRunnerRemote
+).pipe(
   Layer.provide(Rpc.layerClientTest),
   Layer.provide(Rpc.layerHandlers),
-  Layer.provide(layerLoopLocal(Counter, Ports))
+  Layer.provide(Loop)
 )
 
+interface ResponseSink {
+  write(response: unknown): Effect.Effect<void>
+}
+
+/** A client of the whole contract talking, in-process, to a server that serves only `served`. */
+const clientOfPartialServer = (served: Parameters<typeof Rpc.exposing>[0]) =>
+  Effect.gen(function*() {
+    let client: ResponseSink | undefined
+    const server = yield* RpcServer.makeNoSerialization(Rpc.exposing(served), {
+      onFromServer: (response) => client!.write(response)
+    })
+    const made = yield* RpcClient.makeNoSerialization(Rpc.group, {
+      supportsAck: true,
+      onFromClient: ({ message }) => server.write(0, message)
+    })
+    client = made as unknown as ResponseSink
+    return made.client as unknown as SamClient<typeof Counter>
+  })
+
+const ServerSide = Rpc.layerHandlers.pipe(Layer.provideMerge(Loop))
+
+describe("served RPCs", () => {
+  it.effect("a server without Present does not apply a client's proposal", () =>
+    Effect.gen(function*() {
+      const client = yield* clientOfPartialServer(["Submit", "Representations"])
+
+      const presented = yield* Effect.exit(client.Present({ _tag: "Inc", by: 100 }))
+      const current = yield* client.Representations().pipe(Stream.runHead)
+
+      assert.isTrue(Exit.isFailure(presented))
+      assert.deepStrictEqual(Option.map(current, (r) => r.count), Option.some(0))
+    }).pipe(Effect.provide(ServerSide)))
+
+  it.effect("the served RPCs still work", () =>
+    Effect.gen(function*() {
+      const client = yield* clientOfPartialServer(["Submit", "Representations"])
+
+      yield* client.Submit({ _tag: "Inc", by: 2 })
+      const reached = yield* client.Representations().pipe(Stream.filter((r) => r.count === 2), Stream.runHead)
+
+      assert.isTrue(Option.isSome(reached))
+    }).pipe(Effect.provide(ServerSide)))
+})
+
 describe("remote ports over in-process RPC", () => {
+  it.effect("an intent submitted through the remote IntentPort runs the server's action", () =>
+    Effect.gen(function*() {
+      const intents = yield* Ports.IntentPort
+      const model = yield* Ports.ModelPort
+
+      yield* intents.dispatch({ _tag: "Inc", by: 2 })
+      const reached = yield* model.representations.pipe(Stream.filter((r) => r.count === 2), Stream.runHead)
+
+      assert.isTrue(Option.isSome(reached))
+    }).pipe(Effect.provide(Remote)))
   it.effect("present reaches the server model and representations stream back", () =>
     Effect.gen(function*() {
       const model = yield* Ports.ModelPort

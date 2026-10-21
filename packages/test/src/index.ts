@@ -5,8 +5,8 @@ import {
   type ExploreOptions,
   type Graph,
   type HistoryPort,
-  type IntentBus,
   type IntentOf,
+  type IntentPort,
   type ModelPort,
   type ModelPortShape,
   type Path,
@@ -70,9 +70,9 @@ export const presentDriver = <D extends AnyDefinition>(ports: Ports<D>): Driver<
 export const intentDriver = <D extends AnyDefinition>(
   ports: Ports<D>,
   intentFor: (step: PathStep<D>) => IntentOf<D>
-): Driver<D, IntentBus<D>> => ({
+): Driver<D, IntentPort<D>> => ({
   appliesOnReturn: false,
-  step: (step) => ports.IntentBus.use((bus) => bus.dispatch(intentFor(step)))
+  step: (step) => ports.IntentPort.use((intents) => intents.dispatch(intentFor(step)))
 })
 
 const describePath = <D extends AnyDefinition>(path: Path<D>) => {

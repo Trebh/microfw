@@ -29,11 +29,13 @@ define({ name, model, proposal, intent, representation })({
 ```mermaid
 sequenceDiagram
   participant V as View / driver
+  participant P as IntentPort
   participant B as IntentBus
   participant D as ActionsDrain
   participant A as ActionRunner
   participant M as ModelPort
-  V->>B: dispatch(intent)
+  V->>P: dispatch(intent)
+  P->>B: dispatch(intent), locally or via Submit on the server
   B->>D: { intent, origin: "user" }
   D->>A: run(intent)
   A-->>D: proposal

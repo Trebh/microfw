@@ -26,8 +26,10 @@ docs/                ARCHITECTURE.md, architecture/*.md, TODO.md
 | `pnpm install` | install; pnpm 12 enforces a minimum release age, so a just-published version is refused |
 | `pnpm typecheck` | `tsc --noEmit` in every package, one at a time |
 | `pnpm test` | vitest over `packages/*/test` and `examples/*/test` |
-| `pnpm dev:server` | auction server on :3001 (`MUFW_AUTO_ACTIONS=off` disables automatic actions) |
-| `pnpm dev:client` | vite on :5173 |
+| `pnpm dev:server` | demo server on :3001 serving every RPC (`MUFW_AUTO_ACTIONS=off` disables automatic actions) |
+| `pnpm start:server` | server with the production defaults (`MUFW_RPCS=Submit,Representations,History`) |
+| `pnpm dev:client` | vite on :5173: one page per deployment plus the demo page |
+| `pnpm build:client` | builds the pages into `examples/auction/dist` |
 | `pnpm --filter @mufw/example-auction test:live` | replays the path tests against a running server |
 
 A change is done when `pnpm typecheck` and `pnpm test` pass and the changed behaviour has been
@@ -47,16 +49,21 @@ for Effect idioms; do not rely on Effect 3 knowledge.
   `@mufw/core` never import an adapter, a transport, a DOM API or a platform package.
 - `@mufw/core` depends on `effect` only. `@mufw/rpc` stays platform-free: transports and
   serialization are chosen by the application. Adapter packages do not depend on each other.
-- Placement is decided at the composition root (`client.ts`, `server.ts`, `test/live.ts`) by
-  choosing layers. If moving a part between client and server needs a change outside the
+- Placement is decided per deployment, at its composition root (`src/client/<page>.ts` calling one
+  module of `src/client/placements/`, `server.ts`, `test/live.ts`), by choosing layers. Only the demo
+  page picks a placement at runtime; never let a visitor choose what the server trusts. If moving a part between client and server needs a change outside the
   composition root, the design is wrong: fix the port, not the call site.
 
 ### Dependency injection and inversion
 
 - Depend on the port, never on an implementation: `yield* ports.ModelPort`, `yield* CreditCheck`.
 - Provide implementations only with `Layer`s, and only at the composition root or in a test.
-- A service a domain action needs (`CreditCheck`) is declared next to the domain and implemented by
-  layers (`layerLive`, `layerPermissive`); the action states it in its `R`.
+- A service a domain action needs (`CreditCheck`) is a port declared in `src/domain/`; its
+  implementations are adapters in their own modules under `src/adapters/`, so a bundle only
+  contains the adapters its composition root imports. Never put a server-side implementation (and
+  its secrets) in the module that declares the port.
+- A server serves only the RPCs its deployment needs (`MUFW_RPCS`); it serves `Present` only to
+  trusted clients, since it applies any proposal it receives.
 - Tests replace a dependency by providing another layer, never by patching modules.
 
 ### Parse, don't validate
@@ -97,7 +104,7 @@ Code stays in `Effect`/`Stream`/`Layer` through every layer of the application. 
 
 | Boundary | Place |
 |---|---|
-| Process entry point | `examples/auction/src/client.ts`, `server.ts`, `test/live.ts` |
+| Process entry point | `runPage` in `examples/auction/src/client/app.ts`, `server.ts`, `test/live.ts` |
 | DOM event handler | `layerMount` dispatch, `layerPanel` click (see TODO: should use the layer's runtime) |
 | Test harness | `it.effect` / `layer` from `@effect/vitest` |
 

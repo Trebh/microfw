@@ -16,15 +16,15 @@ export interface MountOptions<D extends AnyDefinition> {
 
 const defaultRender = Effect.promise(() => import("uhtml")).pipe(Effect.map((uhtml): Render => uhtml.render))
 
-/** Re-renders `view` into `root` on every representation. Requires `IntentBus | ModelPort`. */
+/** Re-renders `view` into `root` on every representation. Requires `IntentPort | ModelPort`. */
 export const layerMount = <D extends AnyDefinition>(ports: Ports<D>, options: MountOptions<D>) =>
   Layer.effectDiscard(
     Effect.gen(function*() {
-      const bus = yield* ports.IntentBus
+      const intents = yield* ports.IntentPort
       const model = yield* ports.ModelPort
       const render = options.render ?? (yield* defaultRender)
       const dispatch = (intent: IntentOf<D>) => {
-        Effect.runFork(bus.dispatch(intent))
+        Effect.runFork(intents.dispatch(intent))
       }
       const paint = (representation: RepresentationOf<D>) =>
         Effect.sync(() => render(options.root, options.view(representation, dispatch)))

@@ -6,7 +6,9 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "dev:client": "vite",
-    "dev:server": "tsx src/server.ts",
+    "build:client": "vite build",
+    "dev:server": "MUFW_RPCS=Submit,Present,Dispatch,Representations,History,TravelTo tsx src/server.ts",
+    "start:server": "tsx src/server.ts",
     "test:live": "tsx test/live.ts"
   },
   "dependencies": {

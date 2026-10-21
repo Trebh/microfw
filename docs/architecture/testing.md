@@ -49,7 +49,7 @@ Any mismatch or thrown assertion becomes `PathFailure { target, stepIndex, expec
 | Driver | Transition | Applies on return |
 |---|---|---|
 | `presentDriver(ports)` (default) | `ModelPort.present(step.proposal)` | yes |
-| `intentDriver(ports, intentFor)` | `IntentBus.dispatch(intentFor(step))`, through the real actions | no |
+| `intentDriver(ports, intentFor)` | `IntentPort.dispatch(intentFor(step))`, through the real actions | no |
 
 A driver needs only the ports it uses, so the same path runs against `layerLoopLocal`, against
 remote ports over `Rpc.layerClientTest`, or against a live server over a websocket

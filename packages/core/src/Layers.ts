@@ -16,9 +16,9 @@ export const AutoActions = Context.Reference<boolean>("@mufw/core/AutoActions", 
   defaultValue: () => true
 })
 
+/** The local queue, which also serves as the `IntentPort` of a loop that runs its own actions. */
 export const layerIntentBus = <D extends AnyDefinition>(_def: D, ports: Ports<D>) =>
-  Layer.effect(
-    ports.IntentBus,
+  Layer.effectContext(
     Effect.gen(function*() {
       const queue = yield* Queue.unbounded<IntentEnvelope<IntentOf<D>>>()
       const bus: IntentBusShape<D> = {
@@ -26,7 +26,7 @@ export const layerIntentBus = <D extends AnyDefinition>(_def: D, ports: Ports<D>
         dispatchAuto: (intent) => Queue.offer(queue, { intent, origin: "auto" }).pipe(Effect.asVoid),
         intents: Stream.fromQueue(queue)
       }
-      return bus
+      return Context.make(ports.IntentBus, bus).pipe(Context.add(ports.IntentPort, { dispatch: bus.dispatch }))
     })
   )
 

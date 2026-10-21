@@ -1,79 +1,102 @@
 # Placement
 
 Living document. Source of truth: `packages/core/src/Ports.ts`, `Layers.ts`, `packages/rpc/src/index.ts`,
-`examples/auction/src/client.ts`, `server.ts`.
+`examples/auction/src/client/`, `examples/auction/src/server.ts`.
+
+Placement is a deployment decision. Each deployment has its own composition root, which chooses
+layers; nothing is switched at runtime except on the demo page.
 
 ## Ports
 
-`makePorts(def)` returns four service keys, identified as `${def.name}/<Port>`:
+`makePorts(def)` returns five service keys, identified as `${def.name}/<Port>`:
 
-| Port | Shape |
-|---|---|
-| `IntentBus` | `dispatch(intent)`, `dispatchAuto(intent)`, `intents: Stream<IntentEnvelope>` |
-| `ActionRunner` | `run(intent): Effect<proposal, ActionFailure>` |
-| `ModelPort` | `present(proposal)`, `representations: Stream` (current value first, then changes) |
-| `HistoryPort` | `records: Stream<StepRecord>` (existing first, then live), `travelTo(seq)` |
+| Port | Shape | Used by |
+|---|---|---|
+| `IntentPort` | `dispatch(intent)` | the view, `intentDriver`: where user intents enter the loop |
+| `IntentBus` | `dispatch`, `dispatchAuto`, `intents: Stream<IntentEnvelope>` | the local loop: the queue in front of `ActionsDrain` |
+| `ActionRunner` | `run(intent): Effect<proposal, ActionFailure>` | `ActionsDrain` |
+| `ModelPort` | `present(proposal)`, `representations: Stream` (current value first) | `ActionsDrain`, the view, `presentDriver` |
+| `HistoryPort` | `records: Stream<StepRecord>` (existing first, then live), `travelTo(seq)` | devtools, test runner |
+
+`IntentPort` is separate from `IntentBus` because a page whose server runs the actions has no
+local queue: its intents go straight to the server.
 
 ## Layers
 
 | Layer | Provides | Requires |
 |---|---|---|
-| `layerIntentBus` | `IntentBus` | — |
+| `layerIntentBus` | `IntentBus`, `IntentPort` (local) | — |
 | `layerModelLocal` | `ModelPort`, `HistoryPort` (one state object) | `IntentBus` |
 | `layerActionRunnerLocal` | `ActionRunner` | the actions' services `R` |
 | `layerActionsDrain` | — (background fiber) | `IntentBus`, `ActionRunner`, `ModelPort` |
-| `layerLoopLocal` | all four ports, drain running | `R` |
-| `Rpc.layerModelRemote` / `layerHistoryRemote` / `layerActionRunnerRemote` | the port | `Rpc.Client` |
+| `layerLoopLocal` | all five ports, drain running | `R` |
+| `Rpc.layerIntentPortRemote` / `layerModelRemote` / `layerHistoryRemote` / `layerActionRunnerRemote` | the port | `Rpc.Client` |
 | `Rpc.layerClient` | `Rpc.Client` | `RpcClient.Protocol` (transport chosen by the app) |
 | `Rpc.layerClientTest` | `Rpc.Client` | `Rpc.layerHandlers` (in-process, no serialization) |
-| `Rpc.layerHandlers` | the RPC handlers | `ModelPort`, `HistoryPort`, `ActionRunner` |
-
-`IntentBus` and `ActionsDrain` always run where the view runs. The server always hosts the whole
-local loop and exposes every RPC, so any client placement works against the same server.
+| `Rpc.layerHandlers` | the RPC handlers | `IntentPort`, `ModelPort`, `HistoryPort`, `ActionRunner` |
 
 ## Wire contract
 
 `makeRpc(def, ports).group`:
 
-| RPC | Payload | Success | Error |
-|---|---|---|---|
-| `Present` | proposal | void | — |
-| `Representations` | — | stream of representation | — |
-| `Dispatch` | intent | proposal | `ActionFailure` |
-| `History` | — | stream of `StepRecord` | — |
-| `TravelTo` | `{ seq: Int }` | void | `NoSuchStep` |
+| RPC | Payload | Success | Error | Trust |
+|---|---|---|---|---|
+| `Submit` | intent | void | — | the server runs the action and its own model |
+| `Present` | proposal | void | — | the server applies whatever the client computed |
+| `Dispatch` | intent | proposal | `ActionFailure` | the server runs one action for a client-side model |
+| `Representations` | — | stream of representation | — | read-only |
+| `History` | — | stream of `StepRecord` | — | read-only |
+| `TravelTo` | `{ seq: Int }` | void | `NoSuchStep` | rewrites the server's model; development only |
 
-## The four placements
+`Rpc.exposing(tags)` is the group a server serves: an RPC not listed is not routed, so calling it
+fails on the client and changes nothing on the server.
 
-The client picks two layers and nothing else:
+## Deployments
 
-```ts
-const ModelLayer = placement.model === "client"
-  ? layerModelLocal(Auction, Ports)
-  : Layer.merge(Rpc.layerModelRemote, Rpc.layerHistoryRemote).pipe(Layer.provide(Transport))
+Each page of the example is one deployment. Its entry point
+(`src/client/<page>.ts`) calls one placement from `src/client/placements/` and `runPage`, which
+mounts the view and the devtools over it.
 
-const RunnerLayer = placement.actions === "client"
-  ? layerActionRunnerLocal(Auction, Ports).pipe(Layer.provide(CreditCheck.layerPermissive))
-  : Rpc.layerActionRunnerRemote.pipe(Layer.provide(Transport))
-```
+| Page | Model | Actions | Placement layers | RPCs needed |
+|---|---|---|---|---|
+| `browser-only` | browser | browser | `layerLoopLocal` + permissive credit check | none |
+| `server-owned` | server | server | remote `IntentPort`, `ModelPort`, `HistoryPort` | `Submit`, `Representations`, `History` |
+| `server-model` | server | browser | local bus, drain, runner (permissive) + remote model and history | `Present`, `Representations`, `History` |
+| `server-actions` | browser | server | local bus, drain, model + remote runner | `Dispatch` |
+| `index` (demo) | from `?placement=` | | any of the four, chosen at runtime | all |
 
-`Transport` is one layer value, so both remote ports share one connection, and a fully local
-placement never opens one.
+- Each placement is its own module, so it is its own chunk in the build. Library code (`@mufw/core`,
+  `@mufw/rpc`) lands in one chunk shared by every page, so a server-owned page still loads the
+  local model and runner code; per-deployment builds are in [TODO.md](../TODO.md).
+- Each placement calls `transport()` once; the returned layer value is built once, so its remote
+  ports share one connection, and `browser-only` never opens one.
+- Domain services follow the same rule: `src/domain/CreditCheck.ts` is only the port, the server's
+  table is `src/adapters/creditCheckTable.ts` and the browser's stand-in is
+  `src/adapters/creditCheckPermissive.ts`, so no page ships the server's limits.
 
-| Model | Actions | Round trips per user intent | Where `nap` runs |
-|---|---|---|---|
-| client | client | 0 | browser |
-| server | server | 2 (`Dispatch`, `Present`) | server; the browser only streams representations |
-| server | client | 1 (`Present`) | server |
-| client | server | 1 (`Dispatch`) | browser; each automatic `Tick` is a `Dispatch` |
+| Placement | Round trips per user intent | Where `nap` runs |
+|---|---|---|
+| browser only | 0 | browser |
+| server owned | 1 (`Submit`) | server; the browser only streams representations |
+| server model | 1 (`Present`) | server |
+| server actions | 1 (`Dispatch`) | browser; each automatic `Tick` is a `Dispatch` |
 
-A rule that must hold (the credit limit) belongs to an action placed on the server: with
-`actions:client` the browser provides its own `CreditCheck`, and the example shows it accepting a
-bid over the limit.
+A rule that must hold (the credit limit) belongs to an action on the server, and the server must
+not serve `Present` to untrusted clients: with `Present` served, any client can apply any proposal.
 
-## Server wiring
+## Server
 
-`RpcServer.layer(group)` + `Rpc.layerHandlers` + the local loop (with `CreditCheck.layerLive` and
-`AutoActions`) + `RpcServer.layerProtocolWebsocket({ path: "/sam" })` + JSON serialization, served
-by `HttpRouter.serve` on `NodeHttpServer` port 3001. `MUFW_AUTO_ACTIONS=off` disables automatic
-actions for live path tests.
+`src/server.ts` is the server's composition root. Configuration is parsed with `Config`, so a bad
+value stops the server at start with a typed error:
+
+| Variable | Parsed as | Default |
+|---|---|---|
+| `MUFW_RPCS` | `Config.Array(Schema.Literals(rpcTags))` | `Submit,Representations,History` |
+| `MUFW_AUTO_ACTIONS` | `Config.Literals(["on", "off"])` | `on` |
+
+Wiring: `RpcServer.layer(Rpc.exposing(rpcs))` + `Rpc.layerHandlers` + the local loop (with
+`layerCreditCheckTable` and `AutoActions`) + `RpcServer.layerProtocolWebsocket({ path: "/sam" })` +
+JSON serialization, served by `HttpRouter.serve` on `NodeHttpServer` port 3001.
+
+`pnpm start:server` uses the defaults; `pnpm dev:server` serves every RPC for the demo and the
+other pages; the live path test needs `Present`, `Representations` and `TravelTo`.

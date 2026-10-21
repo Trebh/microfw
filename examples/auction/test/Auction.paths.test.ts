@@ -1,17 +1,17 @@
 import { assert, describe, it } from "@effect/vitest"
-import { AutoActions, type IntentBus, layerLoopLocal, type ModelPort, type PathStep } from "@mufw/core"
+import { AutoActions, type IntentPort, layerLoopLocal, type ModelPort, type PathStep } from "@mufw/core"
 import { createTestModel, type Driver, intentDriver } from "@mufw/test"
 import { Effect, Layer, Option, Stream } from "effect"
 import { TestClock } from "effect/testing"
 import { Auction, type Intent } from "../src/domain/Auction.ts"
-import { CreditCheck } from "../src/domain/CreditCheck.ts"
+import { layerCreditCheckTable } from "../src/adapters/creditCheckTable.ts"
 import { Ports, Rpc } from "../src/ports.ts"
 import { auctionTestModel } from "./model.ts"
 
 const model = createTestModel(Auction, Ports, auctionTestModel)
 
 const Local = layerLoopLocal(Auction, Ports).pipe(
-  Layer.provide(CreditCheck.layerLive),
+  Layer.provide(layerCreditCheckTable),
   Layer.provide(Layer.succeed(AutoActions, false))
 )
 
@@ -55,7 +55,7 @@ const advanceUntilTicked = (now: number) =>
   })
 
 /** Drives the real actions with the clock set to the time each explored proposal assumes. */
-const clockedIntentDriver: Driver<typeof Auction, IntentBus<typeof Auction> | ModelPort<typeof Auction>> = {
+const clockedIntentDriver: Driver<typeof Auction, IntentPort<typeof Auction> | ModelPort<typeof Auction>> = {
   appliesOnReturn: false,
   step: (step) =>
     Effect.gen(function*() {

@@ -7,18 +7,31 @@ history lives in git). Each item names where the gap is and what done looks like
 
 ### Parse, don't validate
 
-- [ ] **Placement query.** `examples/auction/src/placement.ts` splits `location.search` by hand.
-  Done: a `Schema` decodes the query into `Placement`, invalid input falls back through the decode
-  result, and the parser has tests for each fallback.
+- [ ] **Demo query.** `examples/auction/src/client/placement.ts` splits `location.search` by hand
+  (`placement`, `bidder`). Done: a `Schema` decodes the query, invalid input falls back through the
+  decode result, and the parser has tests for each fallback.
 - [ ] **Bid form input.** `examples/auction/src/view.ts` sends `Number(formData.get("amount"))`,
   which can be `NaN` or non-integer; the `Int` schema only rejects it when it crosses the wire, and
   not at all with local actions. Done: the form value is decoded at the DOM boundary and an
   invalid amount never becomes an intent.
-- [ ] **Environment.** `server.ts` and `test/live.ts` read `process.env` directly. Done:
-  `Config.Literals(["on", "off"], "MUFW_AUTO_ACTIONS")` and `Config.String("MUFW_SERVER")` (with
-  defaults), so a misconfiguration fails at start with a typed error.
 - [ ] **Domain refinements.** Amounts and bidders are bare `Int`/`String`. Done: branded schemas
   (e.g. a positive `Amount`) used by model, proposals and intents, so acceptors stop re-checking.
+
+### Deployment
+
+- [ ] **Identity comes from the payload.** `PlaceBid` carries `bidder`, taken from `?bidder=`, and
+  the server believes it. Done: the server derives the bidder from an authenticated session (RPC
+  middleware providing the identity to the actions), and intents stop carrying it.
+- [ ] **Server URL is a constant.** `src/client/placements/transport.ts` hardcodes
+  `ws://localhost:3001/sam`. Done: it is a build-time setting of each deployment.
+- [ ] **Devtools against a production server.** With the default `MUFW_RPCS`, the panel's travel
+  clicks call an RPC that is not served. Done: production pages omit travel controls (or the panel),
+  and the demo keeps them.
+
+- [ ] **Per-deployment builds.** `pnpm build:client` builds every page in one build, so library
+  code is one shared chunk and a server-owned page still loads the local model and runner. Done: one
+  `vite build` per deployment with a single entry (the demo keeps the multi-page build), and a check
+  that a server-owned build contains no local action runner.
 
 ### Effect boundaries
 
@@ -38,7 +51,9 @@ history lives in git). Each item names where the gap is and what done looks like
   automatic actions on travel, or tag proposals with the seq they were computed from and drop stale
   ones. Add a test for the chosen rule.
 - [ ] **Defects in action fibers.** `ActionsDrain` forks each action with `forkScoped` and handles
-  only `ActionFailure`. Decide and test what happens to a defect (log, surface to devtools, stop).
+  only `ActionFailure`. A defect — for example `Present` refused by a server that does not serve it —
+  is invisible on the page. Decide and test what happens to a defect (log, surface to the view or
+  devtools, stop).
 - [ ] **Unbounded history.** Records are kept in memory forever. Done: a retention policy (count or
   age) with `travelTo` failing `NoSuchStep` for evicted steps, or persistence behind a port.
 - [ ] **Travel records lack their source.** The panel infers it by model equality. Done: the record

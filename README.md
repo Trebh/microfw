@@ -12,7 +12,7 @@ Status: **proof of concept**. APIs move freely; there is no build step and nothi
 - **A pure SAM definition.** Model, proposals, intents and representation are Effect `Schema`s;
   acceptors, reactors, `state` and `nap` are pure functions; only actions are effectful.
 - **Placement by layers.** The model and the actions can each be local or remote (Effect RPC),
-  giving four placements of the same component, all served by one server.
+  giving four placements of the same component, each its own deployment, against the same server code.
 - **Time travel.** Every step is recorded; `travelTo(seq)` restores any recorded model.
 - **Model-based testing.** `@mufw/test` explores the control-state graph from the definition and
   replays each generated path against the real system, in-process or over the wire.
@@ -43,31 +43,45 @@ pnpm test
 Run the example (two terminals):
 
 ```sh
-pnpm dev:server   # auction server on :3001 (websocket RPC at /sam)
+pnpm dev:server   # demo server on :3001: websocket RPC at /sam, every RPC served
 pnpm dev:client   # vite on http://localhost:5173
 ```
 
-Then open one of the placements:
+Each deployment is its own page, with its own entry point and its own composition of layers:
 
-| URL query | Model | Actions |
+| Page | Model | Actions | RPCs it needs |
+|---|---|---|---|
+| `/browser-only.html` | browser | browser | none |
+| `/server-owned.html` | server | server | `Submit`, `Representations`, `History` |
+| `/server-model.html` | server | browser | `Present`, `Representations`, `History` |
+| `/server-actions.html` | browser | server | `Dispatch` |
+| `/` (demo) | picked at runtime from `?placement=model:server,actions:client` | | all of the above |
+
+Add `?bidder=bob` to bid as someone else, and `inspect=1` then **Open Stately inspector** to see
+the diagrams. The server's auction lasts 60 seconds from process start; restart the server for a
+fresh one.
+
+The credit check (`alice` may bid up to 100, `bob` up to 1000) lives on the server. With actions in
+the browser, the page brings a permissive check and the server applies whatever it presents, which
+is how the example shows why that rule must run server-side.
+
+The server is configured, not switched at runtime:
+
+| Variable | Values | Default |
 |---|---|---|
-| `?placement=model:client,actions:client&bidder=alice` | browser | browser |
-| `?placement=model:server,actions:server&bidder=bob` | server | server |
-| `?placement=model:server,actions:client&bidder=alice` | server | browser |
-| `?placement=model:client,actions:server&bidder=alice` | browser | server |
+| `MUFW_RPCS` | comma-separated RPC tags to serve; the rest are not routed | `Submit,Representations,History` |
+| `MUFW_AUTO_ACTIONS` | `on`, `off` | `on` |
 
-Add `&inspect=1` and click **Open Stately inspector** to see the diagrams. The server's auction
-lasts 60 seconds from process start; restart `pnpm dev:server` for a fresh one.
-
-The credit check (`alice` may bid up to 100, `bob` up to 1000) lives on the server: with
-`actions:client` the browser runs a permissive check, which is how the example shows why that rule
-must run server-side.
+`pnpm start:server` runs with the defaults, which serve only `/server-owned.html`; `pnpm dev:server`
+serves every RPC so every page works. `pnpm build:client` builds all pages in one build: each gets
+its own entry and placement chunk over a shared library chunk, the permissive credit check loads
+only on pages that run actions in the browser, and the credit table is in no client chunk.
 
 Replay the model-based paths against a live server:
 
 ```sh
 MUFW_AUTO_ACTIONS=off pnpm dev:server
-pnpm --filter @mufw/example-auction test:live
+pnpm --filter @mufw/example-auction test:live   # MUFW_SERVER overrides ws://localhost:3001/sam
 ```
 
 ## A definition, in short
