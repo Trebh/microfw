@@ -3,7 +3,7 @@ import { exploreGraph, layerLoopLocal, toXStateDefinition } from "@mufw/core"
 import { createInspector, type StatelyInspectionEvent } from "@statelyai/inspect"
 import { Effect, Layer, Stream } from "effect"
 import { Counter, Ports } from "../../core/test/fixtures/Counter.ts"
-import { layerStately } from "../src/index.ts"
+import { layerStately, replayOnStart, type StartableInspector } from "../src/index.ts"
 
 const definition = toXStateDefinition(
   Counter,
@@ -43,5 +43,47 @@ describe("layerStately", () => {
         value: "low"
       })
     }).pipe(Effect.provide(layer))
+  })
+})
+
+const recordingInspector = (calls: Array<string>): StartableInspector => ({
+  actor: (actor, snapshot) => void calls.push(`actor ${actor.sessionId} ${JSON.stringify(snapshot)}`),
+  event: (actor, event) => void calls.push(`event ${actor} ${event.type}`),
+  snapshot: (actor, snapshot) => void calls.push(`snapshot ${actor} ${JSON.stringify(snapshot)}`),
+  start: () => void calls.push("start")
+})
+
+describe("replayOnStart", () => {
+  it.effect("re-sends the actor registration and only the latest snapshot after starting", () => {
+    const calls: Array<string> = []
+    const inspector = replayOnStart(recordingInspector(calls))
+    const layer = layerStately(Counter, Ports, inspector, { definition }).pipe(
+      Layer.provideMerge(layerLoopLocal(Counter, Ports))
+    )
+    return Effect.gen(function*() {
+      const model = yield* Ports.ModelPort
+      const history = yield* Ports.HistoryPort
+      yield* model.present({ _tag: "Inc", by: 1 })
+      yield* model.present({ _tag: "Inc", by: 1 })
+      yield* history.records.pipe(Stream.take(3), Stream.runDrain)
+      yield* Effect.yieldNow
+      calls.length = 0
+
+      inspector.start()
+
+      assert.deepStrictEqual(calls, [
+        "start",
+        `actor counter {"context":{"count":0},"value":"low"}`,
+        `snapshot counter {"context":{"count":2},"value":"low"}`
+      ])
+    }).pipe(Effect.provide(layer))
+  })
+
+  it("only starts when nothing was sent yet", () => {
+    const calls: Array<string> = []
+
+    replayOnStart(recordingInspector(calls)).start()
+
+    assert.deepStrictEqual(calls, ["start"])
   })
 })

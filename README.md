@@ -57,9 +57,29 @@ Each deployment is its own page, with its own entry point and its own compositio
 | `/server-actions.html` | browser | server | `Dispatch` |
 | `/` (demo) | picked at runtime from `?placement=model:server,actions:client` | | all of the above |
 
-Add `?bidder=bob` to bid as someone else, and `inspect=1` then **Open Stately inspector** to see
-the diagrams. The server's auction lasts 60 seconds from process start; restart the server for a
-fresh one.
+Query parameters: `?session=demo-bob` picks who a page bids as where the actions run on the server
+(`server-owned`, `server-actions`); `?bidder=bob` does it where they run in the browser
+(`browser-only`, `server-model`); `?inspect=1` then **Open Stately inspector** shows the diagrams.
+The footer of each page says which one it uses. The auction opens when its loop starts, reading the loop's `Clock`, and lasts 60
+seconds. While it is `opening` the bid form is disabled and the page shows an **Open auction** button that
+submits `Open`: after a `travelTo(0)`, or on a server with `MUFW_AUTO_ACTIONS=off`, nothing else
+would reopen it, because `nap` does not run after a travel and its intents are dropped without automatic actions.
+
+An intent never carries who is bidding. The server reads the session token the client sends with
+every `Submit` and `Dispatch` (the `x-session-token` request header), looks it up and runs the
+action as that bidder; a request without a valid session fails with a typed `Unauthenticated`
+error, and a `server-owned` page (`?session=` unknown) shows it as a notice above the auction. The
+demo sessions are fixed in `src/adapters/sessionsTable.ts`:
+
+| Token | Bidder |
+|---|---|
+| `demo-alice` (default) | `alice` |
+| `demo-bob` | `bob` |
+
+Where the actions run in the browser there is no server to vouch for the bidder, and the server
+applies whatever proposal the page presents anyway, so the page states its own identity from
+`?bidder=` (default `alice`) at its composition root. A server that serves only `Submit`,
+`Representations` and `History` never believes a visitor about who is bidding.
 
 The credit check (`alice` may bid up to 100, `bob` up to 1000) lives on the server. With actions in
 the browser, the page brings a permissive check and the server applies whatever it presents, which
@@ -73,9 +93,20 @@ The server is configured, not switched at runtime:
 | `MUFW_AUTO_ACTIONS` | `on`, `off` | `on` |
 
 `pnpm start:server` runs with the defaults, which serve only `/server-owned.html`; `pnpm dev:server`
-serves every RPC so every page works. `pnpm build:client` builds all pages in one build: each gets
-its own entry and placement chunk over a shared library chunk, the permissive credit check loads
-only on pages that run actions in the browser, and the credit table is in no client chunk.
+serves every RPC so every page works.
+
+The client is built per deployment, not as one bundle:
+
+| Command | Does |
+|---|---|
+| `pnpm build:client` | one `vite build --mode <deployment>` per page into `examples/auction/dist/<deployment>` (`browser-only`, `server-owned`, `server-model`, `server-actions`, and `demo` with all four placements), then `check:bundle` |
+| `pnpm --filter @mufw/example-auction check:bundle` | fails if a deployment ships a local half it should not (a `server-owned` bundle with the local model or action runner) or lacks one it should |
+
+Each build has a single entry, so a `server-owned` bundle holds no local model or action runner, the
+permissive credit check is only in builds that run actions in the browser, and the credit table is
+in no client bundle. The server's websocket URL is a build-time setting: `VITE_SERVER_URL`, default
+`ws://localhost:3001/sam` from `examples/auction/.env`; override it per deployment in
+`.env.<deployment>` or in the environment (`VITE_SERVER_URL=wss://auction.example/sam pnpm build:client`).
 
 Replay the model-based paths against a live server:
 
@@ -83,6 +114,9 @@ Replay the model-based paths against a live server:
 MUFW_AUTO_ACTIONS=off pnpm dev:server
 pnpm --filter @mufw/example-auction test:live   # MUFW_SERVER overrides ws://localhost:3001/sam
 ```
+
+The live test replays the paths over `Present`, then submits `Open` and a bid with the `demo-alice`
+session and checks the accepted bid is alice's, and that a client with no session is refused.
 
 ## A definition, in short
 

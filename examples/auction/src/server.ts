@@ -5,9 +5,11 @@ import { Config, Effect, Layer, Schema } from "effect"
 import { HttpRouter } from "effect/http"
 import { RpcSerialization, RpcServer } from "effect/rpc"
 import { createServer } from "node:http"
+import { layerAuthenticationServer } from "./adapters/authenticationServer.ts"
 import { layerCreditCheckTable } from "./adapters/creditCheckTable.ts"
+import { layerSessionsTable } from "./adapters/sessionsTable.ts"
 import { Auction } from "./domain/Auction.ts"
-import { Ports, Rpc } from "./ports.ts"
+import { ServerPorts, ServerRpc } from "./serverPorts.ts"
 
 const PORT = 3001
 
@@ -22,13 +24,15 @@ const ServerConfig = Config.all({
 })
 
 const makeServer = (autoActions: boolean, rpcs: ReadonlyArray<RpcTag>) => {
-  const Loop = layerLoopLocal(Auction, Ports).pipe(
+  // The bidder comes from the request's session (`Authentication`), not from the layer.
+  const Loop = layerLoopLocal(Auction, ServerPorts).pipe(
     Layer.provide(layerCreditCheckTable),
     Layer.provide(Layer.succeed(AutoActions, autoActions))
   )
-  const RpcRoutes = RpcServer.layer(Rpc.exposing(rpcs)).pipe(
-    Layer.provide(Rpc.layerHandlers),
+  const RpcRoutes = RpcServer.layer(ServerRpc.exposing(rpcs)).pipe(
+    Layer.provide(ServerRpc.layerHandlers),
     Layer.provide(Loop),
+    Layer.provide(layerAuthenticationServer.pipe(Layer.provide(layerSessionsTable))),
     Layer.provide(RpcServer.layerProtocolWebsocket({ path: "/sam" })),
     Layer.provide(RpcSerialization.layerJson)
   )

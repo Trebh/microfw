@@ -4,8 +4,14 @@ header { display: flex; gap: 1rem; align-items: baseline; }
 .badge.open { background: #cfc; }
 .badge.closing { background: #fd9; }
 .badge.sold { background: #fbb; }
+.badge.opening { background: #cde; }
+.opening { color: #345; }
 .rejection { color: #c00; min-height: 1.2em; }
 footer { color: #666; font-size: 0.85rem; }
+.connection { margin: 0 0 1rem; padding: 0.4rem 0.8rem; border-radius: 0.5rem; background: #fd9; }
+.connection[hidden] { display: none; }
+.refusal { margin: 0 0 1rem; padding: 0.4rem 0.8rem; border-radius: 0.5rem; background: #fbb; }
+.refusal[hidden] { display: none; }
 .mufw-history li { cursor: pointer; font-family: ui-monospace, monospace; font-size: 0.85rem; }
 .mufw-history li.mufw-latest { font-weight: bold; background: #eef; }
 pre { background: #f6f6f6; padding: 0.5rem; font-size: 0.75rem; max-height: 20rem; overflow: auto; }

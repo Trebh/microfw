@@ -28,9 +28,43 @@ export interface StatelyInspector {
   snapshot(actor: string, snapshot: InspectedSnapshot, info?: { readonly event?: InspectedEvent }): void
 }
 
+/** A `StatelyInspector` that can be started; `createBrowserInspector({ autoStart: false })` is one. */
+export interface StartableInspector extends StatelyInspector {
+  start(): void
+}
+
+type Registration = Parameters<StatelyInspector["actor"]>
+type Update = Parameters<StatelyInspector["snapshot"]>
+
 export interface StatelyOptions {
   /** Usually `toXStateDefinition(def, exploreGraph(def, explore))`. */
   readonly definition: XStateDefinition
+}
+
+/**
+ * Wraps an inspector that buffers events until `start()`, remembering the actor registration and
+ * the latest snapshot. Starting re-sends both: the buffer is bounded, so on a long session it
+ * has dropped the registration and the inspector would draw nothing.
+ */
+export const replayOnStart = (inspector: StartableInspector): StartableInspector => {
+  let registration: Registration | undefined
+  let latest: Update | undefined
+  return {
+    actor: (...args) => {
+      registration = args
+      inspector.actor(...args)
+    },
+    event: (actor, event) => inspector.event(actor, event),
+    snapshot: (...args) => {
+      latest = args
+      inspector.snapshot(...args)
+    },
+    start: () => {
+      inspector.start()
+      if (registration !== undefined) inspector.actor(...registration)
+      if (latest !== undefined) inspector.snapshot(...latest)
+    }
+  }
 }
 
 const TRAVEL_EVENT: InspectedEvent = { type: "@mufw.travel" }

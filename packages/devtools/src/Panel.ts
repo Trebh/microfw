@@ -1,5 +1,5 @@
 import type { AnyDefinition, Ports, StepRecord } from "@mufw/core"
-import { Effect, Layer, Option, Stream } from "effect"
+import { Effect, FiberSet, Layer, Option, Stream } from "effect"
 import type { Hole } from "uhtml"
 
 type Tag = (template: TemplateStringsArray, ...values: Array<unknown>) => Hole
@@ -14,15 +14,11 @@ export interface PanelOptions {
 
 const loadUhtml = Effect.promise(() => import("uhtml"))
 
-/** A travel record does not carry its source; the latest earlier non-travel record with the same model is it. */
-const travelSource = <D extends AnyDefinition>(records: ReadonlyArray<StepRecord<D>>, travel: StepRecord<D>) => {
-  const model = JSON.stringify(travel.model)
-  const source = records.findLast((r) => r.seq < travel.seq && r.kind !== "travel" && JSON.stringify(r.model) === model)
-  return source === undefined ? "↩" : `↩ ${source.seq}`
-}
+const travelSource = <D extends AnyDefinition>(travel: StepRecord<D>) =>
+  travel.travelledTo === undefined ? "↩" : `↩ ${travel.travelledTo}`
 
-const label = <D extends AnyDefinition>(records: ReadonlyArray<StepRecord<D>>, record: StepRecord<D>) => {
-  if (record.kind === "travel") return travelSource(records, record)
+const label = <D extends AnyDefinition>(record: StepRecord<D>) => {
+  if (record.kind === "travel") return travelSource(record)
   return Option.match(record.proposal, { onNone: () => "", onSome: (proposal) => proposal._tag })
 }
 
@@ -37,24 +33,30 @@ export const layerPanel = <D extends AnyDefinition>(ports: Ports<D>, options: Pa
       const uhtml = options.render && options.html ? undefined : yield* loadUhtml
       const render: Render = options.render ?? uhtml!.render
       const html: Tag = options.html ?? uhtml!.html
+      const runFork = yield* FiberSet.makeRuntime()
       const records: Array<StepRecord<D>> = []
       let selected: number | undefined
       const select = (seq: number) => {
         selected = seq
-        Effect.runFork(history.travelTo(seq).pipe(Effect.catchTag("NoSuchStep", (e) => Effect.logWarning(e))))
+        runFork(history.travelTo(seq).pipe(Effect.catchTag("NoSuchStep", (e) => Effect.logWarning(e))))
       }
-      const row = (record: StepRecord<D>, latest: number) =>
+      const row = (record: StepRecord<D>, latest: number | undefined) =>
         html`<li class=${record.seq === latest ? "mufw-latest" : ""} onclick=${() => select(record.seq)}>
-          #${record.seq} ${record.kind} ${label(records, record)} → ${record.representation.controlState}
+          #${record.seq} ${record.kind} ${label(record)} → ${record.representation.controlState}
         </li>`
       const paint = () => {
-        const latest = records.length - 1
-        const shown = records[selected ?? latest]
+        const latest = records.at(-1)?.seq
+        const shown = records.find((r) => r.seq === (selected ?? latest))
         const detail = shown && JSON.stringify({ model: shown.model, representation: shown.representation }, null, 2)
         render(options.root, html`<ol class="mufw-history">${records.map((r) => row(r, latest))}</ol><pre>${detail}</pre>`)
       }
       const append = (record: StepRecord<D>) =>
         Effect.sync(() => {
+          // An `init` record opens a history: a restarted server sends a new one after the old.
+          if (record.kind === "init") {
+            records.length = 0
+            selected = undefined
+          }
           records.push(record)
           paint()
         })

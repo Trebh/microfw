@@ -6,7 +6,8 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "dev:client": "vite",
-    "build:client": "vite build",
+    "build:client": "tsx scripts/build-client.ts && pnpm run check:bundle",
+    "check:bundle": "tsx scripts/check-bundle.ts",
     "dev:server": "MUFW_RPCS=Submit,Present,Dispatch,Representations,History,TravelTo tsx src/server.ts",
     "start:server": "tsx src/server.ts",
     "test:live": "tsx test/live.ts"

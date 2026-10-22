@@ -7,6 +7,10 @@ export const auctionTestModel: TestModelOptions<typeof Auction> = {
   explore: exploreAuction,
   serialize: serializeAuction,
   states: {
+    opening: (representation) => {
+      assert.strictEqual(representation.controlState, "opening")
+      assert.strictEqual(representation.remainingSeconds, 60)
+    },
     open: (representation) => {
       assert.ok(representation.remainingSeconds > 10, `${representation.remainingSeconds}s left`)
       assert.strictEqual(representation.controlState, "open")

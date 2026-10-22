@@ -1,5 +1,6 @@
 import {
   type AnyDefinition,
+  type DispatchRefused,
   exploreGraph,
   type Explore,
   type ExploreOptions,
@@ -38,9 +39,9 @@ export class PathFailure extends Schema.TaggedError<PathFailure>()("PathFailure"
   message: Schema.String
 }) {}
 
-/** Performs one transition of a path on the real system. */
-export interface Driver<D extends AnyDefinition, R> {
-  readonly step: (step: PathStep<D>) => Effect.Effect<void, never, R>
+/** Performs one transition of a path on the real system. `E` is how the transition itself can fail. */
+export interface Driver<D extends AnyDefinition, R, E = never> {
+  readonly step: (step: PathStep<D>) => Effect.Effect<void, E, R>
   /** `true` when the transition is applied by the time `step` returns, so no waiting is needed. */
   readonly appliesOnReturn: boolean
 }
@@ -52,10 +53,10 @@ export interface TestModel<D extends AnyDefinition> {
   /** Test name of a path. */
   readonly describe: (path: Path<D>) => string
   /** Resets to the `init` record, then drives each step and asserts the node reached. */
-  readonly run: <R = ModelPort<D>>(
+  readonly run: <R = ModelPort<D>, E = never>(
     path: Path<D>,
-    driver?: Driver<D, R>
-  ) => Effect.Effect<void, PathFailure, ModelPort<D> | HistoryPort<D> | R>
+    driver?: Driver<D, R, E>
+  ) => Effect.Effect<void, PathFailure | E, ModelPort<D> | HistoryPort<D> | R>
 }
 
 const STEP_TIMEOUT = "5 seconds"
@@ -66,14 +67,19 @@ export const presentDriver = <D extends AnyDefinition>(ports: Ports<D>): Driver<
   step: (step) => ports.ModelPort.use((model) => model.present(step.proposal))
 })
 
-/** Dispatches an intent for each step, so the transition goes through the actions. */
-export const intentDriver = <D extends AnyDefinition>(
-  ports: Ports<D>,
+/**
+ * Dispatches an intent for each step, so the transition goes through the actions. A refused
+ * dispatch fails the step with `DispatchRefused`; the per-request services of `ports` are
+ * required of whoever runs the path.
+ */
+export const intentDriver = <D extends AnyDefinition, R = never>(
+  ports: Ports<D, R>,
   intentFor: (step: PathStep<D>) => IntentOf<D>
-): Driver<D, IntentPort<D>> => ({
+): Driver<D, IntentPort<D> | R, DispatchRefused> => ({
   appliesOnReturn: false,
   step: (step) => ports.IntentPort.use((intents) => intents.dispatch(intentFor(step)))
 })
+
 
 const describePath = <D extends AnyDefinition>(path: Path<D>) => {
   if (path.steps.length === 0) return `reaches ${path.target} (initial)`
@@ -115,7 +121,7 @@ const makeRunner = <D extends AnyDefinition>(ports: Ports<D>, graph: Graph<D>, o
     })
   }
 
-  return <R>(path: Path<D>, driver: Driver<D, R>) =>
+  return <R, E>(path: Path<D>, driver: Driver<D, R, E>) =>
     Effect.gen(function*() {
       const model = yield* ports.ModelPort
       yield* ports.HistoryPort.use((history) => history.travelTo(0)).pipe(Effect.orDie)
@@ -147,6 +153,6 @@ export const createTestModel = <D extends AnyDefinition>(
     shortestPaths: () => shortestPaths(graph),
     simplePaths: () => simplePaths(graph),
     describe: describePath,
-    run: (path, driver) => runPath(path, driver ?? (presentDriver(ports) as Driver<D, any>))
+    run: (path, driver) => runPath(path, driver ?? (presentDriver(ports) as Driver<D, any, any>))
   }
 }

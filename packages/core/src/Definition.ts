@@ -63,7 +63,7 @@ export interface SamDefinition<
   R
 > extends SamSchemas<M, P, I, Rp>, SamBehaviour<M, P, I, Rp, R> {}
 
-export type AnyDefinition = SamDefinition<any, any, any, any, any>
+export type AnyDefinition = SamDefinition<Codec<any>, Codec<any>, Codec<any>, Codec<any>, any>
 
 export type ModelOf<D extends AnyDefinition> = D["model"]["Type"]
 export type ProposalOf<D extends AnyDefinition> = D["proposal"]["Type"]

@@ -1,4 +1,12 @@
+import { Layer } from "effect"
 import { runPage } from "./app.ts"
+import { describeIdentity, parseIdentity } from "./placement.ts"
 import { browserOnly } from "./placements/browserOnly.ts"
 
-runPage(browserOnly(), "model:client,actions:client")
+const identity = parseIdentity(location.search)
+
+runPage(
+  browserOnly(identity.bidder),
+  `model:client,actions:client · ${describeIdentity("client", identity)}`,
+  Layer.empty
+)

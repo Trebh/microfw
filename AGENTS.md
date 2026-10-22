@@ -29,7 +29,7 @@ docs/                ARCHITECTURE.md, architecture/*.md, TODO.md
 | `pnpm dev:server` | demo server on :3001 serving every RPC (`MUFW_AUTO_ACTIONS=off` disables automatic actions) |
 | `pnpm start:server` | server with the production defaults (`MUFW_RPCS=Submit,Representations,History`) |
 | `pnpm dev:client` | vite on :5173: one page per deployment plus the demo page |
-| `pnpm build:client` | builds the pages into `examples/auction/dist` |
+| `pnpm build:client` | one `vite build` per deployment into `examples/auction/dist/<deployment>`, then `check:bundle` |
 | `pnpm --filter @mufw/example-auction test:live` | replays the path tests against a running server |
 
 A change is done when `pnpm typecheck` and `pnpm test` pass and the changed behaviour has been
@@ -105,7 +105,7 @@ Code stays in `Effect`/`Stream`/`Layer` through every layer of the application. 
 | Boundary | Place |
 |---|---|
 | Process entry point | `runPage` in `examples/auction/src/client/app.ts`, `server.ts`, `test/live.ts` |
-| DOM event handler | `layerMount` dispatch, `layerPanel` click (see TODO: should use the layer's runtime) |
+| DOM event handler | `layerMount` dispatch, `layerPanel` click, through a `FiberSet.makeRuntime` runner captured from the layer |
 | Test harness | `it.effect` / `layer` from `@effect/vitest` |
 
 Anywhere else, return the effect and let the caller compose it. Do not convert an `Effect` to a

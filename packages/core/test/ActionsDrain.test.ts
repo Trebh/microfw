@@ -1,12 +1,21 @@
 import { assert, describe, it } from "@effect/vitest"
 import { Effect, Layer, Option } from "effect"
 import { TestClock } from "effect/testing"
-import { AutoActions, layerLoopLocal } from "../src/index.ts"
+import { AutoActions, layerActionsDrain, layerIntentBus, layerLoopLocal, layerModelLocal } from "../src/index.ts"
 import { Counter, Ports } from "./fixtures/Counter.ts"
-import { awaitFirst, collect, settle } from "./support.ts"
+import { awaitFirst, captureLogs, collect, settle } from "./support.ts"
 
 const Loop = layerLoopLocal(Counter, Ports)
 const LoopWithoutAutoActions = Loop.pipe(Layer.provide(Layer.succeed(AutoActions, false)))
+
+const DyingRunner = Layer.succeed(Ports.ActionRunner, {
+  run: (intent) => (intent._tag === "Fail" ? Effect.die("boom") : Effect.succeed({ _tag: "Inc", by: 1 } as const))
+})
+
+const DyingLoop = layerActionsDrain(Counter, Ports).pipe(
+  Layer.provideMerge(Layer.merge(layerModelLocal(Counter, Ports), DyingRunner)),
+  Layer.provideMerge(layerIntentBus(Counter, Ports))
+)
 
 const proposalTags = (records: ReadonlyArray<{ readonly proposal: Option.Option<{ readonly _tag: string }> }>) =>
   records.map((record) => Option.match(record.proposal, { onNone: () => "-", onSome: (p) => p._tag }))
@@ -57,4 +66,23 @@ describe("layerActionsDrain", () => {
       assert.deepStrictEqual(afterAuto, ["-", "Inc"])
       assert.strictEqual(next.controlState, "high")
     }).pipe(Effect.provide(LoopWithoutAutoActions)))
+
+  it.effect("logs a defect with the intent tag and cause, and keeps draining", () => {
+    const logs = captureLogs()
+    return Effect.gen(function*() {
+      const bus = yield* Ports.IntentBus
+      const model = yield* Ports.ModelPort
+
+      yield* bus.dispatch({ _tag: "Fail" })
+      yield* settle
+      yield* bus.dispatch({ _tag: "Inc", by: 1 })
+      const next = yield* awaitFirst(model.representations, (r) => r.count === 1)
+
+      assert.strictEqual(next.controlState, "low")
+      assert.deepStrictEqual(logs.entries.map((entry) => [entry.level, entry.message]), [
+        ["Error", ["action died", "Fail"]]
+      ])
+      assert.include(logs.entries[0]?.cause, "boom")
+    }).pipe(Effect.provide(DyingLoop.pipe(Layer.provide(logs.layer))))
+  })
 })

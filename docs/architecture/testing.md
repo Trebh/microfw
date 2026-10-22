@@ -55,6 +55,10 @@ A driver needs only the ports it uses, so the same path runs against `layerLoopL
 remote ports over `Rpc.layerClientTest`, or against a live server over a websocket
 (`examples/auction/test/live.ts`).
 
+`Driver<D, R, E>` types how a transition can fail: `intentDriver` fails with `DispatchRefused`, which
+`TestModel.run` adds to `PathFailure`, and its `R` includes the per-request services of the ports it
+was built from.
+
 ## Writing a test model
 
 - Keep `explore` small and bounded: one representative proposal per kind of transition.

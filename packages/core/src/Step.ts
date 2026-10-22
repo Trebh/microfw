@@ -21,9 +21,10 @@ export interface StepRecord<D extends AnyDefinition> {
   readonly proposal: Option.Option<ProposalOf<D>>
   readonly model: ModelOf<D>
   readonly representation: RepresentationOf<D>
+  /** The seq whose model and representation a `travel` record restored; absent on other records. */
+  readonly travelledTo?: number
 }
 
-/** The definition's schemas carry no services, but a generic `D` erases that to `any`, hence the cast. */
 export const stepRecordSchema = <D extends AnyDefinition>(def: D): Schema.Codec<StepRecord<D>, unknown> =>
   Schema.Struct({
     seq: Schema.Int,
@@ -31,8 +32,9 @@ export const stepRecordSchema = <D extends AnyDefinition>(def: D): Schema.Codec<
     kind: Schema.Literals(["init", "step", "travel"]),
     proposal: Schema.Option(def.proposal),
     model: def.model,
-    representation: def.representation
-  }) as unknown as Schema.Codec<StepRecord<D>, unknown>
+    representation: def.representation,
+    travelledTo: Schema.optional(Schema.Int)
+  })
 
 export class NoSuchStep extends Schema.TaggedError<NoSuchStep>()("NoSuchStep", {
   seq: Schema.Int
