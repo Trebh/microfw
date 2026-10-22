@@ -26,6 +26,26 @@ Consumers:
 | `unreachableControlStates(def, graph)` | declared control states no node carries |
 | `toXStateDefinition(def, graph)` | `{ id, initial, states: { [node]: { on: { [tag]: target \| [{ target }…] } } } }` |
 
+## Merging a recorded history
+
+`mergeHistory(graph, records, { key? })` is pure. It adds what a runtime history crossed to an
+explored graph and returns a `MergedGraph`: a `Graph` plus `observed` and `unexplored` edge lists.
+
+- A transition is a `step` record with a proposal, read against the record just before it, whatever
+  that record's kind: after a `travel` the step leaves the restored state. `init` and `travel`
+  records are not transitions. A step whose predecessor is not in `records` (its seq is not
+  `previous.seq + 1`: evicted or not exported) has no known source and is skipped.
+- Each transition becomes the edge `key(previous.representation) → key(record.representation)` labelled
+  with the proposal. `key` must be the one used to explore (default: the control state).
+- An edge exploration already holds is not duplicated: proposals are compared by value, whatever the
+  order of their fields. It is listed in `observed` only. An edge exploration missed is appended to
+  `edges`, and listed in `observed` and in `unexplored`: the sample alphabet to widen.
+- A node the history reached and exploration did not is added, with the recorded model as its
+  representative.
+- `states` and `transitions` stay those of exploration, so `shortestPaths` and `simplePaths` still
+  walk explored behaviour only. `toXStateDefinition` and `unreachableControlStates` read the merged
+  `nodes` and `edges`.
+
 ## Running a path
 
 `createTestModel(def, ports, { explore, states, key?, serialize?, limit? })` explores the graph

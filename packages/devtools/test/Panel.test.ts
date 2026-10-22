@@ -1,9 +1,10 @@
 import { assert, describe, it } from "@effect/vitest"
+import { decodeHistoryJson } from "@mufw/core"
 import { Context, Deferred, Effect, Exit, Layer, Option, Scope, Stream } from "effect"
 import { Document } from "uhtml/dom"
 import init from "uhtml/init"
-import { Ports } from "../../core/test/fixtures/Counter.ts"
-import { layerPanel } from "../src/index.ts"
+import { Counter, Ports } from "../../core/test/fixtures/Counter.ts"
+import { type ExportedFile, layerHistoryList, layerPanel } from "../src/index.ts"
 
 interface DomNode {
   readonly localName?: string
@@ -40,7 +41,7 @@ const panelWithTravel = (travelTo: () => Effect.Effect<void>) => {
     Layer.succeed(Ports.HistoryPort, { records: Stream.make(initial), travelTo }),
     Layer.succeed(Marker, "from-layer")
   )
-  const layer = layerPanel(Ports, { root, render, html }).pipe(Layer.provideMerge(deps))
+  const layer = layerPanel(Counter, Ports, { root, render, html }).pipe(Layer.provideMerge(deps))
   return { root, layer }
 }
 
@@ -112,7 +113,7 @@ describe("layerPanel travel rows", () => {
     const travel = { ...step(3, 1), kind: "travel" as const, proposal: Option.none(), travelledTo: 1 }
     const records = Stream.make(initial, step(1, 1), step(2, 1), travel)
     const history = Layer.succeed(Ports.HistoryPort, { records, travelTo: () => Effect.void })
-    const layer = layerPanel(Ports, { root, render, html }).pipe(Layer.provideMerge(history))
+    const layer = layerPanel(Counter, Ports, { root, render, html }).pipe(Layer.provideMerge(history))
     return Effect.gen(function*() {
       yield* rowsRendered(root, 4)
 
@@ -128,7 +129,7 @@ describe("layerPanel across a restarted history", () => {
     const root = document.createElement("div") as unknown as Element
     const records = Stream.make(initial, step(1, 1), step(2, 2), initial, step(1, 1))
     const history = Layer.succeed(Ports.HistoryPort, { records, travelTo: () => Effect.void })
-    const layer = layerPanel(Ports, { root, render, html }).pipe(Layer.provideMerge(history))
+    const layer = layerPanel(Counter, Ports, { root, render, html }).pipe(Layer.provideMerge(history))
     return Effect.gen(function*() {
       yield* rowsRendered(root, 2)
       yield* Effect.yieldNow
@@ -136,6 +137,51 @@ describe("layerPanel across a restarted history", () => {
       const rows = findElements(root as unknown as DomNode, "li")
 
       assert.strictEqual(rows.length, 2)
+    }).pipe(Effect.provide(layer))
+  })
+})
+
+describe("layerHistoryList", () => {
+  it.effect("a row click shows that record and does not travel", () => {
+    const root = document.createElement("div") as unknown as Element
+    const travelled = Deferred.makeUnsafe<void>()
+    const records = Stream.make(initial, step(1, 1), step(2, 2))
+    const history = Layer.succeed(Ports.HistoryPort, { records, travelTo: () => Deferred.succeed(travelled, undefined).pipe(Effect.asVoid) })
+    const layer = layerHistoryList(Counter, Ports, { root, render, html }).pipe(Layer.provideMerge(history))
+    return Effect.gen(function*() {
+      yield* rowsRendered(root, 3)
+
+      findElements(root as unknown as DomNode, "li")[1]!.dispatchEvent(new Event("click"))
+      yield* Effect.yieldNow
+      yield* Effect.yieldNow
+
+      const detail = findElement(root as unknown as DomNode, "pre")?.textContent ?? ""
+      assert.deepStrictEqual(JSON.parse(detail).model, { count: 1 })
+      assert.isFalse(yield* Deferred.isDone(travelled))
+    }).pipe(Effect.provide(layer))
+  })
+})
+
+describe("layerPanel export", () => {
+  it.effect("saves the retained history as JSON that decodes back to the same records", () => {
+    const root = document.createElement("div") as unknown as Element
+    const saved = Deferred.makeUnsafe<ExportedFile>()
+    const records = [initial, step(1, 1), step(2, 2)]
+    const history = Layer.succeed(Ports.HistoryPort, { records: Stream.fromIterable(records), travelTo: () => Effect.void })
+    const layer = layerPanel(Counter, Ports, {
+      root,
+      render,
+      html,
+      save: (file) => Deferred.succeed(saved, file).pipe(Effect.asVoid)
+    }).pipe(Layer.provideMerge(history))
+    return Effect.gen(function*() {
+      yield* rowsRendered(root, 3)
+
+      findElement(root as unknown as DomNode, "button")!.dispatchEvent(new Event("click"))
+      const file = yield* Deferred.await(saved)
+
+      const decoded = yield* decodeHistoryJson(Counter)(file.json)
+      assert.deepStrictEqual(decoded, records)
     }).pipe(Effect.provide(layer))
   })
 })

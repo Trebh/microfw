@@ -1,30 +1,33 @@
 import { BrowserSocket } from "@effect/platform-browser"
+import type { AnyDefinition } from "@mufw/core"
 import { Effect, Layer, Schema } from "effect"
-import { type RpcMiddleware, RpcSerialization } from "effect/rpc"
-import type { Authentication } from "../../authentication.ts"
-import { Rpc } from "../../ports.ts"
+import { type RpcClient, RpcSerialization } from "effect/rpc"
+import { samPath } from "../../samPath.ts"
 import { layerProtocol } from "../connection.ts"
+import { ServerOrigin } from "../serverOrigin.ts"
 
-const WebSocketUrl = Schema.String.check(Schema.isPattern(/^wss?:\/\/.+/, { expected: "a ws:// or wss:// URL" }))
+const decodeServerOrigin = Schema.decodeUnknownEffect(ServerOrigin)
 
-const decodeWebSocketUrl = Schema.decodeUnknownEffect(WebSocketUrl)
-
-const layerSocket = Layer.unwrap(
-  decodeWebSocketUrl(import.meta.env.VITE_SERVER_URL).pipe(Effect.map(BrowserSocket.layerWebSocket))
-)
+const layerSocket = (def: AnyDefinition) =>
+  Layer.unwrap(
+    decodeServerOrigin(import.meta.env.VITE_SERVER_URL).pipe(
+      Effect.map((origin) => BrowserSocket.layerWebSocket(`${origin}${samPath(def)}`))
+    )
+  )
 
 /**
- * The server's websocket URL is a build-time setting of the deployment (`VITE_SERVER_URL`, defaulted
- * in `.env`). It is decoded when the layer is built, so a bad value is a `SchemaError` in the layer's
- * error channel at the composition root. Call once per placement: the returned layer value is built
- * once, so all its remote ports share one connection. `authentication` is how the placement's
- * requests carry the session. It provides `Rpc.Client` and `Connection`; a placement merges
- * `Connection` into its output with `Layer.provideMerge` so the page can show it.
+ * The connection to the server's endpoint for `def`, under `client`: that definition's RPC client,
+ * which gets its protocol from here. The server's origin is a build-time setting of the deployment
+ * (`VITE_SERVER_URL`, defaulted in `.env`); the path is the definition's (`samPath`). The origin is
+ * decoded when the layer is built, so a bad value is a `SchemaError` in the layer's error channel
+ * at the composition root. Call once per placement and definition: the returned layer value is
+ * built once, so that definition's remote ports share one connection, and the protocol is built
+ * afresh, so two definitions never share a socket. It provides `client` and `Connection`; a
+ * placement merges `Connection` into its output with `Layer.provideMerge` so the page can show it.
  */
-export const transport = (authentication: Layer.Layer<RpcMiddleware.ForClient<Authentication>>) =>
-  Rpc.layerClient.pipe(
-    Layer.provide(authentication),
-    Layer.provideMerge(layerProtocol),
-    Layer.provide(layerSocket),
+export const transport = <Client>(def: AnyDefinition, client: Layer.Layer<Client, never, RpcClient.Protocol>) =>
+  client.pipe(
+    Layer.provideMerge(Layer.fresh(layerProtocol)),
+    Layer.provide(layerSocket(def)),
     Layer.provide(RpcSerialization.layerJson)
   )

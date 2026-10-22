@@ -37,3 +37,26 @@ export const layerMount = <D extends AnyDefinition, R = never>(ports: Ports<D>, 
       yield* Effect.forkScoped(Stream.runForEach(model.representations, paint))
     })
   )
+
+export interface ReadOnlyMountOptions<D extends AnyDefinition> {
+  readonly root: Element
+  readonly view: (representation: RepresentationOf<D>) => Hole
+  /** Default: uhtml's `render`, loaded on mount because uhtml needs a DOM at import time. */
+  readonly render?: Render
+}
+
+/**
+ * Re-renders `view` into `root` on every representation. It requires `ModelPort` alone and the view
+ * is given no `dispatch`, so an island mounted with it cannot send an intent and needs no
+ * `IntentPort`: a model read from a source that only serves representations is enough.
+ */
+export const layerMountReadOnly = <D extends AnyDefinition>(ports: Ports<D>, options: ReadOnlyMountOptions<D>) =>
+  Layer.effectDiscard(
+    Effect.gen(function*() {
+      const model = yield* ports.ModelPort
+      const render = options.render ?? (yield* defaultRender)
+      const paint = (representation: RepresentationOf<D>) =>
+        Effect.sync(() => render(options.root, options.view(representation)))
+      yield* Effect.forkScoped(Stream.runForEach(model.representations, paint))
+    })
+  )

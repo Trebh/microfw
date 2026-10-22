@@ -121,6 +121,10 @@ importers:
       effect:
         specifier: ^4.0.5
         version: 4.0.5
+    devDependencies:
+      '@mufw/rpc':
+        specifier: workspace:*
+        version: link:../rpc
 
   packages/view-uhtml:
     dependencies:

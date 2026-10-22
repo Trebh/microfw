@@ -1,5 +1,6 @@
+import { Option } from "effect"
 import type { AnyDefinition, ModelOf, ProposalOf, RepresentationOf } from "./Definition.ts"
-import { applyProposal } from "./Step.ts"
+import { applyProposal, type StepRecord } from "./Step.ts"
 
 /** Sample alphabet of proposals to try from a state, written next to the definition. */
 export type Explore<D extends AnyDefinition> = (
@@ -189,4 +190,87 @@ export const toXStateDefinition = <D extends AnyDefinition>(def: D, graph: Graph
     states[node] = { on }
   }
   return { id: def.name, initial: graph.initial, states }
+}
+
+export type MergeOptions<D extends AnyDefinition> = Pick<ExploreOptions<D>, "key">
+
+/**
+ * An explored graph plus the transitions a history crossed. `states` and `transitions` stay those
+ * of exploration: path generation walks explored behaviour only.
+ */
+export interface MergedGraph<D extends AnyDefinition> extends Graph<D> {
+  /** Every edge the history crossed, explored or not; each is an element of `edges`. */
+  readonly observed: ReadonlyArray<GraphEdge<D>>
+  /** The observed edges exploration did not produce: transitions the sample alphabet missed. */
+  readonly unexplored: ReadonlyArray<GraphEdge<D>>
+}
+
+interface ObservedTransition<D extends AnyDefinition> {
+  readonly from: GraphNode<D>
+  readonly to: GraphNode<D>
+  readonly proposal: ProposalOf<D>
+}
+
+/** JSON with sorted object keys: the same proposal read back from a history or written in a sample is one edge. */
+const canonical = (value: unknown): string =>
+  JSON.stringify(value, (_, nested: unknown) =>
+    typeof nested === "object" && nested !== null && !Array.isArray(nested)
+      ? Object.fromEntries(Object.entries(nested).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)))
+      : nested)
+
+const nodeOf = <D extends AnyDefinition>(
+  record: StepRecord<D>,
+  key: (representation: RepresentationOf<D>) => string
+): GraphNode<D> => ({ key: key(record.representation), model: record.model, representation: record.representation })
+
+/**
+ * The transitions of a history: a `step` record with a proposal, read against the record just
+ * before it, whatever its kind (after a `travel` the step leaves the restored state). `init` and
+ * `travel` records are not transitions, and a step whose predecessor is missing from `records`
+ * (evicted, or never exported) has no known source and is skipped.
+ */
+const observedTransitions = <D extends AnyDefinition>(
+  records: ReadonlyArray<StepRecord<D>>,
+  key: (representation: RepresentationOf<D>) => string
+): ReadonlyArray<ObservedTransition<D>> =>
+  records.flatMap((record, index): ReadonlyArray<ObservedTransition<D>> => {
+    const previous = records[index - 1]
+    if (previous === undefined || record.kind !== "step" || previous.seq !== record.seq - 1) return []
+    return Option.toArray(
+      Option.map(record.proposal, (proposal) => ({ from: nodeOf(previous, key), to: nodeOf(record, key), proposal }))
+    )
+  })
+
+/**
+ * Adds what a history crossed to an explored graph: the nodes it reached that exploration did not,
+ * and one edge per distinct `key(previous) --proposal--> key(next)` transition. An edge exploration
+ * already holds is marked observed, not duplicated. `key` must be the one the graph was explored
+ * with (default: the control state), since observed states are keyed by their recorded
+ * representation.
+ */
+export const mergeHistory = <D extends AnyDefinition>(
+  graph: Graph<D>,
+  records: ReadonlyArray<StepRecord<D>>,
+  options: MergeOptions<D> = {}
+): MergedGraph<D> => {
+  const key = options.key ?? ((representation: RepresentationOf<D>) => representation.controlState)
+  const nodes = new Map(graph.nodes)
+  const edgeById = new Map(graph.edges.map((edge) => [canonical(edge), edge]))
+  const exploredIds = new Set(edgeById.keys())
+  const observedById = new Map<string, GraphEdge<D>>()
+  for (const transition of observedTransitions(records, key)) {
+    for (const node of [transition.from, transition.to]) if (!nodes.has(node.key)) nodes.set(node.key, node)
+    const crossed = { from: transition.from.key, to: transition.to.key, proposal: transition.proposal }
+    const id = canonical(crossed)
+    const edge = edgeById.get(id) ?? crossed
+    edgeById.set(id, edge)
+    observedById.set(id, edge)
+  }
+  return {
+    ...graph,
+    nodes,
+    edges: [...edgeById.values()],
+    observed: [...observedById.values()],
+    unexplored: [...observedById].filter(([id]) => !exploredIds.has(id)).map(([, edge]) => edge)
+  }
 }

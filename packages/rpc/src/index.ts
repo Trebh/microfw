@@ -14,7 +14,7 @@ import {
   type StepRecord,
   stepRecordSchema
 } from "@mufw/core"
-import { Context, Effect, Layer, Schedule, Schema, Stream } from "effect"
+import { Context, Deferred, type Duration, Effect, Layer, Queue, Schedule, Schema, Stream } from "effect"
 import { Rpc, RpcClient, type RpcClientError, RpcGroup, type RpcMiddleware, type RpcSchema, RpcTest } from "effect/rpc"
 
 /** A request that carries no identity, or one the server does not accept. */
@@ -96,14 +96,129 @@ const socketLoss: Record<string, true> = {
 }
 
 /**
- * A dropped socket fails the streams running on it; the protocol redials in the background, and
- * a stream that subscribes again once it is back resumes. Other client errors (a malformed
- * frame) stay defects.
+ * An HTTP request that never reached the server (`TransportError`) or whose response body was cut
+ * (`DecodeError`, what a dropped stream surfaces as). A status error or a malformed body is not a loss.
  */
-const resubscribe = Schedule.spaced("1 second").pipe(
-  Schedule.setInputType<RpcClientError.RpcClientError>(),
-  Schedule.while(({ input }) => input.reason._tag in socketLoss)
-)
+const httpLoss: Record<string, true> = {
+  TransportError: true,
+  DecodeError: true
+}
+
+const isSocketLost = (error: RpcClientError.RpcClientError) => error.reason._tag in socketLoss
+
+const isConnectionLost = (error: RpcClientError.RpcClientError) => {
+  const reason = error.reason
+  return reason._tag === "HttpError" ? reason.kind in httpLoss : isSocketLost(error)
+}
+
+const redialWhile = (every: Duration.Input, lost: (error: RpcClientError.RpcClientError) => boolean) =>
+  Schedule.spaced(every).pipe(
+    Schedule.setInputType<RpcClientError.RpcClientError>(),
+    Schedule.while(({ input }) => lost(input))
+  )
+
+/**
+ * A lost connection fails the streams running on it: a dropped socket, which the protocol redials
+ * in the background, or an HTTP stream cut or refused, which only a new request replaces. A stream
+ * that subscribes again once the server is back resumes. Other client errors (a malformed frame)
+ * stay defects.
+ */
+const resubscribe = redialWhile("1 second", isConnectionLost)
+
+/** Only a socket refusal proves the request was not written, so only it may be sent again. */
+const holdUntilConnected = redialWhile("250 millis", isSocketLost)
+
+type ClientProtocol = RpcClient.Protocol["Service"]
+
+/** A request waiting for its turn to be written; `abandoned` is set by a caller that stopped waiting. */
+interface PendingRequest {
+  readonly attempt: Effect.Effect<void, RpcClientError.RpcClientError>
+  readonly written: Deferred.Deferred<void, RpcClientError.RpcClientError>
+  abandoned: boolean
+}
+
+/**
+ * Writes the queued requests one at a time, in the order they were queued. `send` decides on the
+ * call, not when the effect it returns runs: it reads the protocol's last socket error and
+ * encodes the frame as it is invoked, so each attempt calls it again. An abandoned request is not
+ * attempted, so a request interrupted while it waits is never written.
+ */
+const writeInOrder = (pending: Queue.Dequeue<PendingRequest>) =>
+  Queue.take(pending).pipe(
+    Effect.flatMap((request) => {
+      const attempt = Effect.suspend(() => (request.abandoned ? Effect.void : request.attempt))
+      return Effect.exit(attempt.pipe(Effect.retry(holdUntilConnected))).pipe(
+        Effect.flatMap((exit) => Deferred.done(request.written, exit))
+      )
+    }),
+    Effect.forever
+  )
+
+/** The requests waiting to be written, and the signal that the protocol's scope has closed. */
+interface RequestQueue {
+  readonly pending: Queue.Enqueue<PendingRequest>
+  readonly closed: Deferred.Deferred<never>
+}
+
+/**
+ * Every request goes through one queue and one writer fiber, which is what makes the order strict:
+ * a lock would not, because `Semaphore` wakes its waiters from a scheduled task, and a request
+ * issued before that task runs finds the permit free and overtakes the waiter. The caller waits for
+ * its request to be written, not for the response. Interrupting it marks the request abandoned
+ * (a write already under way completes, as the writer fiber is not the caller's). Once the scope
+ * has closed the writer is gone, so a caller still waiting, and any later one, is interrupted, as
+ * `RpcClient` interrupts its own calls when its scope closes. The other messages skip the queue:
+ * an interrupt follows the fiber that wrote (or abandoned) its request, and an ack answers a
+ * response of the live connection, which a held write must not stall.
+ */
+const holdRequest = (protocol: ClientProtocol, requests: RequestQueue): ClientProtocol => ({
+  ...protocol,
+  send: (clientId, message, transferables) => {
+    const attempt = Effect.suspend(() => protocol.send(clientId, message, transferables))
+    if (message._tag !== "Request") return attempt
+    return Effect.suspend(() => {
+      const request: PendingRequest = { attempt, written: Deferred.makeUnsafe(), abandoned: false }
+      return Queue.offer(requests.pending, request).pipe(
+        Effect.andThen(Effect.raceFirst(Deferred.await(request.written), Deferred.await(requests.closed))),
+        Effect.onInterrupt(() => Effect.sync(() => void (request.abandoned = true)))
+      )
+    })
+  }
+})
+
+/**
+ * Wraps the client protocol beneath it so that a request made while the socket is down waits for
+ * the connection and is then sent once, in the order the requests were issued: one fiber per
+ * protocol writes the requests from a queue, retries included, so a later request, held or live,
+ * is written after an earlier held one. Writing does not wait for the response, so round trips
+ * stay concurrent. The socket protocol refuses a `send` with the socket error only before
+ * writing anything (`RpcClient.makeProtocolSocket` keeps the last error until a redial succeeds,
+ * and a write that fails is a defect), so that refusal is the signal that the server cannot have
+ * received the request and retrying it cannot apply it twice.
+ *
+ * The inner protocol MUST be `RpcClient.layerProtocolSocket({ retryTransientErrors: true,
+ * retryPolicy })` with a `retryPolicy` that never ends. Without `retryTransientErrors` a failed
+ * redial is broadcast as a client error and fails the held requests; with a policy that runs out,
+ * the protocol stops redialling while the held requests keep retrying every 250 ms for good.
+ *
+ * A request already written when the socket drops is not retried: the server may have run it, and
+ * `Submit`, `Present` and `Dispatch` are not idempotent. It fails with the socket error, which
+ * the remote ports turn into a defect. Interrupt, ack and end messages are neither held nor
+ * queued. A held request fails with the socket error if the connection drops again before it is
+ * written.
+ */
+export const layerHoldRequestsWhileDisconnected: Layer.Layer<RpcClient.Protocol, never, RpcClient.Protocol> =
+  Layer.effect(
+    RpcClient.Protocol,
+    Effect.gen(function*() {
+      const protocol = yield* RpcClient.Protocol
+      const pending = yield* Queue.unbounded<PendingRequest>()
+      const closed = Deferred.makeUnsafe<never>()
+      yield* Effect.addFinalizer(() => Deferred.interrupt(closed))
+      yield* Effect.forkScoped(writeInOrder(pending))
+      return holdRequest(protocol, { pending, closed })
+    })
+  )
 
 const resumable = <A>(stream: Stream.Stream<A, RpcClientError.RpcClientError>) =>
   stream.pipe(Stream.retry(resubscribe), Stream.catchTag("RpcClientError", Stream.die))

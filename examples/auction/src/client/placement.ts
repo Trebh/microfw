@@ -32,6 +32,8 @@ const BidderQuery = Schema.fromURLSearchParams(Schema.Struct({
   bidder: Bidder.pipe(Schema.withDecodingDefaultTypeKey(Effect.succeed(DEFAULT_BIDDER)))
 }))
 
+const ExplicitBidderQuery = Schema.fromURLSearchParams(Schema.Struct({ bidder: Schema.optionalKey(Bidder) }))
+
 const SessionQuery = Schema.fromURLSearchParams(Schema.Struct({
   session: SessionToken.pipe(Schema.withDecodingDefaultTypeKey(Effect.succeed(DEFAULT_SESSION)))
 }))
@@ -51,6 +53,12 @@ export const parseBidder = (search: string): Bidder =>
   Schema.decodeUnknownOption(BidderQuery)(new URLSearchParams(search)).pipe(
     Option.map((query) => query.bidder),
     Option.getOrElse(() => DEFAULT_BIDDER)
+  )
+
+/** `?bidder=bob` only when the URL states a valid one; a missing, empty or invalid name is `None`, never a default. */
+const parseExplicitBidder = (search: string): Option.Option<Bidder> =>
+  Schema.decodeUnknownOption(ExplicitBidderQuery)(new URLSearchParams(search)).pipe(
+    Option.flatMapNullishOr((query) => query.bidder)
   )
 
 /**
@@ -77,5 +85,18 @@ export const parseIdentity = (search: string): Identity => ({
 /** What a page shows about its identity; only the one its actions' side uses counts. */
 export const describeIdentity = (actions: Side, identity: Identity) =>
   actions === "server" ? `session ${identity.session}` : `bidder ${identity.bidder}`
+
+/** Whose leading bids the wallet island reserves for; `None` is a wallet that follows nobody. */
+export type WalletOwner = Option.Option<Bidder>
+
+const walletOwnerOf: Record<Side, (search: string) => WalletOwner> = {
+  // The browser runs the actions, so `?bidder=` (default `alice`) is the identity of the page too.
+  client: (search) => Option.some(parseBidder(search)),
+  // The server decides whose a session is and never tells the page, so only an explicit `?bidder=` names the owner.
+  server: parseExplicitBidder
+}
+
+/** The wallet's owner, decided by the side that runs the page's actions. */
+export const parseWalletOwner = (actions: Side, search: string): WalletOwner => walletOwnerOf[actions](search)
 
 export const formatPlacement = (placement: Placement) => `model:${placement.model},actions:${placement.actions}`

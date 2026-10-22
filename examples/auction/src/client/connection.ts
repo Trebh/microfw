@@ -1,3 +1,4 @@
+import { layerHoldRequestsWhileDisconnected } from "@mufw/rpc"
 import { Context, Effect, Layer, Schedule, Stream, SubscriptionRef } from "effect"
 import { RpcClient } from "effect/rpc"
 
@@ -33,9 +34,14 @@ export const layerConnectionHooks = Layer.effectContext(
 
 /**
  * The client protocol over the socket in context: it redials on `reconnectSchedule`, and a dial
- * that cannot open leaves calls pending instead of failing them. `Connection` follows the socket.
+ * that cannot open leaves calls pending instead of failing them. A request made after an open
+ * connection dropped waits for the next one (`layerHoldRequestsWhileDisconnected`). `Connection`
+ * follows the socket.
  */
-export const layerProtocol = RpcClient.layerProtocolSocket({
-  retryTransientErrors: true,
-  retryPolicy: reconnectSchedule
-}).pipe(Layer.provideMerge(layerConnectionHooks))
+export const layerProtocol = layerHoldRequestsWhileDisconnected.pipe(
+  Layer.provide(RpcClient.layerProtocolSocket({
+    retryTransientErrors: true,
+    retryPolicy: reconnectSchedule
+  })),
+  Layer.provideMerge(layerConnectionHooks)
+)

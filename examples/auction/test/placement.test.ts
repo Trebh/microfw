@@ -1,6 +1,14 @@
 import { assert, describe, it } from "@effect/vitest"
+import { Option } from "effect"
 import { Bidder, SessionToken } from "../src/domain/Values.ts"
-import { describeIdentity, formatPlacement, parseBidder, parsePlacement, parseSession } from "../src/client/placement.ts"
+import {
+  describeIdentity,
+  formatPlacement,
+  parseBidder,
+  parsePlacement,
+  parseSession,
+  parseWalletOwner
+} from "../src/client/placement.ts"
 
 describe("parsePlacement", () => {
   it("is client/client without a query", () => {
@@ -96,5 +104,27 @@ describe("describeIdentity", () => {
 
   it("names the bidder where the browser runs the actions", () => {
     assert.strictEqual(describeIdentity("client", identity), "bidder bob")
+  })
+})
+
+describe("parseWalletOwner", () => {
+  it("defaults to alice where the browser runs the actions", () => {
+    assert.deepStrictEqual(parseWalletOwner("client", ""), Option.some(Bidder.make("alice")))
+  })
+
+  it("reads ?bidder= where the browser runs the actions", () => {
+    assert.deepStrictEqual(parseWalletOwner("client", "?bidder=bob"), Option.some(Bidder.make("bob")))
+  })
+
+  it("follows nobody where the server runs the actions and the URL names no bidder", () => {
+    assert.deepStrictEqual(parseWalletOwner("server", "?session=demo-bob"), Option.none())
+  })
+
+  it("follows nobody where the server runs the actions and the bidder is empty", () => {
+    assert.deepStrictEqual(parseWalletOwner("server", "?bidder="), Option.none())
+  })
+
+  it("follows the explicit ?bidder= where the server runs the actions", () => {
+    assert.deepStrictEqual(parseWalletOwner("server", "?session=demo-bob&bidder=bob"), Option.some(Bidder.make("bob")))
   })
 })

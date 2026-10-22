@@ -1,5 +1,6 @@
 import { Layer } from "effect"
 import { layerAuthenticationClient } from "../../authentication.ts"
+import { Auction } from "../../domain/Auction.ts"
 import type { SessionToken } from "../../domain/Values.ts"
 import { Rpc } from "../../ports.ts"
 import { transport } from "./transport.ts"
@@ -11,5 +12,5 @@ import { transport } from "./transport.ts"
  */
 export const serverOwned = (session: SessionToken) =>
   Layer.mergeAll(Rpc.layerIntentPortRemote, Rpc.layerModelRemote, Rpc.layerHistoryRemote).pipe(
-    Layer.provideMerge(transport(layerAuthenticationClient(session)))
+    Layer.provideMerge(transport(Auction, Rpc.layerClient.pipe(Layer.provide(layerAuthenticationClient(session)))))
   )

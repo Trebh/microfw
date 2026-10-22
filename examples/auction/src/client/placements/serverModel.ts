@@ -1,11 +1,10 @@
-import { layerActionRunnerLocal, layerActionsDrain, layerIntentBus } from "@mufw/core"
+import { layerActionsDrain, layerIntentBus } from "@mufw/core"
 import { Layer } from "effect"
-import { layerCreditCheckPermissive } from "../../adapters/creditCheckPermissive.ts"
-import { layerCurrentBidderFixed } from "../../adapters/currentBidderFixed.ts"
 import { layerAuthenticationAnonymous } from "../../authentication.ts"
 import { Auction } from "../../domain/Auction.ts"
 import type { Bidder } from "../../domain/Values.ts"
 import { Ports, Rpc } from "../../ports.ts"
+import { auctionActionRunnerLocal } from "./auctionLocal.ts"
 import { transport } from "./transport.ts"
 
 /**
@@ -14,14 +13,12 @@ import { transport } from "./transport.ts"
  * server to serve `Present`, `Representations`, `History`.
  */
 export const serverModel = (bidder: Bidder) => {
+  const client = Rpc.layerClient.pipe(Layer.provide(layerAuthenticationAnonymous))
   const remoteModel = Layer.merge(Rpc.layerModelRemote, Rpc.layerHistoryRemote).pipe(
-    Layer.provideMerge(transport(layerAuthenticationAnonymous))
-  )
-  const localActions = layerActionRunnerLocal(Auction, Ports).pipe(
-    Layer.provide(Layer.merge(layerCreditCheckPermissive, layerCurrentBidderFixed(bidder)))
+    Layer.provideMerge(transport(Auction, client))
   )
   return layerActionsDrain(Auction, Ports).pipe(
-    Layer.provideMerge(Layer.merge(remoteModel, localActions)),
+    Layer.provideMerge(Layer.merge(remoteModel, auctionActionRunnerLocal(bidder))),
     Layer.provideMerge(layerIntentBus(Auction, Ports))
   )
 }

@@ -12,6 +12,8 @@ export default defineConfig(({ command, mode }) => {
     throw new Error(`unknown deployment "${mode}"; build with --mode ${Object.keys(pages).join("|")}`)
   }
   return {
+    // The page starts its worker with `{ type: "module" }`, so the worker is bundled as an ES module.
+    worker: { format: "es" },
     build: {
       outDir: `dist/${mode}`,
       rollupOptions: { input: { [mode]: page } }

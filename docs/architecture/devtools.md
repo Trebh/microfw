@@ -4,24 +4,43 @@ Living document. Source of truth: `packages/devtools/src/Panel.ts`, `Stately.ts`
 
 Both adapters read `HistoryPort.records`, so they work with a local model and with a remote one.
 
-## Time-travel panel
+## History panel
 
-`layerPanel(ports, { root, render?, html? })` renders one row per record:
-`#seq kind [proposal tag | ↩ source seq] → controlState`, the latest highlighted. Clicking a row
+`layerPanel(def, ports, { root, render?, html?, save? })` renders one row per record:
+`#seq kind [proposal label | ↩ source seq] → controlState`, the latest highlighted. Clicking a row
 calls `travelTo(seq)` and shows that record's model and representation as JSON. The travel runs as
 a fiber of the layer (`FiberSet.makeRuntime`): it sees the layer's logger and references and is
 interrupted when the layer's scope closes.
+
+`layerHistoryList(def, ports, options)` is the same panel without travel: a row click only shows
+that record. It is a separate layer, not a flag on `layerPanel`, because the two need different
+servers: `TravelTo` rewrites the server's model and is only served when `MUFW_RPCS` lists it (the
+default does not), whereas the list needs `History` alone. Which one a page mounts is decided at its
+composition root.
+
+A proposal's label is `proposalLabel(proposal)` of `@mufw/core`: its tag, or for a proposal of a
+`nest`ed child `Child/` and the child's label, recursively (`Child/Inc`). The panel does not know
+the wrapper's shape.
+
+**Export history (JSON)** encodes the retained records with `encodeHistoryJson(def)` and hands the
+text to `options.save`, default a browser download named `<definition name>-history.json`
+(a `Blob` and an anchor, the DOM boundary). The file decodes back with `decodeHistoryJson(def)`.
+The export runs as a fiber of the layer like the travel; a failed encoding is logged.
 
 A travel row shows its source from the record's `travelledTo`; it does not infer it from the models.
 
 An `init` record opens a history: the panel drops its rows when one arrives, so a restarted server's
 history replaces the old one.
 
-Row clicks call `TravelTo`, which a server only serves when `MUFW_RPCS` lists it (the default
-does not). The example therefore mounts the panel from the composition root: `runPage(placement,
-label, devtools)` takes the page's devtools layer. `demo.ts` passes `layerTimeTravel()`; the four
-production entries (`browser-only`, `server-actions`, `server-model`, `server-owned`) pass
-`Layer.empty`.
+The example mounts a panel from the composition root: `runPage(placement, label, devtools,
+walletOwner)` takes the page's devtools layer. `demo.ts` passes `layerTimeTravel()` (`layerPanel`,
+which needs a server that serves `TravelTo`), and so does the `worker` page, whose worker serves
+`TravelTo`; the four other auction entries (`browser-only`, `server-actions`, `server-model`,
+`server-owned`) pass `Layer.empty`. The `devtools` page
+(`devtools.html`, `src/client/devtools.ts`) mounts `layerHistoryList` over the remote `HistoryPort`
+alone (`placements/historyOnly.ts`) and the connection banner: no view, wallet, local model or action
+runner, which `check:bundle` verifies. Against a server with the default `MUFW_RPCS` it follows every
+record the other pages produce.
 
 ## Stately inspector
 

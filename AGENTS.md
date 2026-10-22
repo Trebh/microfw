@@ -7,13 +7,13 @@ Instructions for anyone — human or coding agent — changing this repository. 
 
 µFW is a SAM-pattern framework on Effect 4. A SAM definition is the domain; its ports are Effect
 services; local and remote implementations are layers; the example (`examples/auction`) runs one
-definition in four browser/server placements.
+definition in four browser/server placements and in a web worker.
 
 ```
-packages/core        @mufw/core        definition, pure step, ports, local layers, graph
+packages/core        @mufw/core        definition, nesting, pure step, ports, local layers, forwarding, graph, history, persistence, sync
 packages/rpc         @mufw/rpc         wire contract and remote adapters (no transport)
-packages/view-uhtml  @mufw/view-uhtml  mounts a pure uhtml v4 view
-packages/devtools    @mufw/devtools    time-travel panel, Stately adapter
+packages/view-uhtml  @mufw/view-uhtml  mounts a pure uhtml v4 view; `./ssr` renders one to markup in Node
+packages/devtools    @mufw/devtools    time-travel panel, history list, Stately adapter
 packages/test        @mufw/test        model-based path testing
 examples/auction     @mufw/example-auction
 docs/                ARCHITECTURE.md, architecture/*.md, TODO.md
@@ -32,7 +32,9 @@ docs/                ARCHITECTURE.md, architecture/*.md, TODO.md
 | `pnpm start:server` | server with the production defaults (`MUFW_RPCS=Submit,Representations,History`) |
 | `pnpm dev:client` | vite on :5173: one page per deployment plus the demo page |
 | `pnpm build:client` | one `vite build` per deployment into `examples/auction/dist/<deployment>`, then `check:bundle` |
-| `pnpm --filter @mufw/example-auction test:live` | replays the path tests against a running server |
+| `pnpm --filter @mufw/example-auction test:live` | replays the path tests against a running server started without `MUFW_STORE` (or with an empty store): seq 0 must be `Auction.initial` |
+| `pnpm --filter @mufw/example-auction test:sync` | against two running servers that share an event log (`MUFW_SYNC=host` on :3001 with its log on `127.0.0.1:3101`, `MUFW_PORT=3002 MUFW_SYNC=ws://127.0.0.1:3101/eventlog` on :3002, freshly started): bids on both at once and fails unless they end with the same bids |
+| `pnpm --filter @mufw/example-auction compare:transports` | starts a server of its own, builds the two ticker pages and prints first paint and update latency of the websocket, HTTP and HTML-stream islands in headless Chromium (once: `pnpm exec playwright install chromium`) |
 
 A change is done when `pnpm typecheck` and `pnpm test` pass and the changed behaviour has been
 exercised: a UI change in the browser, a server change against a running server.
@@ -52,8 +54,9 @@ for Effect idioms; do not rely on Effect 3 knowledge.
 - `@mufw/core` depends on `effect` only. `@mufw/rpc` stays platform-free: transports and
   serialization are chosen by the application. Adapter packages do not depend on each other.
 - Placement is decided per deployment, at its composition root (`src/client/<page>.ts` calling one
-  module of `src/client/placements/`, `server.ts`, `test/live.ts`), by choosing layers. Only the demo
-  page picks a placement at runtime; never let a visitor choose what the server trusts. If moving a part between client and server needs a change outside the
+  module of `src/client/placements/`, `src/client/auctionWorker.ts`, `server.ts`, `test/live.ts`),
+  by choosing layers. Only the demo page picks a placement at runtime; never let a visitor choose
+  what the server trusts. If moving a part between client and server needs a change outside the
   composition root, the design is wrong: fix the port, not the call site.
 
 ### Dependency injection and inversion
@@ -66,6 +69,11 @@ for Effect idioms; do not rely on Effect 3 knowledge.
   its secrets) in the module that declares the port.
 - A server serves only the RPCs its deployment needs (`MUFW_RPCS`); it serves `Present` only to
   trusted clients, since it applies any proposal it receives.
+- The event-log server of a synced host (`MUFW_SYNC=host`) applies any proposal it receives, as
+  `Present` does, and its authorization cannot tell who writes. Serve it only to trusted instances:
+  on a listener and router of its own (`MUFW_SYNC_PORT`, loopback unless `MUFW_SYNC_HOST` says
+  otherwise), never on the public port or beside the client routes, and with an authorization that
+  refuses every event the log does not define (`layerSyncAuthorization`).
 - Tests replace a dependency by providing another layer, never by patching modules.
 
 ### Parse, don't validate
@@ -80,7 +88,7 @@ for Effect idioms; do not rely on Effect 3 knowledge.
 - Never manufacture a domain value from `unknown` with `as`. A cast is allowed only where the type
   system cannot follow a generic definition, with a comment saying which concrete type it stands for.
 - Business outcomes are proposals (`BidRejected`), not errors. Technical failures are typed errors
-  (`Schema.TaggedError`). A lost transport or an impossible state is a defect.
+  (`Schema.TaggedError`). A transport lost under a call already written, or an impossible state, is a defect.
 - Known gaps are listed in [docs/TODO.md](docs/TODO.md); do not add new ones.
 
 ### Effect, idiomatically
@@ -92,7 +100,7 @@ for Effect idioms; do not rely on Effect 3 knowledge.
   `Layer.effectDiscard` for background fibers), configuration with `Config` and
   `Context.Reference` for defaults (`AutoActions`).
 - Errors in the error channel with `Schema.TaggedError`, handled with `Effect.catchTag`; never
-  `throw` inside effectful code. Pure functions may throw only for authoring bugs (the graph limit).
+  `throw` inside effectful code. Pure functions may throw only for authoring bugs (the graph limit, a `Child` tag clash in `nest`).
 - Sequences are `Stream`s; shared state is `Ref`/`SubscriptionRef`/`PubSub` under a `Semaphore`;
   resources and fibers are scoped (`Effect.forkScoped`, `Stream.unwrap`), never left dangling.
 - Time comes from `Clock` (testable with `TestClock`), never `Date.now()` in effectful code.
@@ -106,8 +114,8 @@ Code stays in `Effect`/`Stream`/`Layer` through every layer of the application. 
 
 | Boundary | Place |
 |---|---|
-| Process entry point | `runPage` in `examples/auction/src/client/app.ts`, `server.ts`, `test/live.ts` |
-| DOM event handler | `layerMount` dispatch, `layerPanel` click, through a `FiberSet.makeRuntime` runner captured from the layer |
+| Process entry point | `runPage` in `examples/auction/src/client/app.ts`, `runTicker` in `client/ticker.ts`, `runStreamFrame` in `client/streamEmbed.ts`, `client/devtools.ts`, `client/auctionWorker.ts` (the web worker), `server.ts`, `test/live.ts`, `test/syncLive.ts`, the `scripts/` |
+| DOM event handler | `layerMount` dispatch, `layerPanel` and `layerHistoryList` row and export clicks, through a `FiberSet.makeRuntime` runner captured from the layer |
 | Test harness | `it.effect` / `layer` from `@effect/vitest` |
 
 Anywhere else, return the effect and let the caller compose it. Do not convert an `Effect` to a
@@ -120,7 +128,7 @@ transport loss is turned into a defect, in `@mufw/rpc`.
   no randomness. Put anything effectful in an action and pass its result in the proposal.
 - Each acceptor handles its own tags and returns the model unchanged otherwise.
 - The representation always carries `controlState`; `controlStates` lists every value it can take.
-- `nap` returns at most one intent; automatic intents of a tag already in flight are skipped.
+- `nap` returns at most one intent; automatic intents with an `intentKey` (default their tag) already in flight are skipped.
 - Model mutation happens only in `layerModelLocal`, under its permit.
 
 ## Testing rules

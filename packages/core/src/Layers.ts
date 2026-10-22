@@ -13,14 +13,15 @@ import {
   Stream,
   SubscriptionRef
 } from "effect"
-import type {
-  ActionFailure,
-  AnyDefinition,
-  IntentOf,
-  ModelOf,
-  ProposalOf,
-  RepresentationOf,
-  ServicesOf
+import {
+  type ActionFailure,
+  type AnyDefinition,
+  intentKeyOf,
+  type IntentOf,
+  type ModelOf,
+  type ProposalOf,
+  type RepresentationOf,
+  type ServicesOf
 } from "./Definition.ts"
 import type { HistoryPortShape, IntentBusShape, IntentEnvelope, ModelPortShape, Ports } from "./Ports.ts"
 import { applyProposal, NoSuchStep, type StepKind, type StepRecord } from "./Step.ts"
@@ -73,12 +74,12 @@ interface ModelStore<D extends AnyDefinition> {
   readonly published: PubSub.PubSub<StepRecord<D>>
 }
 
-const makeStore = <D extends AnyDefinition>(def: D) =>
+const makeStore = <D extends AnyDefinition>(def: D, initial: ModelOf<D>) =>
   Effect.gen(function*() {
     const limit = yield* HistoryLimit
     const store: ModelStore<D> = {
-      model: yield* Ref.make<ModelOf<D>>(def.initial),
-      representation: yield* SubscriptionRef.make<RepresentationOf<D>>(def.state(def.initial)),
+      model: yield* Ref.make<ModelOf<D>>(initial),
+      representation: yield* SubscriptionRef.make<RepresentationOf<D>>(def.state(initial)),
       records: [],
       retention: Math.max(2, limit),
       published: yield* PubSub.unbounded<StepRecord<D>>()
@@ -166,15 +167,29 @@ const makeModelPort = <D extends AnyDefinition>(
   return { port, runNap }
 }
 
-/** In-process model: one state object provides both `ModelPort` and `HistoryPort`. Requires `IntentBus`. */
-export const layerModelLocal = <D extends AnyDefinition, R = never>(def: D, ports: Ports<D, R>) =>
+/** Starts a local loop from a model other than `def.initial`, already decoded by the caller. */
+export interface LocalModelOptions<D extends AnyDefinition> {
+  readonly initial?: ModelOf<D>
+}
+
+/**
+ * In-process model: one state object provides both `ModelPort` and `HistoryPort`. Requires
+ * `IntentBus`. Seq 0 (`init`) carries `options.initial` when given, else `def.initial`, so
+ * `travelTo(0)` returns to it.
+ */
+export const layerModelLocal = <D extends AnyDefinition, R = never>(
+  def: D,
+  ports: Ports<D, R>,
+  options?: LocalModelOptions<D>
+) =>
   Layer.effectContext(
     Effect.gen(function*() {
       const bus = yield* ports.IntentBus
-      const store = yield* makeStore(def)
+      const initial = options?.initial ?? def.initial
+      const store = yield* makeStore(def, initial)
       const { port, runNap } = makeModelPort(def, store, bus)
-      const representation = def.state(def.initial)
-      yield* commit(store, { kind: "init", proposal: Option.none(), model: def.initial, representation })
+      const representation = def.state(initial)
+      yield* commit(store, { kind: "init", proposal: Option.none(), model: initial, representation })
       yield* runNap(representation)
       return Context.make(ports.ModelPort, port).pipe(Context.add(ports.HistoryPort, port))
     })
@@ -206,9 +221,10 @@ export const layerActionRunnerLocal = <D extends AnyDefinition, R = never>(def: 
   )
 
 /**
- * Consumes intents, runs them and presents the proposals. An automatic intent whose tag has an
- * action still running is skipped, so a `nap` loop cannot multiply; user intents are never deduped.
- * The tag is released once the action has its proposal, before presenting it: the `nap` of that
+ * Consumes intents, runs them and presents the proposals. An automatic intent whose key
+ * (`definition.intentKey`, default its tag) has an action still running is skipped, so a `nap`
+ * loop cannot multiply; user intents are never deduped.
+ * The key is released once the action has its proposal, before presenting it: the `nap` of that
  * very step must be able to start the next round.
  *
  * A user intent's action runs with the services of the fiber that dispatched it, so a request's
@@ -218,7 +234,7 @@ export const layerActionRunnerLocal = <D extends AnyDefinition, R = never>(def: 
  * Automatic actions run on the bus's fibers, which `travelTo` interrupts. A defect in any action
  * or in its `present` is logged with the intent tag and the cause; the drain keeps running.
  */
-export const layerActionsDrain = <D extends AnyDefinition, R = never>(_def: D, ports: Ports<D, R>) =>
+export const layerActionsDrain = <D extends AnyDefinition, R = never>(def: D, ports: Ports<D, R>) =>
   Layer.effectDiscard(
     Effect.gen(function*() {
       const bus = yield* ports.IntentBus
@@ -235,11 +251,12 @@ export const layerActionsDrain = <D extends AnyDefinition, R = never>(_def: D, p
       const runAuto = (envelope: IntentEnvelope<IntentOf<D>, R>) =>
         Effect.suspend(() => {
           const tag = envelope.intent._tag
+          const key = intentKeyOf(def, envelope.intent)
           if (!autoActions) return Effect.logDebug("auto action dropped", tag)
-          if (inFlight.has(tag)) return Effect.logDebug("auto action already in flight", tag)
-          inFlight.add(tag)
+          if (inFlight.has(key)) return Effect.logDebug("auto action already in flight", tag)
+          inFlight.add(key)
           const action = Effect.provideContext(runner.run(envelope.intent), envelope.context).pipe(
-            Effect.ensuring(Effect.sync(() => inFlight.delete(tag)))
+            Effect.ensuring(Effect.sync(() => inFlight.delete(key)))
           )
           return bus.runAuto(present(tag, action))
         })
@@ -254,8 +271,12 @@ export const layerActionsDrain = <D extends AnyDefinition, R = never>(_def: D, p
   )
 
 /** Everything in-process: intent bus, actions drain, local model and local action runner. */
-export const layerLoopLocal = <D extends AnyDefinition, R = never>(def: D, ports: Ports<D, R>) =>
+export const layerLoopLocal = <D extends AnyDefinition, R = never>(
+  def: D,
+  ports: Ports<D, R>,
+  options?: LocalModelOptions<D>
+) =>
   layerActionsDrain(def, ports).pipe(
-    Layer.provideMerge(Layer.merge(layerModelLocal(def, ports), layerActionRunnerLocal(def, ports))),
+    Layer.provideMerge(Layer.merge(layerModelLocal(def, ports, options), layerActionRunnerLocal(def, ports))),
     Layer.provideMerge(layerIntentBus(def, ports))
   )

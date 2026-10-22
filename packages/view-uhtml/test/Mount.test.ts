@@ -4,7 +4,7 @@ import { Context, Deferred, Effect, Exit, Layer, Scope, Stream } from "effect"
 import { Document } from "uhtml/dom"
 import init from "uhtml/init"
 import { Counter, Ports } from "../../core/test/fixtures/Counter.ts"
-import { layerMount, type View } from "../src/index.ts"
+import { layerMount, layerMountReadOnly, type Render, type View } from "../src/index.ts"
 
 interface DomNode {
   readonly localName?: string
@@ -143,6 +143,32 @@ describe("layerMount refusals", () => {
 
       const refused = yield* Deferred.await(reported)
       assert.deepStrictEqual([refused._tag, refused.intentTag, refused.message], ["DispatchRefused", "Inc", "No session"])
+    }).pipe(Effect.provide(layer))
+  })
+})
+
+describe("layerMountReadOnly", () => {
+  it.effect("renders the representations of a model port alone: no intent port is in the context", () => {
+    const painted = Deferred.makeUnsafe<void>()
+    const signalling: Render = (where, what) => {
+      const rendered = render(where, what)
+      Deferred.doneUnsafe(painted, Effect.void)
+      return rendered
+    }
+    const root = document.createElement("div") as unknown as Element
+    const modelOnly = Layer.succeed(Ports.ModelPort, {
+      present: () => Effect.void,
+      representations: Stream.make({ controlState: "low" as const, count: 7 })
+    })
+    const layer = layerMountReadOnly(Ports, {
+      root,
+      view: (representation) => html`<p>count: ${representation.count}</p>`,
+      render: signalling
+    }).pipe(Layer.provide(modelOnly))
+    return Effect.gen(function*() {
+      yield* Deferred.await(painted)
+
+      assert.include(root.textContent, "count: 7")
     }).pipe(Effect.provide(layer))
   })
 })

@@ -7,5 +7,7 @@ export const pages: Readonly<Record<string, string>> = {
   "browser-only": "browser-only.html",
   "server-owned": "server-owned.html",
   "server-model": "server-model.html",
-  "server-actions": "server-actions.html"
+  "server-actions": "server-actions.html",
+  "devtools": "devtools.html",
+  "worker": "worker.html"
 }

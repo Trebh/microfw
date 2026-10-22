@@ -25,7 +25,8 @@ and makes the control state a *derived* value rather than a declared one.
    or the actions between browser and server is a change of `Layer`, never of domain code.
 3. **The definition is the test oracle.** Because the step is pure, the control-state graph can be
    explored offline; each generated path is replayed against the real system — in-process, over an
-   in-process RPC, or against a live server — asserting the representation at every node.
+   in-process RPC, through the rendered UI, or against a live server — asserting the representation
+   at every node.
 
 Effect 4 is the substrate: services and layers give dependency injection and inversion for free,
 `Schema` makes parsing and the wire contract the same artefact, and typed errors keep failures
@@ -44,17 +45,16 @@ visible end to end.
 
 ## Where it is going
 
-Near term (see [docs/TODO.md](docs/TODO.md) for the list):
+Near term. The open gaps, each with what done looks like, are in [docs/TODO.md](docs/TODO.md):
 
-- Close the parse-don't-validate gaps at the example's boundaries (URL query, form input).
-- Run DOM-triggered effects with the application's services rather than the default runtime.
-- Islands of interactivity: several definitions on one page, each with its own placement,
-  forwarding intents to each other.
-- Server-rendered first paint with takeover by the browser loop, and streamed representations
-  without a socket.
-- Nested definitions (parent and child in one loop).
-- Persistence of the model and multi-instance synchronisation of proposals.
-- Devtools as a standalone page; the model in a Web Worker.
+- Transports that bound what a stalled or disconnected client costs, and a page that can tell a
+  call is held.
+- A synchronised deployment that survives a host restart, starts a late instance from a stored
+  model and hands the automatic actions to another instance when theirs stops.
+- A server-owned page that learns its identity from the server, so an island that depends on it
+  (the wallet) needs no claim from the page.
+- Several definitions served by one server, each at its own path.
+- Packages a consumer outside the workspace can install.
 
 Longer term, µFW aims to compete with XState on its own ground — modelling, visualisation and
 model-based testing — while keeping the domain as plain data and pure functions, and adding what a
@@ -69,6 +69,7 @@ chart library cannot: moving parts of the loop across the network without touchi
 
 ## How we will know it works
 
-- The four placements of the example run from one definition, with zero domain changes.
+- The example's placements (the four browser/server combinations of model and actions, and a web
+  worker that holds both) run from one definition, with zero domain changes.
 - The same path test passes locally, over in-process RPC and against a live server.
 - A rule moved from client to server (or back) is a one-line layer change plus its test.

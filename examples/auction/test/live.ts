@@ -7,20 +7,21 @@ import { layerAuthenticationAnonymous, layerAuthenticationClient } from "../src/
 import { Auction } from "../src/domain/Auction.ts"
 import { Amount, SessionToken } from "../src/domain/Values.ts"
 import { Ports, Rpc } from "../src/ports.ts"
+import { samPath } from "../src/samPath.ts"
 import { auctionTestModel } from "./model.ts"
 
 /**
  * Replays the auction's shortest paths against a live server, then checks that it takes the bidder
  * from the session. The server must run with `MUFW_AUTO_ACTIONS=off` (ticks cannot move the model)
- * and serve `Submit`, `Present`, `Representations` and `TravelTo`, which `pnpm dev:server` does.
+ * and serve `Submit`, `Present`, `Representations`, `History` and `TravelTo`, which `pnpm dev:server` does.
  */
-const ServerUrl = Config.String("MUFW_SERVER").pipe(Config.withDefault("ws://localhost:3001/sam"))
+const ServerOrigin = Config.String("MUFW_SERVER").pipe(Config.withDefault("ws://localhost:3001"))
 
 const model = createTestModel(Auction, Ports, auctionTestModel)
 
 const Socket = Layer.unwrap(
   Effect.gen(function*() {
-    return NodeSocket.layerWebSocket(yield* ServerUrl)
+    return NodeSocket.layerWebSocket(`${yield* ServerOrigin}${samPath(Auction)}`)
   })
 )
 

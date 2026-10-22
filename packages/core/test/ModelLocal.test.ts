@@ -163,3 +163,35 @@ describe("layerModelLocal", () => {
       assert.deepStrictEqual(Option.map(current, (r) => r.count), Option.some(0))
     }).pipe(Effect.provide(LimitedLoop)))
 })
+
+describe("layerModelLocal with an initial model", () => {
+  const FromTwo = layerLoopLocal(Counter, Ports, { initial: { count: 2 } }).pipe(
+    Layer.provide(Layer.succeed(AutoActions, false))
+  )
+
+  it.effect("emits the first representation and the seq 0 record from the given model", () =>
+    Effect.gen(function*() {
+      const model = yield* Ports.ModelPort
+      const history = yield* Ports.HistoryPort
+
+      const first = yield* Stream.runHead(model.representations)
+      const records = yield* history.records.pipe(Stream.take(1), Stream.runCollect)
+
+      assert.deepStrictEqual(first, Option.some({ controlState: "low", count: 2 }))
+      assert.deepStrictEqual(records.map((r) => [r.seq, r.kind, r.model.count]), [[0, "init", 2]])
+    }).pipe(Effect.provide(FromTwo)))
+
+  it.effect("steps from the given model and travelTo(0) returns to it", () =>
+    Effect.gen(function*() {
+      const model = yield* Ports.ModelPort
+      const history = yield* Ports.HistoryPort
+      yield* model.present(inc1)
+      const stepped = yield* Stream.runHead(model.representations)
+
+      yield* history.travelTo(0)
+
+      const restored = yield* Stream.runHead(model.representations)
+      assert.deepStrictEqual(stepped, Option.some({ controlState: "high", count: 3 }))
+      assert.deepStrictEqual(restored, Option.some({ controlState: "low", count: 2 }))
+    }).pipe(Effect.provide(FromTwo)))
+})

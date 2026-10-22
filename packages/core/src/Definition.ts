@@ -52,6 +52,11 @@ export interface SamBehaviour<
   readonly reactors: ReadonlyArray<(model: M["Type"]) => M["Type"]>
   readonly state: (model: M["Type"]) => Rp["Type"]
   readonly nap: (representation: Rp["Type"]) => Option.Option<I["Type"]>
+  /**
+   * Automatic intents with the same key are not run concurrently: while one is in flight the drain
+   * skips the others. Default: the intent's `_tag`. Pure.
+   */
+  intentKey?(intent: I["Type"]): string
   readonly actions: Actions<I["Type"], P["Type"], R>
 }
 
@@ -70,6 +75,10 @@ export type ProposalOf<D extends AnyDefinition> = D["proposal"]["Type"]
 export type IntentOf<D extends AnyDefinition> = D["intent"]["Type"]
 export type RepresentationOf<D extends AnyDefinition> = D["representation"]["Type"]
 export type ServicesOf<D extends AnyDefinition> = D extends SamDefinition<any, any, any, any, infer R> ? R : never
+
+/** The concurrency key of an automatic intent: the definition's `intentKey`, else the intent's tag. */
+export const intentKeyOf = (definition: AnyDefinition, intent: Tagged): string =>
+  definition.intentKey?.(intent) ?? intent._tag
 
 /**
  * `define(schemas)(behaviour)`. Two calls, because TypeScript only types the behaviour's literals

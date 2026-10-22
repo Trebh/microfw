@@ -25,6 +25,10 @@ const placeBid = (dispatch: (intent: Intent) => void) => (event: SubmitEvent) =>
  * bid form is disabled and the user can dispatch `Open` themselves: the automatic `Open` from `nap`
  * is not re-run after a travel and is dropped when automatic actions are off. The bid handler reads
  * the input through `getElementsByTagName` because `FormData(form)` does not exist outside a browser.
+ * The form has `method="dialog"` so that a submit before the bundle mounts `onsubmit` on the
+ * server-rendered markup does nothing: a dialog-method form outside a `<dialog>` does not navigate
+ * (HTML form submission algorithm), where the default GET would replace the document's query, and
+ * with it the session.
  */
 export const makeViewWith = (html: typeof Html) => (placement: string): View<Representation, Intent> =>
 (representation, dispatch) => {
@@ -50,7 +54,7 @@ export const makeViewWith = (html: typeof Html) => (placement: string): View<Rep
     </header>
     <p class="highest">highest: ${highest}</p>
     ${openControl}
-    <form onsubmit=${placeBid(dispatch)}>
+    <form method="dialog" onsubmit=${placeBid(dispatch)}>
       <input name="amount" type="number" .value=${representation.minimumBid} ?disabled=${!bidding}>
       <button class="bid" ?disabled=${!bidding}>Place bid</button>
     </form>

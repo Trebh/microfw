@@ -10,7 +10,9 @@
     "check:bundle": "tsx scripts/check-bundle.ts",
     "dev:server": "MUFW_RPCS=Submit,Present,Dispatch,Representations,History,TravelTo tsx src/server.ts",
     "start:server": "tsx src/server.ts",
-    "test:live": "tsx test/live.ts"
+    "test:live": "tsx test/live.ts",
+    "test:sync": "tsx test/syncLive.ts",
+    "compare:transports": "tsx scripts/compare-transports.ts"
   },
   "dependencies": {
     "effect": "^4.0.5",
