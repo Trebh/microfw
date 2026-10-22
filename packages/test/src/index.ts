@@ -18,7 +18,7 @@ import {
   simplePaths,
   unreachableControlStates
 } from "@mufw/core"
-import { Effect, Option, Schema, Stream } from "effect"
+import { Clock, Effect, Option, Schema, Stream } from "effect"
 
 export type StateAssertions<D extends AnyDefinition> = {
   readonly [S in RepresentationOf<D>["controlState"]]: (representation: RepresentationOf<D>) => void
@@ -80,6 +80,104 @@ export const intentDriver = <D extends AnyDefinition, R = never>(
   step: (step) => ports.IntentPort.use((intents) => intents.dispatch(intentFor(step)))
 })
 
+/** Counts the paints of a `render` it wraps, so a driver can wait for the DOM to catch up with the model. */
+export interface Painted {
+  /** Returns `render` unchanged in type, counting every call. */
+  readonly observe: <F extends (...args: never[]) => unknown>(render: F) => F
+  readonly paints: () => number
+  /** Resolves as soon as the paint count exceeds `seen`: immediately if it already does. */
+  readonly after: (seen: number) => Effect.Effect<void>
+}
+
+export const makePainted: Effect.Effect<Painted> = Effect.sync(() => {
+  let count = 0
+  let waiters: Array<() => void> = []
+  const wakeAll = () => {
+    const woken = waiters
+    waiters = []
+    for (const wake of woken) wake()
+  }
+  const observe = <F extends (...args: never[]) => unknown>(render: F): F => {
+    const counted = (...args: Parameters<F>) => {
+      const result = render(...args)
+      count += 1
+      wakeAll()
+      return result
+    }
+    // `counted` has the signature of `F`, which TypeScript cannot express for a generic `F`.
+    return counted as unknown as F
+  }
+  // The count is read inside the callback, so a paint between a failed check and this wait still wakes it.
+  const after = (seen: number) =>
+    Effect.callback<void>((resume) => {
+      if (count > seen) return resume(Effect.void)
+      const wake = () => resume(Effect.void)
+      waiters.push(wake)
+      return Effect.sync(() => {
+        waiters = waiters.filter((waiter) => waiter !== wake)
+      })
+    })
+  return { observe, paints: () => count, after }
+})
+
+/** The DOM did not show node `node` within the paint timeout; `message` is the last assertion error. */
+export class NotShown extends Schema.TaggedError<NotShown>()("NotShown", {
+  node: Schema.String,
+  message: Schema.String
+}) {}
+
+export interface DomDriverOptions<D extends AnyDefinition, R, E> {
+  readonly painted: Painted
+  /** Performs the step on the rendered UI (click, fill, submit); dispatches when the step has no UI. */
+  readonly act: (step: PathStep<D>) => Effect.Effect<void, E, R>
+  /** Throws while the DOM does not show node `node`; re-run after every paint until it passes or the wait times out. */
+  readonly shows: (node: string) => void
+}
+
+/** Re-runs `attempt` after every paint until it succeeds. */
+const shownAfterPaints = (painted: Painted, attempt: Effect.Effect<void, string>): Effect.Effect<void> =>
+  Effect.suspend(() => {
+    const seen = painted.paints()
+    const nextPaint = painted.after(seen).pipe(Effect.andThen(shownAfterPaints(painted, attempt)))
+    return attempt.pipe(Effect.catch(() => nextPaint))
+  })
+
+/**
+ * Paints happen in wall-clock time whatever clock the test runs on, so the wait uses the live
+ * clock: under `TestClock` a virtual timeout would never fire. It stays below vitest's default
+ * test timeout so a missing paint fails with `NotShown`.
+ */
+const PAINT_TIMEOUT = "2 seconds"
+
+const untilShown = (painted: Painted, shows: (node: string) => void, node: string) => {
+  const attempt = Effect.try({
+    try: () => shows(node),
+    catch: (error) => error instanceof Error ? error.message : String(error)
+  })
+  const timedOut = attempt.pipe(Effect.mapError((message) => new NotShown({ node, message })))
+  const shownInTime = shownAfterPaints(painted, attempt).pipe(
+    Effect.timeoutOption(PAINT_TIMEOUT),
+    Effect.provideService(Clock.Clock, Clock.Clock.defaultValue())
+  )
+  return shownInTime.pipe(Effect.flatMap(Option.match({ onNone: () => timedOut, onSome: () => Effect.void })))
+}
+
+/**
+ * Waits for the DOM to show `step.from`, acts, then waits for it to show `step.to`. The view paints
+ * after the model holds the new representation, so once `step.to` is shown the transition is applied.
+ * When `step.from === step.to` the DOM check may read the previous paint; the runner's
+ * representation assertions cover that step.
+ */
+export const domDriver = <D extends AnyDefinition, R, E>(
+  options: DomDriverOptions<D, R, E>
+): Driver<D, R, E | NotShown> => ({
+  appliesOnReturn: true,
+  step: (step) =>
+    untilShown(options.painted, options.shows, step.from).pipe(
+      Effect.andThen(() => options.act(step)),
+      Effect.andThen(untilShown(options.painted, options.shows, step.to))
+    )
+})
 
 const describePath = <D extends AnyDefinition>(path: Path<D>) => {
   if (path.steps.length === 0) return `reaches ${path.target} (initial)`

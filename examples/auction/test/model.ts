@@ -1,4 +1,4 @@
-import assert from "node:assert/strict"
+import { assert } from "@effect/vitest"
 import type { TestModelOptions } from "@mufw/test"
 import { type Auction, exploreAuction, serializeAuction } from "../src/domain/Auction.ts"
 

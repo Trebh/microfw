@@ -15,7 +15,8 @@ Status: **proof of concept**. APIs move freely; there is no build step and nothi
   giving four placements of the same component, each its own deployment, against the same server code.
 - **Time travel.** Every step is recorded; `travelTo(seq)` restores any recorded model.
 - **Model-based testing.** `@mufw/test` explores the control-state graph from the definition and
-  replays each generated path against the real system, in-process or over the wire.
+  replays each generated path against the real system, in-process or over the wire, or by clicking
+  the rendered UI and reading the DOM.
 - **Devtools.** A time-travel panel, and an adapter for the
   [Stately inspector](https://stately.ai/docs/inspector) that draws the state and sequence diagrams.
 
@@ -117,6 +118,15 @@ pnpm --filter @mufw/example-auction test:live   # MUFW_SERVER overrides ws://loc
 
 The live test replays the paths over `Present`, then submits `Open` and a bid with the `demo-alice`
 session and checks the accepted bid is alice's, and that a client with no session is refused.
+
+The example's path tests also replay through the rendered view with `domDriver`: on uhtml's fake
+DOM inside `pnpm test`, and in headless Chromium with
+
+```sh
+pnpm exec playwright install chromium   # once
+pnpm test:browser
+pnpm test:browser:ui                    # visible Chromium, steps slowed down, watch mode
+```
 
 ## A definition, in short
 

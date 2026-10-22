@@ -50,6 +50,7 @@ Any mismatch or thrown assertion becomes `PathFailure { target, stepIndex, expec
 |---|---|---|
 | `presentDriver(ports)` (default) | `ModelPort.present(step.proposal)` | yes |
 | `intentDriver(ports, intentFor)` | `IntentPort.dispatch(intentFor(step))`, through the real actions | no |
+| `domDriver({ painted, act, shows })` | waits for the DOM to show `step.from`, runs `act(step)` on the rendered UI, waits for it to show `step.to` | yes |
 
 A driver needs only the ports it uses, so the same path runs against `layerLoopLocal`, against
 remote ports over `Rpc.layerClientTest`, or against a live server over a websocket
@@ -58,6 +59,31 @@ remote ports over `Rpc.layerClientTest`, or against a live server over a websock
 `Driver<D, R, E>` types how a transition can fail: `intentDriver` fails with `DispatchRefused`, which
 `TestModel.run` adds to `PathFailure`, and its `R` includes the per-request services of the ports it
 was built from.
+
+### DOM driver
+
+`domDriver` keeps `@mufw/test` free of DOM types: `act` (click, fill, submit; dispatch when the
+step has no UI) and `shows(node)` (throws while the DOM does not show `node`) are closures the test
+writes against its own document.
+
+- `makePainted` counts the calls of the `render` it wraps (`painted.observe(render)`, passed to
+  `layerMount`); `shows` is re-run after every paint until it passes.
+- The wait runs on the live clock, for 2 s: paints happen in wall-clock time even under `TestClock`.
+  A node never shown fails the step with `NotShown { node, message }`, `message` being the last
+  assertion error.
+- It applies on return: the view paints after the model holds the new representation, so once
+  `step.to` is shown the runner reads the reached representation. For a self-loop the DOM check
+  can pass on the previous paint; the runner's representation assertions cover that step.
+
+`examples/auction/test/dom.ts` replays the auction's shortest and simple paths through
+`layerMount`, given a `Harness`: the uhtml to render with, where to mount the view, the user
+gestures (`click`, `fill`, `submit`) and how long each state stays on screen.
+
+| Runtime | File | Root | Gestures | Pace |
+|---|---|---|---|---|
+| uhtml's fake DOM (`pnpm test`) | `Auction.dom.test.ts` | a detached element | events dispatched with uhtml's own `Event` | none |
+| Chromium (`pnpm test:browser`) | `Auction.dom.browser.test.ts` | the page's `<body>`, styled by `src/client/style.css` | `userEvent` from `vitest/browser`: real clicks and typing through Playwright | none |
+| visible Chromium (`pnpm test:browser:ui`) | the same | the same | the same | 700 ms before every step and after the path, so a person can follow it |
 
 ## Writing a test model
 

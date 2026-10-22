@@ -48,11 +48,13 @@ Near term (see [docs/TODO.md](docs/TODO.md) for the list):
 
 - Close the parse-don't-validate gaps at the example's boundaries (URL query, form input).
 - Run DOM-triggered effects with the application's services rather than the default runtime.
-- A browser driver for `@mufw/test`, so paths can be replayed by clicking the real UI.
+- Islands of interactivity: several definitions on one page, each with its own placement,
+  forwarding intents to each other.
+- Server-rendered first paint with takeover by the browser loop, and streamed representations
+  without a socket.
+- Nested definitions (parent and child in one loop).
 - Persistence of the model and multi-instance synchronisation of proposals.
-- Composition of SAM instances (parent and child loops).
-- Devtools as a standalone page fed by the `History` RPC; the model in a Web Worker; server-rendered
-  first paint from the current representation.
+- Devtools as a standalone page; the model in a Web Worker.
 
 Longer term, µFW aims to compete with XState on its own ground — modelling, visualisation and
 model-based testing — while keeping the domain as plain data and pure functions, and adding what a

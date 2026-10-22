@@ -25,7 +25,9 @@ docs/                ARCHITECTURE.md, architecture/*.md, TODO.md
 |---|---|
 | `pnpm install` | install; pnpm 12 enforces a minimum release age, so a just-published version is refused |
 | `pnpm typecheck` | `tsc --noEmit` in every package, one at a time |
-| `pnpm test` | vitest over `packages/*/test` and `examples/*/test` |
+| `pnpm test` | vitest over `packages/*/test` and `examples/*/test`, except `*.browser.test.ts` |
+| `pnpm test:browser` | the `*.browser.test.ts` files in headless Chromium (once: `pnpm exec playwright install chromium`) |
+| `pnpm test:browser:ui` | the same files in a visible Chromium, one step every 700 ms, in watch mode: re-runs on change, `q` quits |
 | `pnpm dev:server` | demo server on :3001 serving every RPC (`MUFW_AUTO_ACTIONS=off` disables automatic actions) |
 | `pnpm start:server` | server with the production defaults (`MUFW_RPCS=Submit,Representations,History`) |
 | `pnpm dev:client` | vite on :5173: one page per deployment plus the demo page |

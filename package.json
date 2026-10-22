@@ -5,18 +5,22 @@
   "scripts": {
     "typecheck": "pnpm -r --workspace-concurrency=1 typecheck",
     "test": "vitest run",
+    "test:browser": "vitest run --config vitest.browser.config.ts",
+    "test:browser:ui": "vitest --watch --config vitest.browser.config.ts --browser.headless=false",
     "dev:server": "pnpm --filter @mufw/example-auction dev:server",
     "dev:client": "pnpm --filter @mufw/example-auction dev:client",
     "start:server": "pnpm --filter @mufw/example-auction start:server",
     "build:client": "pnpm --filter @mufw/example-auction build:client"
   },
   "devDependencies": {
+    "@effect/vitest": "^4.0.5",
+    "@types/node": "^24.0.0",
+    "@vitest/browser-playwright": "5.0.5",
+    "effect": "^4.0.5",
+    "playwright": "^1.64.1",
+    "tsx": "^4.20.0",
     "typescript": "^5.9.3",
     "vitest": "^5.0.5",
-    "@effect/vitest": "^4.0.5",
-    "effect": "^4.0.5",
-    "tsx": "^4.20.0",
-    "xstate": "^5.33.3",
-    "@types/node": "^24.0.0"
+    "xstate": "^5.33.3"
   }
 }

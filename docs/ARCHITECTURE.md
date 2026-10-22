@@ -15,7 +15,7 @@ Living document: change it in the same commit that changes what it describes. De
 flowchart LR
   subgraph Driving adapters
     View["@mufw/view-uhtml<br/>layerMount"]
-    Drivers["@mufw/test<br/>presentDriver / intentDriver"]
+    Drivers["@mufw/test<br/>presentDriver / intentDriver / domDriver"]
     Handlers["@mufw/rpc<br/>layerHandlers (server side)"]
   end
   subgraph Core["@mufw/core"]

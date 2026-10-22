@@ -1,32 +1,11 @@
 import { assert, describe, it } from "@effect/vitest"
-import {
-  AutoActions,
-  type DispatchRefused,
-  type IntentPort,
-  layerLoopLocal,
-  type ModelPort,
-  type PathStep
-} from "@mufw/core"
-import { createTestModel, type Driver, intentDriver } from "@mufw/test"
-import { Effect, Layer, Option, Stream } from "effect"
-import { TestClock } from "effect/testing"
-import { AUCTION_LENGTH, Auction, type Intent } from "../src/domain/Auction.ts"
-import { Amount, Bidder, SessionToken } from "../src/domain/Values.ts"
+import { Effect, Layer } from "effect"
 import { layerAuthenticationServer } from "../src/adapters/authenticationServer.ts"
-import { layerCreditCheckTable } from "../src/adapters/creditCheckTable.ts"
-import { layerCurrentBidderFixed } from "../src/adapters/currentBidderFixed.ts"
 import { layerSessionsTable } from "../src/adapters/sessionsTable.ts"
 import { layerAuthenticationClient } from "../src/authentication.ts"
-import { Ports, Rpc } from "../src/ports.ts"
-import { auctionTestModel } from "./model.ts"
-
-const model = createTestModel(Auction, Ports, auctionTestModel)
-
-const Local = layerLoopLocal(Auction, Ports).pipe(
-  Layer.provide(layerCreditCheckTable),
-  Layer.provide(layerCurrentBidderFixed(Bidder.make("alice"))),
-  Layer.provide(Layer.succeed(AutoActions, false))
-)
+import { SessionToken } from "../src/domain/Values.ts"
+import { Rpc } from "../src/ports.ts"
+import { auctionModel as model, clockedIntentDriver, currentRepresentation, Local, named } from "./drivers.ts"
 
 const Remote = Layer.merge(Rpc.layerModelRemote, Rpc.layerHistoryRemote).pipe(
   Layer.provide(Rpc.layerClientTest),
@@ -35,8 +14,6 @@ const Remote = Layer.merge(Rpc.layerModelRemote, Rpc.layerHistoryRemote).pipe(
   Layer.provide(layerAuthenticationServer.pipe(Layer.provide(layerSessionsTable))),
   Layer.provide(Local)
 )
-
-const named = (paths: typeof model.shortestPaths) => paths().map((path) => ({ name: model.describe(path), path }))
 
 describe("local placement", () => {
   it.effect.each(named(model.shortestPaths))("shortest: $name", ({ path }) => model.run(path).pipe(Effect.provide(Local)))
@@ -47,49 +24,6 @@ describe("remote placement (in-process RPC)", () => {
   it.effect.each(named(model.shortestPaths))("shortest: $name", ({ path }) => model.run(path).pipe(Effect.provide(Remote)))
   it.effect.each(named(model.simplePaths))("simple: $name", ({ path }) => model.run(path).pipe(Effect.provide(Remote)))
 })
-
-const intentFor = (step: PathStep<typeof Auction>): Intent => {
-  const proposal = step.proposal
-  if (proposal._tag === "Bid") return { _tag: "PlaceBid", amount: proposal.amount }
-  if (proposal._tag === "BidRejected") return { _tag: "PlaceBid", amount: Amount.make(1_000_000) }
-  if (proposal._tag === "Opened") return { _tag: "Open" }
-  return { _tag: proposal._tag }
-}
-
-const currentRepresentation = Ports.ModelPort.use((port) => Stream.runHead(port.representations)).pipe(
-  Effect.map(Option.getOrThrow)
-)
-
-/** The explored `Opened` proposal carries the initial model's clock. */
-const OPENED_AT = Auction.initial.now
-
-/** Advances the clock a second at a time until the `Tick` action, which sleeps one second, has presented. */
-const advanceUntilTicked = (now: number) =>
-  Effect.gen(function*() {
-    const expectedRemaining = Math.max(0, Math.ceil((OPENED_AT + AUCTION_LENGTH - now) / 1000))
-    for (let attempt = 0; attempt < 5; attempt++) {
-      if ((yield* currentRepresentation).remainingSeconds <= expectedRemaining) return
-      yield* TestClock.adjust("1 second")
-    }
-  })
-
-/** Drives the real actions with the clock set to the time each explored proposal assumes. */
-const clockedIntentDriver: Driver<
-  typeof Auction,
-  IntentPort<typeof Auction> | ModelPort<typeof Auction>,
-  DispatchRefused
-> = {
-  appliesOnReturn: false,
-  step: (step) =>
-    Effect.gen(function*() {
-      const proposal = step.proposal
-      if (proposal._tag === "Opened") yield* TestClock.setTime(proposal.at)
-      if (proposal._tag === "Tick") yield* TestClock.setTime(proposal.now)
-      if (proposal._tag === "Bid") yield* TestClock.setTime(proposal.at)
-      yield* intentDriver(Ports, intentFor).step(step)
-      if (proposal._tag === "Tick") yield* advanceUntilTicked(proposal.now)
-    })
-}
 
 describe("intent driver", () => {
   it.effect("reaches sold through the real actions", () =>
