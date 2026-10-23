@@ -1,7 +1,7 @@
 import { Effect, Option, Schema } from "effect"
 import { layerTimeTravel, runPage } from "./app.ts"
 import { pageLabels } from "./labels.ts"
-import { parseIdentity, parsePlacement, parseWalletOwner } from "./placement.ts"
+import { parseIdentity, parsePlacement } from "./placement.ts"
 import { browserOnly } from "./placements/browserOnly.ts"
 import { httpReadOnly } from "./placements/httpReadOnly.ts"
 import { serverActions } from "./placements/serverActions.ts"
@@ -26,8 +26,7 @@ const placement = parsePlacement(location.search)
 runPage(
   placements[`${placement.model}/${placement.actions}`](),
   pageLabels["demo"](location.search),
-  layerTimeTravel(),
-  parseWalletOwner(placement.actions, location.search)
+  layerTimeTravel()
 )
 
 /**

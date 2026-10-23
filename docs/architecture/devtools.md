@@ -32,8 +32,8 @@ A travel row shows its source from the record's `travelledTo`; it does not infer
 An `init` record opens a history: the panel drops its rows when one arrives, so a restarted server's
 history replaces the old one.
 
-The example mounts a panel from the composition root: `runPage(placement, label, devtools,
-walletOwner)` takes the page's devtools layer. `demo.ts` passes `layerTimeTravel()` (`layerPanel`,
+The example mounts a panel from the composition root: `runPage(placement, label, devtools)` takes
+the page's devtools layer. `demo.ts` passes `layerTimeTravel()` (`layerPanel`,
 which needs a server that serves `TravelTo`), and so does the `worker` page, whose worker serves
 `TravelTo`; the four other auction entries (`browser-only`, `server-actions`, `server-model`,
 `server-owned`) pass `Layer.empty`. The `devtools` page

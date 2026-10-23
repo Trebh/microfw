@@ -90,9 +90,9 @@ export class ReplayBaseMismatch extends Schema.TaggedError<ReplayBaseMismatch>()
 }) {}
 
 /**
- * Replays on the live loop, through the ports alone: `travelTo(seq)`, then `present` for the
- * proposal of every later `step` record, in order. The loop's own history gains a `travel` record
- * and one `step` record per proposal, under new seqs.
+ * Replays on the live loop, through the ports alone: `travelTo(seq)`, then `HistoryPort.replay`
+ * of the proposal of every later `step` record, in order. The loop's own history gains a `travel`
+ * record and one `step` record per proposal, under new seqs.
  *
  * `travelTo(seq)` restores what the live loop recorded under `seq`, which is the recorded base only
  * if the loop made the same steps (an imported history, or a loop that has moved on, may not). After
@@ -102,10 +102,9 @@ export class ReplayBaseMismatch extends Schema.TaggedError<ReplayBaseMismatch>()
  * `ReplayBaseMismatch`. The comparison cannot see a model difference that the representation does
  * not show.
  *
- * Every `present` runs the loop's `nap`, and the recorded history already holds the automatic
- * proposals it produced. Reproducing the recording therefore needs a loop whose automatic actions
- * are off (`AutoActions` false); with them on, `nap` starts them again and they apply a second
- * time.
+ * The replay runs no `nap`: the recorded history already holds the automatic proposals, so it is
+ * the same whether the loop's automatic actions are on or off. Like a travel, it leaves the loop
+ * quiescent: no automatic action starts for the state it ends in.
  *
  * Fails with `NoSuchStep` when `records` holds no record `seq`, before touching the ports, or when
  * the loop no longer retains it.
@@ -123,5 +122,5 @@ export const replayInto = <D extends AnyDefinition, R>(
     const live = yield* Stream.runHead(model.representations)
     const isRecordedBase = Option.exists(live, (current) => Equal.equals(current, base.representation))
     if (!isRecordedBase) return yield* new ReplayBaseMismatch({ seq })
-    yield* Effect.forEach(stepsAfter(records, seq), ({ proposal }) => model.present(proposal), { discard: true })
+    yield* history.replay(stepsAfter(records, seq).map(({ proposal }) => proposal))
   })

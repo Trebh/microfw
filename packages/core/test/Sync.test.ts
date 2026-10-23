@@ -1,39 +1,14 @@
 import { assert, describe, it } from "@effect/vitest"
-import { Cause, Context, Effect, Exit, Fiber, Latch, Layer, Option, Stream } from "effect"
-import { EventJournal, EventLogMessage, EventLogRemote } from "effect/eventlog"
-import { RpcTest } from "effect/rpc"
+import { Cause, Context, Deferred, Effect, Exit, Fiber, Latch, Layer, Stream } from "effect"
+import { EventJournal, EventLogRemote } from "effect/eventlog"
 import { TestClock } from "effect/testing"
-import {
-  AutoActions,
-  type HistoryPortShape,
-  layerLoopSynced,
-  layerSyncLogClient,
-  layerSyncLogStorage,
-  layerSyncAuthorization,
-  layerSyncServer,
-  type ModelPortShape,
-  SyncLog
-} from "../src/index.ts"
-import { Counter, Ports } from "./fixtures/Counter.ts"
-import { awaitFirst, collect, settle } from "./support.ts"
+import { LogId, type LogSubscription, noLease, SyncLog, type SyncLogMismatch } from "../src/index.ts"
+import { Counter } from "./fixtures/Counter.ts"
+import { countIs, countsOf, currentRepresentation, harness, instanceOn, loopOn, readLog } from "./fixtures/SyncHarness.ts"
+import { awaitFirst, settle } from "./support.ts"
 
 const inc = (by: number) => ({ _tag: "Inc", by }) as const
 const reset = { _tag: "Reset" } as const
-
-/**
- * One log server (in-memory storage, the event-log RPC handlers) and the two ways an instance
- * reaches it: the server's own process reads and writes its storage; another process is an
- * event-log client over an in-process connection to the handlers.
- */
-const harness = Effect.gen(function*() {
-  const context = yield* Layer.build(layerSyncServer(Counter).pipe(Layer.provide(layerSyncAuthorization)))
-  const server = Layer.succeedContext(context)
-  const rpcClient = Layer.effect(EventLogRemote.EventLogRemoteClient, RpcTest.makeClient(EventLogMessage.EventLogRemoteRpcs))
-  return {
-    hostLog: layerSyncLogStorage(Counter).pipe(Layer.provide(server)),
-    clientLog: layerSyncLogClient(Counter).pipe(Layer.provide(rpcClient), Layer.provide(server))
-  }
-})
 
 /** Wraps a log so that `append` waits for `latch`: a proposal formed on an instance that reaches the log late. */
 const slowAppend = <E, R>(log: Layer.Layer<SyncLog, E, R>, latch: Latch.Latch) =>
@@ -55,13 +30,17 @@ const lostAfter = <E, R>(log: Layer.Layer<SyncLog, E, R>, delivered: number, sub
     Effect.gen(function*() {
       const inner = yield* SyncLog
       const lost = new EventLogRemote.EventLogRemoteError({ method: "changes", cause: "connection lost" })
-      const entries = (from: number) => {
-        subscribedFrom.push(from)
-        const isFirst = subscribedFrom.length === 1
-        const cut = Stream.concat(inner.entries(from).pipe(Stream.take(delivered)), Stream.fail(lost))
-        return isFirst ? cut : inner.entries(from)
-      }
-      return SyncLog.of({ ...inner, entries })
+      const cut = (subscription: LogSubscription): LogSubscription => ({
+        log: subscription.log,
+        entries: Stream.concat(subscription.entries.pipe(Stream.take(delivered)), Stream.fail(lost))
+      })
+      const follow = (from: number) =>
+        Effect.suspend(() => {
+          subscribedFrom.push(from)
+          const isFirst = subscribedFrom.length === 1
+          return Effect.map(inner.follow(from), (subscription) => isFirst ? cut(subscription) : subscription)
+        })
+      return SyncLog.of({ ...inner, follow })
     })
   ).pipe(Layer.provide(log))
 
@@ -106,30 +85,6 @@ const corruptingProposals = <E, R>(log: Layer.Layer<SyncLog, E, R>) =>
       return SyncLog.of({ ...inner, append: (entry) => inner.append(corrupt(entry)) })
     })
   ).pipe(Layer.provide(log))
-
-interface Instance {
-  readonly model: ModelPortShape<typeof Counter>
-  readonly history: HistoryPortShape<typeof Counter>
-}
-
-const instanceOn = <E, R>(log: Layer.Layer<SyncLog, E, R>, autoActions: boolean) =>
-  Layer.build(
-    layerLoopSynced(Counter, Ports).pipe(Layer.provide(log), Layer.provide(Layer.succeed(AutoActions, autoActions)))
-  ).pipe(
-    Effect.map((context): Instance => ({
-      model: Context.get(context, Ports.ModelPort),
-      history: Context.get(context, Ports.HistoryPort)
-    }))
-  )
-
-const currentRepresentation = (instance: Instance) =>
-  Stream.runHead(instance.model.representations).pipe(Effect.map(Option.getOrThrow))
-
-const countIs = (count: number) => (representation: { readonly count: number }) => representation.count === count
-
-/** The count of every record the instance holds, the initial one first. */
-const countsOf = (instance: Instance) =>
-  collect(instance.history.records).pipe(Effect.map((records) => records.map((record) => record.model.count)))
 
 describe("layerLoopSynced", () => {
   it.effect("applies on the other instance a proposal presented on this one", () =>
@@ -280,6 +235,141 @@ describe("layerLoopSynced", () => {
 
       assert.isTrue(Exit.isFailure(exit) && Cause.hasDies(exit.cause))
       assert.deepStrictEqual(yield* countsOf(b), [0])
+    }))
+})
+
+/**
+ * Wraps a log so that its first subscription is lost after `delivered` entries, and every later one
+ * reports `replacement` as the log it follows, as a host restarted over a new log does.
+ */
+const replacedAfterLoss = <E, R>(log: Layer.Layer<SyncLog, E, R>, delivered: number, replacement: LogId) =>
+  Layer.effect(
+    SyncLog,
+    Effect.gen(function*() {
+      const inner = yield* SyncLog
+      const lost = new EventLogRemote.EventLogRemoteError({ method: "changes", cause: "connection lost" })
+      let subscriptions = 0
+      const follow = (from: number) =>
+        Effect.suspend(() => {
+          subscriptions += 1
+          const isFirst = subscriptions === 1
+          return Effect.map(inner.follow(from), (subscription): LogSubscription =>
+            isFirst
+              ? { log: subscription.log, entries: Stream.concat(subscription.entries.pipe(Stream.take(delivered)), Stream.fail(lost)) }
+              : { log: replacement, entries: subscription.entries })
+        })
+      return SyncLog.of({ ...inner, follow })
+    })
+  ).pipe(Layer.provide(log))
+
+const aLogOfItsOwn = LogId.make("0123456789abcdef0123456789abcdef")
+
+describe("layerLoopSynced resuming from a checkpoint", () => {
+  it.effect("applies only the entries after the checkpoint's sequence", () =>
+    Effect.gen(function*() {
+      const { hostLog, clientLog } = yield* harness
+      const a = yield* instanceOn(hostLog, false)
+      yield* a.model.present(inc(2))
+      yield* a.model.present(inc(3))
+      const { log } = yield* readLog(hostLog, 0)
+
+      const joiner = yield* instanceOn(clientLog, false, {
+        resume: { log, sequence: 2, model: { count: 2 }, lease: noLease }
+      })
+
+      assert.deepStrictEqual(yield* countsOf(joiner), [2, 5])
+    }))
+
+  it.effect("ends equal to a joiner that replays the whole log", () =>
+    Effect.gen(function*() {
+      const { hostLog, clientLog } = yield* harness
+      const a = yield* instanceOn(hostLog, false)
+      yield* a.model.present(inc(2))
+      yield* a.model.present(inc(3))
+      const { log } = yield* readLog(hostLog, 0)
+
+      const resumed = yield* instanceOn(clientLog, false, {
+        resume: { log, sequence: 2, model: { count: 2 }, lease: noLease }
+      })
+      const replayed = yield* instanceOn(clientLog, false)
+
+      assert.deepStrictEqual(yield* currentRepresentation(resumed), { controlState: "high", count: 5 })
+      assert.deepStrictEqual(yield* currentRepresentation(resumed), yield* currentRepresentation(replayed))
+    }))
+
+  it.effect("keeps following the log after it has caught up from the checkpoint", () =>
+    Effect.gen(function*() {
+      const { hostLog, clientLog } = yield* harness
+      const a = yield* instanceOn(hostLog, false)
+      yield* a.model.present(inc(2))
+      const { log } = yield* readLog(hostLog, 0)
+      const resumed = yield* instanceOn(clientLog, false, {
+        resume: { log, sequence: 2, model: { count: 2 }, lease: noLease }
+      })
+
+      yield* a.model.present(inc(1))
+
+      assert.deepStrictEqual(yield* awaitFirst(resumed.model.representations, countIs(3)), {
+        controlState: "high",
+        count: 3
+      })
+    }))
+
+  it.effect("fails the layer with SyncLogMismatch when the checkpoint belongs to another log", () =>
+    Effect.gen(function*() {
+      const { hostLog, clientLog } = yield* harness
+      const { log } = yield* readLog(hostLog, 0)
+
+      const error = yield* Effect.flip(
+        Layer.build(
+          loopOn(clientLog, false, { resume: { log: aLogOfItsOwn, sequence: 2, model: { count: 2 }, lease: noLease } })
+        )
+      )
+
+      assert.include(error as object, { _tag: "SyncLogMismatch", expected: aLogOfItsOwn, actual: log })
+    }))
+
+  it.effect("stops applying when a later subscription finds another log", () =>
+    Effect.gen(function*() {
+      const { hostLog, clientLog } = yield* harness
+      const a = yield* instanceOn(hostLog, false)
+      const b = yield* instanceOn(replacedAfterLoss(clientLog, 2, aLogOfItsOwn), false)
+      yield* settle
+
+      yield* TestClock.adjust("1 second")
+      yield* a.model.present(inc(1))
+      yield* settle
+
+      assert.deepStrictEqual(yield* countsOf(a), [0, 1])
+      assert.deepStrictEqual(yield* countsOf(b), [0])
+    }))
+
+  it.effect("fails the caller's stopped signal with the mismatch when it stops applying", () =>
+    Effect.gen(function*() {
+      const { hostLog, clientLog } = yield* harness
+      const { log } = yield* readLog(hostLog, 0)
+      const stopped = yield* Deferred.make<never, SyncLogMismatch>()
+      yield* instanceOn(replacedAfterLoss(clientLog, 1, aLogOfItsOwn), false, { stopped })
+      yield* settle
+
+      yield* TestClock.adjust("1 second")
+      const error = yield* Effect.flip(Deferred.await(stopped))
+
+      assert.include(error as object, { _tag: "SyncLogMismatch", expected: log, actual: aLogOfItsOwn })
+    }))
+
+  it.effect("dies on present with SyncLogMismatch once it has stopped, instead of waiting for an entry nothing applies", () =>
+    Effect.gen(function*() {
+      const { clientLog } = yield* harness
+      const b = yield* instanceOn(replacedAfterLoss(clientLog, 1, aLogOfItsOwn), false)
+      yield* settle
+      yield* TestClock.adjust("1 second")
+      yield* settle
+
+      const exit = yield* Effect.exit(b.model.present(inc(1)))
+
+      assert.isTrue(Exit.isFailure(exit))
+      assert.include(Cause.squash((exit as Exit.Failure<void, never>).cause) as object, { _tag: "SyncLogMismatch" })
     }))
 })
 

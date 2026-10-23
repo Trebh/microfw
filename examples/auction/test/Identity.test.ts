@@ -8,9 +8,10 @@ import { layerAuthenticationAnonymous, layerAuthenticationClient } from "../src/
 import { Auction, type Representation } from "../src/domain/Auction.ts"
 import type { CurrentBidder } from "../src/domain/CurrentBidder.ts"
 import { Amount, Bidder, SessionToken } from "../src/domain/Values.ts"
+import { Whoami } from "../src/domain/Whoami.ts"
 import { Ports, Rpc } from "../src/ports.ts"
 import { ServerPorts, ServerRpc } from "../src/serverPorts.ts"
-import { clientWith } from "./serverSide.ts"
+import { clientWith, whoamiWith } from "./serverSide.ts"
 
 const noAutoActions = Layer.succeed(AutoActions, false)
 
@@ -77,6 +78,31 @@ describe("an RPC that runs actions", () => {
 
       assert.deepStrictEqual(highestBidder(bid), Option.some(Bidder.make("bob")))
     }).pipe(Effect.timeout("5 seconds"), Effect.provide(withSession("demo-bob"))))
+})
+
+describe("Whoami", () => {
+  const askBidder = Whoami.use((whoami) => whoami.bidder)
+
+  it.effect("names the session's bidder", () =>
+    Effect.gen(function*() {
+      const bidder = yield* askBidder
+
+      assert.strictEqual(bidder, Bidder.make("bob"))
+    }).pipe(Effect.provide(whoamiWith(layerAuthenticationClient(SessionToken.make("demo-bob"))))))
+
+  it.effect("without a session fails Unauthenticated", () =>
+    Effect.gen(function*() {
+      const refused = yield* askBidder.pipe(Effect.flip)
+
+      assert.deepStrictEqual([refused._tag, refused.message], ["Unauthenticated", "No session"])
+    }).pipe(Effect.provide(whoamiWith(layerAuthenticationAnonymous))))
+
+  it.effect("with an unknown session fails Unauthenticated", () =>
+    Effect.gen(function*() {
+      const refused = yield* askBidder.pipe(Effect.flip)
+
+      assert.deepStrictEqual([refused._tag, refused.message], ["Unauthenticated", "Unknown session"])
+    }).pipe(Effect.provide(whoamiWith(layerAuthenticationClient(SessionToken.make("demo-mallory"))))))
 })
 
 describe("a page whose server runs the actions", () => {

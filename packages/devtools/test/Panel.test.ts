@@ -38,7 +38,7 @@ const initial = {
 const panelWithTravel = (travelTo: () => Effect.Effect<void>) => {
   const root = document.createElement("div") as unknown as Element
   const deps = Layer.mergeAll(
-    Layer.succeed(Ports.HistoryPort, { records: Stream.make(initial), travelTo }),
+    Layer.succeed(Ports.HistoryPort, { records: Stream.make(initial), travelTo, replay: () => Effect.void }),
     Layer.succeed(Marker, "from-layer")
   )
   const layer = layerPanel(Counter, Ports, { root, render, html }).pipe(Layer.provideMerge(deps))
@@ -112,7 +112,7 @@ describe("layerPanel travel rows", () => {
     const root = document.createElement("div") as unknown as Element
     const travel = { ...step(3, 1), kind: "travel" as const, proposal: Option.none(), travelledTo: 1 }
     const records = Stream.make(initial, step(1, 1), step(2, 1), travel)
-    const history = Layer.succeed(Ports.HistoryPort, { records, travelTo: () => Effect.void })
+    const history = Layer.succeed(Ports.HistoryPort, { records, travelTo: () => Effect.void, replay: () => Effect.void })
     const layer = layerPanel(Counter, Ports, { root, render, html }).pipe(Layer.provideMerge(history))
     return Effect.gen(function*() {
       yield* rowsRendered(root, 4)
@@ -128,7 +128,7 @@ describe("layerPanel across a restarted history", () => {
   it.effect("starts the rows over at a new init record", () => {
     const root = document.createElement("div") as unknown as Element
     const records = Stream.make(initial, step(1, 1), step(2, 2), initial, step(1, 1))
-    const history = Layer.succeed(Ports.HistoryPort, { records, travelTo: () => Effect.void })
+    const history = Layer.succeed(Ports.HistoryPort, { records, travelTo: () => Effect.void, replay: () => Effect.void })
     const layer = layerPanel(Counter, Ports, { root, render, html }).pipe(Layer.provideMerge(history))
     return Effect.gen(function*() {
       yield* rowsRendered(root, 2)
@@ -146,7 +146,11 @@ describe("layerHistoryList", () => {
     const root = document.createElement("div") as unknown as Element
     const travelled = Deferred.makeUnsafe<void>()
     const records = Stream.make(initial, step(1, 1), step(2, 2))
-    const history = Layer.succeed(Ports.HistoryPort, { records, travelTo: () => Deferred.succeed(travelled, undefined).pipe(Effect.asVoid) })
+    const history = Layer.succeed(Ports.HistoryPort, {
+      records,
+      travelTo: () => Deferred.succeed(travelled, undefined).pipe(Effect.asVoid),
+      replay: () => Effect.void
+    })
     const layer = layerHistoryList(Counter, Ports, { root, render, html }).pipe(Layer.provideMerge(history))
     return Effect.gen(function*() {
       yield* rowsRendered(root, 3)
@@ -167,7 +171,11 @@ describe("layerPanel export", () => {
     const root = document.createElement("div") as unknown as Element
     const saved = Deferred.makeUnsafe<ExportedFile>()
     const records = [initial, step(1, 1), step(2, 2)]
-    const history = Layer.succeed(Ports.HistoryPort, { records: Stream.fromIterable(records), travelTo: () => Effect.void })
+    const history = Layer.succeed(Ports.HistoryPort, {
+      records: Stream.fromIterable(records),
+      travelTo: () => Effect.void,
+      replay: () => Effect.void
+    })
     const layer = layerPanel(Counter, Ports, {
       root,
       render,

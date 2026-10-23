@@ -10,6 +10,8 @@ header { display: flex; gap: 1rem; align-items: baseline; }
 footer { color: #666; font-size: 0.85rem; }
 .connection { margin: 0 0 1rem; padding: 0.4rem 0.8rem; border-radius: 0.5rem; background: #fd9; }
 .connection[hidden] { display: none; }
+.held { margin: 0 0 1rem; padding: 0.4rem 0.8rem; border-radius: 0.5rem; background: #fd9; }
+.held[hidden] { display: none; }
 .refusal { margin: 0 0 1rem; padding: 0.4rem 0.8rem; border-radius: 0.5rem; background: #fbb; }
 .refusal[hidden] { display: none; }
 .mufw-history li { cursor: pointer; font-family: ui-monospace, monospace; font-size: 0.85rem; }

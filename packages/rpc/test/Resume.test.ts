@@ -6,6 +6,7 @@ import { RpcClientError } from "effect/rpc"
 import { Socket } from "effect/socket"
 import { TestClock } from "effect/testing"
 import { Counter, Ports } from "../../core/test/fixtures/Counter.ts"
+import { settle } from "../../core/test/support.ts"
 import { makeRpc, type SamClient } from "../src/index.ts"
 
 const Rpc = makeRpc(Counter, Ports)
@@ -83,6 +84,7 @@ describe("remote streams after a lost socket", () => {
       yield* model.present({ _tag: "Inc", by: 1 })
 
       const resumed = yield* model.representations.pipe(Stream.take(2), Stream.runCollect, Effect.forkChild)
+      yield* settle
       yield* TestClock.adjust("1 second")
 
       const delivered = yield* Fiber.join(resumed)

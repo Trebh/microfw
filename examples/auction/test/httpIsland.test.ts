@@ -2,7 +2,7 @@ import { NodeHttpServer } from "@effect/platform-node"
 import { assert, describe, it } from "@effect/vitest"
 import { AutoActions, layerLoopLocal, type ModelPort } from "@mufw/core"
 import type { SamClient } from "@mufw/rpc"
-import { Context, Effect, Exit, Layer, Option, Queue, Ref, Stream } from "effect"
+import { Context, Deferred, Effect, Exit, Fiber, Layer, Option, Queue, Ref, Stream } from "effect"
 import {
   FetchHttpClient,
   HttpBody,
@@ -12,14 +12,17 @@ import {
   type HttpClientResponse,
   HttpRouter
 } from "effect/http"
+import { layerAuthenticationServer } from "../src/adapters/authenticationServer.ts"
 import { layerCreditCheckTable } from "../src/adapters/creditCheckTable.ts"
+import { layerSessionsTable } from "../src/adapters/sessionsTable.ts"
+import { layerAuthenticationAnonymous } from "../src/authentication.ts"
 import { layerClientOverHttp, layerModelOverHttp } from "../src/client/placements/httpReadOnly.ts"
 import { Auction, type Representation } from "../src/domain/Auction.ts"
 import { Amount, Bidder } from "../src/domain/Values.ts"
-import { layerHttpRoutes, layerLatestRepresentations } from "../src/httpRoutes.ts"
+import { layerHttpHandlers, layerHttpRoutes } from "../src/httpRoutes.ts"
 import { Ports, Rpc } from "../src/ports.ts"
 import { samHttpPath } from "../src/samPath.ts"
-import { ServerPorts } from "../src/serverPorts.ts"
+import { ServerPorts, ServerRpc } from "../src/serverPorts.ts"
 
 const path = samHttpPath(Auction)
 
@@ -131,25 +134,43 @@ describe("representations over HTTP", () => {
     }).pipe(Effect.scoped, Effect.provide(Served)))
 })
 
-describe("the representations the HTTP routes serve", () => {
-  it.effect("skip to the latest for a reader that stopped after the first", () =>
+/** The handlers of the HTTP route behind an in-process client, over a loop the test presents to. */
+const HandlersOfRoute = ServerRpc.layerClientTest.pipe(
+  Layer.provide(layerAuthenticationAnonymous),
+  Layer.provideMerge(layerHttpHandlers),
+  Layer.provideMerge(layerAuthenticationServer.pipe(Layer.provide(layerSessionsTable))),
+  Layer.provideMerge(Loop)
+)
+
+describe("the representations the HTTP route serves", () => {
+  it.effect("skip ahead for a reader that stopped after the first", () =>
     Effect.gen(function*() {
       const server = yield* ServerPorts.ModelPort
-      const served = Context.get(yield* Layer.build(layerLatestRepresentations), ServerPorts.ModelPort)
-      const pull = yield* Stream.toPull(served.representations)
-      const first = yield* pull
+      const client = yield* ServerRpc.Client
+      const gate = yield* Deferred.make<void>()
+      const reader = yield* client.Representations().pipe(
+        Stream.orDie,
+        Stream.tap(() => Deferred.await(gate)),
+        Stream.map((representation) => summary(representation)[1]),
+        Stream.takeUntil((highest) => highest === "bob 400"),
+        Stream.runCollect,
+        Effect.forkChild
+      )
+      yield* Effect.yieldNow.pipe(Effect.repeat({ times: 50 }))
 
       yield* server.present({ _tag: "Opened", at: 1000 })
-      yield* server.present({ _tag: "Bid", bidder: Bidder.make("alice"), amount: Amount.make(10), at: 2000 })
-      yield* server.present({ _tag: "Bid", bidder: Bidder.make("bob"), amount: Amount.make(20), at: 3000 })
-      yield* Effect.yieldNow.pipe(Effect.repeat({ times: 50 }))
-      const resumed = yield* pull
-
-      assert.deepStrictEqual(
-        [summary(first[0]!), summary(resumed[0]!)],
-        [["opening", "no bids"], ["open", "bob 20"]]
+      yield* Effect.forEach(
+        Array.from({ length: 40 }, (_, index) => (index + 1) * 10),
+        (amount) => server.present({ _tag: "Bid", bidder: Bidder.make("bob"), amount: Amount.make(amount), at: 2000 }),
+        { discard: true }
       )
-    }).pipe(Effect.scoped, Effect.provide(Loop)))
+      yield* Effect.yieldNow.pipe(Effect.repeat({ times: 50 }))
+      yield* Deferred.succeed(gate, undefined)
+      const highests = yield* Fiber.join(reader)
+
+      assert.deepStrictEqual([highests[0], highests.at(-1)], ["no bids", "bob 400"])
+      assert.isBelow(highests.length, 41)
+    }).pipe(Effect.provide(HandlersOfRoute)))
 })
 
 describe("the HTTP endpoint", () => {

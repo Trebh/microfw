@@ -74,7 +74,7 @@ Any mismatch or thrown assertion becomes `PathFailure { target, stepIndex, expec
 
 A driver needs only the ports it uses, so the same path runs against `layerLoopLocal`, against
 remote ports over `Rpc.layerClientTest`, or against a live server over a websocket
-(`examples/auction/test/live.ts`).
+(`examples/auction/test/live.ts`, and `test/walletLive.ts` against the second served definition).
 
 `Driver<D, R, E>` types how a transition can fail: `intentDriver` fails with `DispatchRefused`, which
 `TestModel.run` adds to `PathFailure`, and its `R` includes the per-request services of the ports it

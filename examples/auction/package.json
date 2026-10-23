@@ -8,10 +8,14 @@
     "dev:client": "vite",
     "build:client": "tsx scripts/build-client.ts && pnpm run check:bundle",
     "check:bundle": "tsx scripts/check-bundle.ts",
-    "dev:server": "MUFW_RPCS=Submit,Present,Dispatch,Representations,History,TravelTo tsx src/server.ts",
+    "dev:server": "MUFW_RPCS=Submit,Present,Dispatch,Representations,History,TravelTo,Replay tsx src/server.ts",
     "start:server": "tsx src/server.ts",
+    "cert": "tsx scripts/dev-cert.ts",
     "test:live": "tsx test/live.ts",
+    "test:live:wallet": "tsx test/walletLive.ts",
     "test:sync": "tsx test/syncLive.ts",
+    "test:sync:restart": "tsx test/syncRestartLive.ts",
+    "test:sync:failover": "tsx test/syncFailoverLive.ts",
     "compare:transports": "tsx scripts/compare-transports.ts"
   },
   "dependencies": {

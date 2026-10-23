@@ -43,10 +43,10 @@ flowchart LR
 | Domain | The `SamDefinition`: schemas plus pure acceptors, reactors, `state`, `nap` |
 | Application services | The definition's `actions`: the only effectful part, they turn intents into proposals |
 | Driving ports | `IntentPort.dispatch`, `ModelPort.present` |
-| Driven ports | `ActionRunner`, `ModelPort`, `HistoryPort`, `KeyValueStore` (model persistence), `SyncLog` (the ordered log several instances share), and domain services the actions require (`CreditCheck`, `CurrentBidder`) |
+| Driven ports | `ActionRunner`, `ModelPort`, `HistoryPort`, `KeyValueStore` (model, checkpoint and event-log persistence), `SyncLog` (the ordered log several instances share), and domain services the actions require (`CreditCheck`, `CurrentBidder`); a page's `Whoami` |
 | Driving adapters | the uhtml view, test drivers, RPC handlers on the server, the authentication middleware in front of them |
-| Driven adapters | local layers, remote RPC layers, `KeyValueStore.layerMemory`, the example's `layerAtomicFileStore` (temp file + rename over `layerFileSystem`), `layerCreditCheckTable`/`layerCreditCheckPermissive`, `layerSessionsTable`, `layerCurrentBidderFixed`, devtools |
-| Composition roots | one per deployment: `examples/auction/src/client/<page>.ts`, `client/auctionWorker.ts`, `server.ts`, `test/live.ts` |
+| Driven adapters | local layers, remote RPC layers, `KeyValueStore.layerMemory`, the example's `layerAtomicFileStore` (synced temp file + rename + synced directory over `layerFileSystem`), `layerSyncStorage` (the event-log `Storage` over a `KeyValueStore`), `layerCreditCheckTable`/`layerCreditCheckPermissive`, `layerSessionsTable`, `layerCurrentBidderFixed`, `layerWhoamiFixed`/`layerWhoamiRemote`, devtools |
+| Composition roots | one per deployment: `examples/auction/src/client/<page>.ts`, `client/auctionWorker.ts`, `server.ts`, `test/live.ts`, `test/walletLive.ts` |
 
 Ports are Effect service keys (`Context.Service`) created per definition by `makePorts(def)`;
 adapters are `Layer`s. Choosing a placement is choosing layers in a deployment's composition root;
@@ -83,9 +83,9 @@ Code stays inside `Effect`/`Stream`/`Layer` across every package. Effects are ru
 | Browser island | `examples/auction/src/client/ticker.ts` (`runTicker`, called by the demo page's entry point) | `BrowserRuntime.runMain(Layer.launch(ticker))` |
 | Devtools page | `examples/auction/src/client/devtools.ts` | `BrowserRuntime.runMain(Layer.launch(page))` |
 | Stream frame | `examples/auction/src/client/streamEmbed.ts` (`runStreamFrame`, called by the demo page's entry point) | `BrowserRuntime.runMain(show)` |
-| Node server | `examples/auction/src/server.ts` | `Layer.launch(...).pipe(NodeRuntime.runMain)` |
+| Node server | `examples/auction/src/server.ts` | `Layer.launch(...).pipe(Effect.raceFirst(Deferred.await(syncStopped)), NodeRuntime.runMain)`: a synced instance whose log was replaced stops the process |
 | Web worker | `examples/auction/src/client/auctionWorker.ts`, the worker's composition root | `BrowserRuntime.runMain(Layer.launch(workerHost.pipe(Layer.provide(BrowserWorkerRunner.layer))))` |
-| Live tests and scripts | `examples/auction/test/live.ts`, `test/syncLive.ts`, `scripts/*.ts` | `NodeRuntime.runMain(program)` |
+| Live tests and scripts | `examples/auction/test/live.ts`, `test/walletLive.ts`, `test/syncLive.ts`, `test/syncRestartLive.ts`, `test/syncFailoverLive.ts`, `scripts/*.ts` | `NodeRuntime.runMain(program)` |
 | DOM events | `layerMount` dispatch, `layerPanel` and `layerHistoryList` row click and export click | `FiberSet.makeRuntime` captured in the layer: the fiber inherits the layer's services and references and is interrupted with its scope |
 | Tests | every `*.test.ts` | `@effect/vitest` `it.effect` |
 
@@ -95,9 +95,11 @@ Every cut point of the loop is a `Schema`: model, proposal, intent, representati
 record (`stepRecordSchema`). RPC decodes and encodes with them, so a value that crosses the wire
 arrives as a domain type or not at all. Business rejections are proposals (`BidRejected`), not
 errors; technical failures are typed errors (`ActionFailure`, `NoSuchStep`). A call made while the
-transport is down is held until it returns and is then sent once; a call already written when the
-transport drops, which the server may have run, is a defect; the remote streams resubscribe (see
-[placement](architecture/placement.md)).
+transport is down is held until it returns and is then sent once, however many times the connection
+drops before it is written; the page learns how many calls wait from `HeldRequests`, data outside
+the representation, while the call itself waits with no deadline and the domain sees nothing; a call
+already written when the transport drops, which the server may have run, is a defect; the remote
+streams resubscribe (see [placement](architecture/placement.md)).
 
 ## Decisions
 
@@ -120,8 +122,12 @@ Each entry states the choice and the constraint behind it.
   representation, so what counts as a change is the caller's rule. (`nest` is the alternative for
   one loop, one history.)
 - **One websocket path per served definition (`/sam/<name>`), not a definition tag in the wire
-  contract.** The RPC tags stay `Submit`…`TravelTo`; a client builds one protocol and one socket
-  per remote definition, and `MUFW_RPCS` applies to every definition the server serves.
+  contract.** The RPC tags stay `Submit`…`Replay`; a client builds one protocol and one socket
+  per remote definition, and `MUFW_RPCS` applies to every definition the server serves. The server
+  serves two, the auction and the wallet, each with its own loop, `RpcServer.layer` and path, in one
+  `HttpRouter.serve`: nothing collides because ports, client keys and handlers are per definition
+  (`makePorts` prefixes by `def.name`). The served wallet is a separate in-memory instance that no
+  page reads, since the pages keep theirs in the browser.
 - **A server that owns the actions receives intents (`Submit`), not proposals.** Serving `Present`
   to an untrusted client lets it apply any proposal and bypass every rule enforced by the actions.
 - **`Dispatch` returns the proposal and the caller presents it.** It serves a client-side model with
@@ -135,8 +141,10 @@ Each entry states the choice and the constraint behind it.
   it and adds `layerPersistModel`, a fiber that writes the model of every `step` and `travel` record
   read from `HistoryPort`. `layerModelLocal` and the step stay pure and unaware of storage, and a
   write happens after the permit is released, so a slow store never slows a step. Durability is last
-  write wins, with no flush (see [the SAM loop](architecture/sam-loop.md#persistence)). The
-  implementation (memory, files) is chosen at the composition root (`MUFW_STORE` in `server.ts`).
+  write wins, and the store decides what a crash or power loss leaves: the example's file store syncs
+  the file and its directory before it reports a write (see [the SAM loop](architecture/sam-loop.md#persistence)). The
+  implementation (memory, files) is chosen at the composition root (`MUFW_STORE` in `server.ts`); an
+  instance of a synced loop persists a checkpoint instead, see below.
 - **Several instances agree through an ordered log that is the only way a proposal reaches a model.**
   Acceptors need not commute, so instances must apply the same proposals in the same order.
   `layerLoopSynced` makes `ModelPort.present` append the proposal to a `SyncLog` and wait until the
@@ -147,16 +155,53 @@ Each entry states the choice and the constraint behind it.
   arrival order; its `EventLog` runtime is not used, because it applies a writer's entry at once and
   resolves conflicts afterwards by clock-based ids, which would need the acceptors to commute.
   Actions run where the intent arrived; only proposals travel. The log applies any proposal that
-  decodes, as `Present` does, so it is served only to trusted instances. Core holds the mechanism
-  and the in-memory server (effect only); the socket client and the listener are the example's
-  (`MUFW_SYNC` in `server.ts`, `src/sync.ts`). Catch-up, the automatic-actions rule and what breaks
-  convergence are in [the SAM loop](architecture/sam-loop.md#synchronisation-across-instances).
+  decodes, as `Present` does, so it is served only to trusted instances. Core holds the mechanism,
+  the server over any event-log `Storage` and a `Storage` over a `KeyValueStore` (effect only); the
+  socket client, the listener and the choice of store are the example's (`MUFW_SYNC`, `MUFW_STORE` in
+  `server.ts`, `src/sync.ts`). Catch-up, the automatic-actions rule and what breaks convergence are in
+  [the SAM loop](architecture/sam-loop.md#synchronisation-across-instances).
+- **A log has an identity, and what is kept next to a sequence names the log.** Sequences mean
+  something within one log only. The server's `Storage` id, generated when the log is created and kept
+  with it, is the log's `LogId`; a subscription reports it, and an instance that finds another log
+  than the one it joined (or than the one its stored checkpoint names) applies nothing from it and
+  stops with `SyncLogMismatch`. It does not replay the new log over its model: a running replica
+  cannot be reset, and a stored model is not discarded without saying so, as a stored value that does
+  not decode is not replaced by `def.initial`.
+- **Which instance runs the automatic actions is decided by the log, as a lease, not by configuration.**
+  `nap` runs on every instance, so something has to say which one runs its intents. A `Lease { epoch,
+  holder }` entry, next to `Proposal` and `Joined`, claims or renews it; every instance applies lease
+  entries in log order by one compare-and-set rule (a claim wins only for the epoch after the current
+  one), so they agree on the holder at each position of the log without agreeing on a clock. Only the
+  holder's actions drain runs automatic intents (`AutoActionsGate`); an instance that stops hearing the
+  holder for a timeout, by its own `Clock`, claims the next epoch, and the one that loses the lease
+  interrupts its automatic actions in flight, as `travelTo` does. `AutoActions` true means an instance
+  takes part, false that it never ticks. The lease state is in the checkpoint, since a resumed instance
+  reads only the entries after it, and the instance's identity is new with each layer, so a restarted
+  instance never believes it holds a lease its earlier run held. The rule does not fence the proposal
+  of a holder that has not yet heard it was deposed. See
+  [the lease](architecture/sam-loop.md#the-lease).
+- **The log persists in the host's `Storage`, an instance persists a checkpoint, both through a
+  `KeyValueStore`.** `layerSyncStorage` stores the log (id, entries) so a host restart keeps it;
+  `layerLoopSyncedPersisted` stores `{ log, sequence, model, lease }`, decoded once with a `Schema`, so a
+  restarted instance resumes from the model at `sequence` and reads only the entries after it.
+  `layerLoopSynced` stays unaware of storage: it offers each checkpoint to a sliding queue that a
+  separate fiber writes after the permit, as `layerPersistModel` does. A model restored from elsewhere
+  is still not the log's; a checkpoint is, for the log it names. Persistence and `MUFW_SYNC` combine
+  in the example; each instance has a store of its own.
 - **Domain services are ports; their implementations are adapters in separate modules**
   (`CreditCheck` vs `layerCreditCheckTable`), so a browser bundle never contains server secrets.
 - **Identity is a port, not part of the intent.** `PlaceBid` carries an amount; the action reads
   `CurrentBidder`. A server provides it per request from a session token (RPC middleware on
   `Submit` and `Dispatch`), so a client cannot name the bidder; a page that runs its own actions
   provides it at its composition root, because there the browser is trusted with the model anyway.
+- **A page learns its own identity through a port too, `Whoami`, so an island that depends on it
+  needs no claim from the page.** Where the server runs the actions the page asks it: a read-only
+  RPC behind the same middleware, answering with the `CurrentBidder` the middleware provided, or
+  failing with `Unauthenticated`. It is the example's contract (`src/whoami.ts`), not `SamRpcs`:
+  identity is not part of the generic wire contract. A server serves it whatever `MUFW_RPCS` says,
+  because it reveals only the caller's own identity and no RPC that changes anything; where the
+  actions run in the browser the page names its bidder itself (`layerWhoamiFixed`). The wallet
+  follows what `Whoami` says. See [placement](architecture/placement.md#identity).
 - **The dispatcher's services travel with the intent, and are typed.** The bus queue would drop a
   request's context; `IntentEnvelope.context` carries it to the action, generically, so core knows
   nothing of authentication. `Ports<D, R>` puts the per-request services `R` in the `R` of the
@@ -181,6 +226,12 @@ Each entry states the choice and the constraint behind it.
   can cancel the fibers itself under its permit.
 - **History is bounded by count (`HistoryLimit`, default 1000) and always keeps seq 0.** Seqs are
   never reused, and an evicted seq is a `NoSuchStep` like an unknown one.
+- **A stalled reader costs the server a bound, and the history's retention is what backs it.**
+  `records` subscribers share a sliding window (`HistoryBacklog`) and read what they missed from the
+  retained records, because no record may be skipped; served `Representations` slide to the newest
+  (`RepresentationBacklog` in `@mufw/rpc`), because a snapshot supersedes the ones before it. The
+  bound is in the handlers and the model layer, so every transport gets it; a composition root only
+  tunes it (the HTTP route holds one).
 - **Graph nodes are keys (default: control state); exploration states are a finer `serialize`.**
   Some states share a node but enable different transitions (an auction closing before and after
   its deadline); exploring only the first model of each node would miss them.
@@ -188,12 +239,15 @@ Each entry states the choice and the constraint behind it.
   nodes depending on the model; keeping only the first edge hid `closing → sold` in Stately.
 - **A history is replayed as its proposals, never as its models.** `replayFrom` takes the model of
   one record and re-applies the later recorded proposals with `applyProposal`; `replayInto` replays
-  them on the live loop through `HistoryPort.travelTo` and `ModelPort.present`, so it runs on any
+  them on the live loop through `HistoryPort.travelTo` and `HistoryPort.replay`, so it runs on any
   placement, but only against a loop that is at the recorded state at `seq` (it fails with
-  `ReplayBaseMismatch` otherwise) and whose automatic actions are off, because each `present` runs
-  `nap` and the recording already holds the automatic proposals. A `travel` record inside the
-  replayed range is skipped, since the seqs the live loop assigns while replaying differ from the
-  recorded ones.
+  `ReplayBaseMismatch` otherwise). `replay` is a port operation, not a loop of `present`: `present`
+  runs `nap`, and the recording already holds the automatic proposals, so with automatic actions
+  on they would apply twice. Refusing a loop that runs them was not an option, since a remote
+  caller cannot see the server's `AutoActions`; one operation and one wire RPC (`Replay`) say it
+  without the caller knowing. Like `travelTo`, `replay` leaves the loop quiescent: no automatic
+  action starts for the state it ends in. A `travel` record inside the replayed range is skipped,
+  since the seqs the live loop assigns while replaying differ from the recorded ones.
 - **A history is imported by decoding it once with `stepRecordSchema`.** `decodeHistoryJson` is the
   boundary; a record that does not match the definition's schemas is a `SchemaError`, and nothing
   downstream re-checks it.

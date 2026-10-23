@@ -2,6 +2,7 @@ import { NodeRuntime } from "@effect/platform-node"
 import { Console, Effect, Schema } from "effect"
 import { basename } from "node:path"
 import type { Rollup } from "vite"
+import { clientSources, misplacedLocalHalves } from "./auctionLocalHalves.ts"
 import { buildDeployment, buildEntry } from "./build.ts"
 
 class BundleCheckFailure extends Schema.TaggedError<BundleCheckFailure>()("BundleCheckFailure", {
@@ -14,8 +15,8 @@ class BundleCheckFailure extends Schema.TaggedError<BundleCheckFailure>()("Bundl
  * `layerModelLocal` and `layerActionRunnerLocal` of `@mufw/core`: they say nothing about the auction. What does is where
  * the auction's local halves are built, `src/client/placements/auctionLocal.ts`: its exports are
  * names the bundler reports as kept (`renderedExports`), and they survive minification because the
- * bundler reports them before it renames anything. A page that calls `layerModelLocal(Auction, …)`
- * itself, outside that module, is not seen.
+ * bundler reports them before it renames anything. A half built outside that module is not seen in
+ * a bundle; `checkLocalHalvesSource` finds it in the source of the client.
  */
 const AUCTION_MODEL_LOCAL = "auctionModelLocal"
 const AUCTION_ACTION_RUNNER_LOCAL = "auctionActionRunnerLocal"
@@ -121,4 +122,17 @@ const checkDeployment = Effect.fn("checkDeployment")(function*(expected: (typeof
   yield* Console.log(`ok ${expected.deployment}`)
 })
 
-NodeRuntime.runMain(Effect.forEach(expectations, checkDeployment, { discard: true }))
+const root = new URL("..", import.meta.url).pathname
+
+/** A half built outside `auctionLocal.ts` reaches no export that the bundles are checked for, so it is looked for in the source. */
+const checkLocalHalvesSource = Effect.fn("checkLocalHalvesSource")(function*() {
+  const misplaced = misplacedLocalHalves(clientSources(root))
+  if (misplaced.length === 0) return yield* Console.log("ok sources")
+  const where = misplaced.map(({ path, line, call }) => `${path}:${line} ${call}`).join(", ")
+  return yield* new BundleCheckFailure({
+    deployment: "sources",
+    message: `the auction's local halves are built only in src/client/placements/auctionLocal.ts: ${where}`
+  })
+})
+
+NodeRuntime.runMain(checkLocalHalvesSource().pipe(Effect.andThen(Effect.forEach(expectations, checkDeployment, { discard: true }))))

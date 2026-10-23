@@ -10,7 +10,8 @@
     "dev:server": "pnpm --filter @mufw/example-auction dev:server",
     "dev:client": "pnpm --filter @mufw/example-auction dev:client",
     "start:server": "pnpm --filter @mufw/example-auction start:server",
-    "build:client": "pnpm --filter @mufw/example-auction build:client"
+    "build:client": "pnpm --filter @mufw/example-auction build:client",
+    "cert": "pnpm --filter @mufw/example-auction cert"
   },
   "devDependencies": {
     "@effect/vitest": "^4.0.5",

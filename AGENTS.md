@@ -30,10 +30,14 @@ docs/                ARCHITECTURE.md, architecture/*.md, TODO.md
 | `pnpm test:browser:ui` | the same files in a visible Chromium, one step every 700 ms, in watch mode: re-runs on change, `q` quits |
 | `pnpm dev:server` | demo server on :3001 serving every RPC (`MUFW_AUTO_ACTIONS=off` disables automatic actions) |
 | `pnpm start:server` | server with the production defaults (`MUFW_RPCS=Submit,Representations,History`) |
+| `pnpm cert` | with mkcert installed, writes a trusted-once `localhost` certificate and key to `examples/auction/.certs/`; the server speaks HTTPS and HTTP/2 when `MUFW_TLS_CERT` and `MUFW_TLS_KEY` name them |
 | `pnpm dev:client` | vite on :5173: one page per deployment plus the demo page |
 | `pnpm build:client` | one `vite build` per deployment into `examples/auction/dist/<deployment>`, then `check:bundle` |
 | `pnpm --filter @mufw/example-auction test:live` | replays the path tests against a running server started without `MUFW_STORE` (or with an empty store): seq 0 must be `Auction.initial` |
+| `pnpm --filter @mufw/example-auction test:live:wallet` | replays the wallet's path tests against the wallet a running server serves at `/sam/wallet`; any freshly started server has `Wallet.initial` at seq 0 |
 | `pnpm --filter @mufw/example-auction test:sync` | against two running servers that share an event log (`MUFW_SYNC=host` on :3001 with its log on `127.0.0.1:3101`, `MUFW_PORT=3002 MUFW_SYNC=ws://127.0.0.1:3101/eventlog` on :3002, freshly started): bids on both at once and fails unless they end with the same bids |
+| `pnpm --filter @mufw/example-auction test:sync:restart` | starts a host and a joiner of its own, each with a `MUFW_STORE`, on :3211 (log on :3311) and :3212; restarts the host over its store, then the joiner, then the host over an empty store, and fails unless the log, the model and the convergence survive the first two and the joiner stops on the third |
+| `pnpm --filter @mufw/example-auction test:sync:failover` | starts a host that never ticks (`MUFW_AUTO_ACTIONS=off`) and two joiners of its own on :3221 (log on :3321), :3222 and :3223; kills the first joiner, which holds the lease, and fails unless nothing ticks until the lease has timed out, then the second joiner ticks, and the host and it show the same auction (takes about 30 seconds) |
 | `pnpm --filter @mufw/example-auction compare:transports` | starts a server of its own, builds the two ticker pages and prints first paint and update latency of the websocket, HTTP and HTML-stream islands in headless Chromium (once: `pnpm exec playwright install chromium`) |
 
 A change is done when `pnpm typecheck` and `pnpm test` pass and the changed behaviour has been
@@ -54,7 +58,7 @@ for Effect idioms; do not rely on Effect 3 knowledge.
 - `@mufw/core` depends on `effect` only. `@mufw/rpc` stays platform-free: transports and
   serialization are chosen by the application. Adapter packages do not depend on each other.
 - Placement is decided per deployment, at its composition root (`src/client/<page>.ts` calling one
-  module of `src/client/placements/`, `src/client/auctionWorker.ts`, `server.ts`, `test/live.ts`),
+  module of `src/client/placements/`, `src/client/auctionWorker.ts`, `server.ts`, `test/live.ts`, `test/walletLive.ts`),
   by choosing layers. Only the demo page picks a placement at runtime; never let a visitor choose
   what the server trusts. If moving a part between client and server needs a change outside the
   composition root, the design is wrong: fix the port, not the call site.
@@ -114,7 +118,7 @@ Code stays in `Effect`/`Stream`/`Layer` through every layer of the application. 
 
 | Boundary | Place |
 |---|---|
-| Process entry point | `runPage` in `examples/auction/src/client/app.ts`, `runTicker` in `client/ticker.ts`, `runStreamFrame` in `client/streamEmbed.ts`, `client/devtools.ts`, `client/auctionWorker.ts` (the web worker), `server.ts`, `test/live.ts`, `test/syncLive.ts`, the `scripts/` |
+| Process entry point | `runPage` in `examples/auction/src/client/app.ts`, `runTicker` in `client/ticker.ts`, `runStreamFrame` in `client/streamEmbed.ts`, `client/devtools.ts`, `client/auctionWorker.ts` (the web worker), `server.ts`, `test/live.ts`, `test/walletLive.ts`, `test/syncLive.ts`, `test/syncRestartLive.ts`, `test/syncFailoverLive.ts`, the `scripts/` |
 | DOM event handler | `layerMount` dispatch, `layerPanel` and `layerHistoryList` row and export clicks, through a `FiberSet.makeRuntime` runner captured from the layer |
 | Test harness | `it.effect` / `layer` from `@effect/vitest` |
 
@@ -128,7 +132,7 @@ transport loss is turned into a defect, in `@mufw/rpc`.
   no randomness. Put anything effectful in an action and pass its result in the proposal.
 - Each acceptor handles its own tags and returns the model unchanged otherwise.
 - The representation always carries `controlState`; `controlStates` lists every value it can take.
-- `nap` returns at most one intent; automatic intents with an `intentKey` (default their tag) already in flight are skipped.
+- `nap` returns at most one intent; automatic intents with an `intentKey` (default their tag) already in flight are skipped. In a synced loop `nap` runs on every instance and only the holder of the log's lease runs its intents, so an automatic action must be safe to interrupt when the instance loses the lease.
 - Model mutation happens only in `layerModelLocal`, under its permit.
 
 ## Testing rules

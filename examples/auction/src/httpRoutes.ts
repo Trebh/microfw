@@ -1,12 +1,12 @@
-import type { RpcTag } from "@mufw/rpc"
-import { Effect, Layer, Stream } from "effect"
+import { type RpcTag, RepresentationBacklog } from "@mufw/rpc"
+import { Layer } from "effect"
 import { HttpRouter } from "effect/http"
 import { RpcSerialization, RpcServer } from "effect/rpc"
 import { layerAuthenticationServer } from "./adapters/authenticationServer.ts"
 import { layerSessionsTable } from "./adapters/sessionsTable.ts"
 import { Auction } from "./domain/Auction.ts"
 import { samHttpPath } from "./samPath.ts"
-import { ServerPorts, ServerRpc } from "./serverPorts.ts"
+import { ServerRpc } from "./serverPorts.ts"
 
 /**
  * What the HTTP endpoint routes, whatever `MUFW_RPCS` lets the socket serve: it is open to any
@@ -15,20 +15,15 @@ import { ServerPorts, ServerRpc } from "./serverPorts.ts"
 const HTTP_RPCS: ReadonlyArray<RpcTag> = ["Representations"]
 
 /**
- * The loop's `ModelPort` for the HTTP handlers, whose `representations` keeps only the newest one for
- * a reader that falls behind. HTTP has no acks: once a client stops reading, the handler stops
- * pulling and an unbuffered subscription would keep every later representation until the connection
- * closes. Representations are snapshots, so a slow reader skipping to the latest loses nothing.
+ * The handlers hold only the newest representation for a reader that falls behind. HTTP has no
+ * acks: once a client stops reading, the handler stops pulling, and a subscription that kept every
+ * later representation would hold them until the connection closes. Representations are snapshots,
+ * so a slow reader skipping to the latest loses nothing.
  */
-export const layerLatestRepresentations = Layer.effect(ServerPorts.ModelPort)(
-  Effect.gen(function*() {
-    const model = yield* ServerPorts.ModelPort
-    return {
-      present: model.present,
-      representations: model.representations.pipe(Stream.buffer({ capacity: 1, strategy: "sliding" }))
-    }
-  })
-)
+const layerLatestOnly = Layer.succeed(RepresentationBacklog, 1)
+
+/** The handlers the HTTP route serves: the server's, over the loop's ports, holding only the newest representation. */
+export const layerHttpHandlers = ServerRpc.layerHandlers.pipe(Layer.provide(layerLatestOnly))
 
 /**
  * `Representations` as a stream of NDJSON lines, one `POST` per subscription: the response stays
@@ -36,7 +31,7 @@ export const layerLatestRepresentations = Layer.effect(ServerPorts.ModelPort)(
  * serves the same loop as the websocket route when both are built in one `HttpRouter.serve`.
  */
 const layerRpcOverHttp = RpcServer.layer(ServerRpc.exposing(HTTP_RPCS)).pipe(
-  Layer.provide(ServerRpc.layerHandlers.pipe(Layer.provide(layerLatestRepresentations))),
+  Layer.provide(layerHttpHandlers),
   Layer.provide(layerAuthenticationServer.pipe(Layer.provide(layerSessionsTable))),
   Layer.provide(RpcServer.layerProtocolHttp({ path: samHttpPath(Auction) })),
   Layer.provide(RpcSerialization.layerNdjson)

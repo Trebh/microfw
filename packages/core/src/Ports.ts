@@ -65,6 +65,12 @@ export interface HistoryPortShape<D extends AnyDefinition> {
   readonly records: Stream.Stream<StepRecord<D>>
   /** Fails with `NoSuchStep` for a seq that never existed or was evicted by the retention limit. */
   travelTo(seq: number): Effect.Effect<void, NoSuchStep>
+  /**
+   * Applies each proposal in order, as one `step` record apiece, under one hold of the model so no
+   * other proposal falls between them, and runs no `nap`: the loop starts no automatic action, as
+   * after `travelTo`. For a recorded history, which already holds the automatic proposals.
+   */
+  replay(proposals: ReadonlyArray<ProposalOf<D>>): Effect.Effect<void>
 }
 
 export interface IntentBus<D extends AnyDefinition> {

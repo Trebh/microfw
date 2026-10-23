@@ -1,8 +1,11 @@
 import { assert, describe, it } from "@effect/vitest"
-import { ActionFailure, layerLoopLocal, NoSuchStep } from "@mufw/core"
+import { ActionFailure, layerLoopLocal, NoSuchStep, replayInto } from "@mufw/core"
 import { Deferred, Effect, Exit, Fiber, Layer, Option, Stream } from "effect"
 import { RpcClient, RpcServer } from "effect/rpc"
+import { TestClock } from "effect/testing"
 import { Counter, Ports } from "../../core/test/fixtures/Counter.ts"
+import { initRecord, stepRecord } from "../../core/test/fixtures/CounterHistory.ts"
+import { settle } from "../../core/test/support.ts"
 import { makeRpc, type SamClient } from "../src/index.ts"
 
 const Rpc = makeRpc(Counter, Ports)
@@ -113,6 +116,24 @@ describe("remote ports over in-process RPC", () => {
 
       assert.instanceOf(error, NoSuchStep)
       assert.strictEqual(error.seq, 99)
+    }).pipe(Effect.provide(Remote)))
+
+  it.effect("replayInto applies a recorded automatic proposal once on a server that runs automatic actions", () =>
+    Effect.gen(function*() {
+      const model = yield* Ports.ModelPort
+      const recorded = [
+        initRecord(0),
+        stepRecord(1, { _tag: "Inc", by: 4 }, 4),
+        stepRecord(2, { _tag: "Reset" }, 0),
+        stepRecord(3, { _tag: "Inc", by: 1 }, 1)
+      ]
+
+      yield* replayInto(Ports, recorded, 0)
+      yield* settle
+      yield* TestClock.adjust("2 seconds")
+
+      const current = yield* Stream.runHead(model.representations)
+      assert.deepStrictEqual(Option.map(current, (r) => r.count), Option.some(1))
     }).pipe(Effect.provide(Remote)))
 
   it.effect("run returns the proposal computed by the server action", () =>

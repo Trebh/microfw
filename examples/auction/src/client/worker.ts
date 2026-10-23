@@ -1,5 +1,5 @@
 import { layerTimeTravel, runPage } from "./app.ts"
-import { describeIdentity, parseIdentity, parseWalletOwner } from "./placement.ts"
+import { describeIdentity, parseIdentity } from "./placement.ts"
 import { inWorker } from "./placements/worker.ts"
 
 const identity = parseIdentity(location.search)
@@ -8,6 +8,5 @@ const identity = parseIdentity(location.search)
 runPage(
   inWorker(identity.bidder),
   `model:worker,actions:worker · ${describeIdentity("client", identity)}`,
-  layerTimeTravel(),
-  parseWalletOwner("client", location.search)
+  layerTimeTravel()
 )

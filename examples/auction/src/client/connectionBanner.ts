@@ -3,9 +3,9 @@ import { html, render } from "uhtml"
 import { Connection, type ConnectionState } from "./connection.ts"
 
 const messages: Record<ConnectionState, string> = {
-  connecting: "connecting to the server…",
+  connecting: "connecting…",
   connected: "",
-  disconnected: "disconnected from the server, reconnecting…"
+  disconnected: "disconnected, reconnecting…"
 }
 
 /** Pure view of the transport state; hidden while connected, so a page with no remote port shows nothing. */

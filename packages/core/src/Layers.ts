@@ -26,10 +26,24 @@ import {
 import type { HistoryPortShape, IntentBusShape, IntentEnvelope, ModelPortShape, Ports } from "./Ports.ts"
 import { applyProposal, NoSuchStep, type StepKind, type StepRecord } from "./Step.ts"
 
-/** When `false`, intents emitted by `nap` are dropped; user intents still run. */
+/**
+ * When `false`, intents emitted by `nap` are dropped; user intents still run. In a synced loop
+ * (`layerLoopSynced`) `true` means the instance takes part in the lease that owns automatic
+ * actions, not that it runs them: only the holder does.
+ */
 export const AutoActions = Context.Reference<boolean>("@mufw/core/AutoActions", {
   defaultValue: () => true
 })
+
+/**
+ * Whether this instance may run an automatic intent right now, asked each time one is about to
+ * start. A loop that shares automatic actions among instances provides it (`layerLoopSynced`: the
+ * instance that holds the lease); without it `AutoActions` alone decides. An intent is dropped
+ * unless both say yes.
+ */
+export class AutoActionsGate extends Context.Service<AutoActionsGate, {
+  readonly open: Effect.Effect<boolean>
+}>()("@mufw/core/AutoActionsGate") {}
 
 /**
  * How many records `layerModelLocal` keeps, the initial record (seq 0) included. Seq 0 is never
@@ -39,6 +53,17 @@ export const AutoActions = Context.Reference<boolean>("@mufw/core/AutoActions", 
  */
 export const HistoryLimit = Context.Reference<number>("@mufw/core/HistoryLimit", {
   defaultValue: () => 1000
+})
+
+/**
+ * How many records a subscriber to `records` can lag behind before the loop stops holding them for
+ * it: the live records are published through a window of this size, which a subscriber that
+ * stops reading can never grow. A subscriber that falls out of the window reads what it missed
+ * from the retained records (`HistoryLimit`) when it resumes, so a backlog below the limit loses
+ * nothing the history still holds. A backlog below 1 is 1.
+ */
+export const HistoryBacklog = Context.Reference<number>("@mufw/core/HistoryBacklog", {
+  defaultValue: () => 64
 })
 
 /** The local queue, which also serves as the `IntentPort` of a loop that runs its own actions. */
@@ -77,12 +102,13 @@ interface ModelStore<D extends AnyDefinition> {
 const makeStore = <D extends AnyDefinition>(def: D, initial: ModelOf<D>) =>
   Effect.gen(function*() {
     const limit = yield* HistoryLimit
+    const backlog = yield* HistoryBacklog
     const store: ModelStore<D> = {
       model: yield* Ref.make<ModelOf<D>>(initial),
       representation: yield* SubscriptionRef.make<RepresentationOf<D>>(def.state(initial)),
       records: [],
       retention: Math.max(2, limit),
-      published: yield* PubSub.unbounded<StepRecord<D>>()
+      published: yield* PubSub.sliding<StepRecord<D>>(Math.max(1, backlog))
     }
     return store
   })
@@ -120,6 +146,20 @@ const commit = <D extends AnyDefinition>(store: ModelStore<D>, transition: Trans
     yield* PubSub.publish(store.published, record)
   })
 
+/**
+ * Passes the live records through in seq order. A record that follows a gap, because the subscriber
+ * lagged past the published window, is preceded by the retained records the gap covered; the ones
+ * already evicted are skipped, as a new subscriber never sees them.
+ */
+const closingGaps = <D extends AnyDefinition>(store: ModelStore<D>, firstExpected: number) => {
+  const next = (expected: number, record: StepRecord<D>): readonly [number, ReadonlyArray<StepRecord<D>>] => {
+    if (record.seq === expected) return [record.seq + 1, [record]]
+    const missed = store.records.filter((retained) => retained.seq >= expected && retained.seq < record.seq)
+    return [record.seq + 1, [...missed, record]]
+  }
+  return Stream.mapAccum(() => firstExpected, next)
+}
+
 /** Replays the records retained at subscription time, then follows live ones without gaps or duplicates. */
 const recordsOf = <D extends AnyDefinition>(store: ModelStore<D>): Stream.Stream<StepRecord<D>> =>
   Stream.unwrap(
@@ -127,7 +167,10 @@ const recordsOf = <D extends AnyDefinition>(store: ModelStore<D>): Stream.Stream
       const live = yield* PubSub.subscribe(store.published)
       const existing = store.records.slice()
       const lastExisting = existing.at(-1)?.seq ?? -1
-      const fresh = Stream.fromSubscription(live).pipe(Stream.filter((record) => record.seq > lastExisting))
+      const fresh = Stream.fromSubscription(live).pipe(
+        Stream.filter((record) => record.seq > lastExisting),
+        closingGaps(store, lastExisting + 1)
+      )
       return Stream.concat(Stream.fromIterable(existing), fresh)
     })
   )
@@ -143,12 +186,13 @@ const makeModelPort = <D extends AnyDefinition>(
       onNone: () => Effect.void,
       onSome: (intent) => bus.dispatchAuto(intent)
     })
-  const step = (proposal: ProposalOf<D>) =>
+  const napAgain = permit.withPermits(1)(Effect.flatMap(SubscriptionRef.get(store.representation), runNap))
+  const applyStep = (proposal: ProposalOf<D>) =>
     Effect.gen(function*() {
       const model = applyProposal(def, yield* Ref.get(store.model), proposal)
       const representation = def.state(model)
       yield* commit(store, { kind: "step", proposal: Option.some(proposal), model, representation })
-      yield* runNap(representation)
+      return representation
     })
   const travel = (seq: number) =>
     Effect.gen(function*() {
@@ -159,18 +203,40 @@ const makeModelPort = <D extends AnyDefinition>(
       yield* commit(store, { kind: "travel", proposal: Option.none(), model, representation, travelledTo: seq })
     })
   const port: ModelPortShape<D> & HistoryPortShape<D> = {
-    present: (proposal) => permit.withPermits(1)(step(proposal)),
+    present: (proposal) => permit.withPermits(1)(Effect.flatMap(applyStep(proposal), runNap)),
     representations: SubscriptionRef.changes(store.representation),
     records: recordsOf(store),
-    travelTo: (seq) => permit.withPermits(1)(travel(seq))
+    travelTo: (seq) => permit.withPermits(1)(travel(seq)),
+    replay: (proposals) => permit.withPermits(1)(Effect.forEach(proposals, applyStep, { discard: true }))
   }
-  return { port, runNap }
+  return { port, runNap, napAgain }
 }
 
 /** Starts a local loop from a model other than `def.initial`, already decoded by the caller. */
 export interface LocalModelOptions<D extends AnyDefinition> {
   readonly initial?: ModelOf<D>
 }
+
+/**
+ * The local model without a layer around it: both ports in one object, and a read of the model
+ * the last committed record holds. Seq 0 (`init`) carries `options.initial` when given, else
+ * `def.initial`. `layerModelLocal` is this, provided under the ports' keys; a loop that applies
+ * proposals itself and must know the model after each one (`layerLoopSynced`) uses it directly.
+ */
+export const makeLocalModel = <D extends AnyDefinition>(
+  def: D,
+  bus: Pick<IntentBusShape<D>, "dispatchAuto" | "interruptAuto">,
+  options?: LocalModelOptions<D>
+) =>
+  Effect.gen(function*() {
+    const initial = options?.initial ?? def.initial
+    const store = yield* makeStore(def, initial)
+    const { port, runNap, napAgain } = makeModelPort(def, store, bus)
+    const representation = def.state(initial)
+    yield* commit(store, { kind: "init", proposal: Option.none(), model: initial, representation })
+    yield* runNap(representation)
+    return { port, model: Ref.get(store.model), napAgain }
+  })
 
 /**
  * In-process model: one state object provides both `ModelPort` and `HistoryPort`. Requires
@@ -185,12 +251,7 @@ export const layerModelLocal = <D extends AnyDefinition, R = never>(
   Layer.effectContext(
     Effect.gen(function*() {
       const bus = yield* ports.IntentBus
-      const initial = options?.initial ?? def.initial
-      const store = yield* makeStore(def, initial)
-      const { port, runNap } = makeModelPort(def, store, bus)
-      const representation = def.state(initial)
-      yield* commit(store, { kind: "init", proposal: Option.none(), model: initial, representation })
-      yield* runNap(representation)
+      const { port } = yield* makeLocalModel(def, bus, options)
       return Context.make(ports.ModelPort, port).pipe(Context.add(ports.HistoryPort, port))
     })
   )
@@ -231,6 +292,9 @@ export const layerActionRunnerLocal = <D extends AnyDefinition, R = never>(def: 
  * identity survives the queue; an automatic one runs with none, so an action that needs a
  * per-request service dies when `nap` triggers it.
  *
+ * An automatic intent is dropped when `AutoActions` is false or when the `AutoActionsGate` in
+ * context, if any, is closed at the moment the intent is taken from the queue.
+ *
  * Automatic actions run on the bus's fibers, which `travelTo` interrupts. A defect in any action
  * or in its `present` is logged with the intent tag and the cause; the drain keeps running.
  */
@@ -241,6 +305,11 @@ export const layerActionsDrain = <D extends AnyDefinition, R = never>(def: D, po
       const runner = yield* ports.ActionRunner
       const model = yield* ports.ModelPort
       const autoActions = yield* AutoActions
+      const gate = yield* Effect.serviceOption(AutoActionsGate)
+      const mayRunAuto = Option.match(gate, {
+        onNone: () => Effect.succeed(autoActions),
+        onSome: ({ open }) => Effect.map(open, (isOpen) => autoActions && isOpen)
+      })
       const inFlight = new Set<string>()
       const present = (tag: string, action: Effect.Effect<ProposalOf<D>, ActionFailure>) =>
         action.pipe(
@@ -248,11 +317,10 @@ export const layerActionsDrain = <D extends AnyDefinition, R = never>(def: D, po
           Effect.catchTag("ActionFailure", (failure) => Effect.logWarning("action failed", failure)),
           Effect.catchDefect((defect) => Effect.logError("action died", tag, Cause.die(defect)))
         )
-      const runAuto = (envelope: IntentEnvelope<IntentOf<D>, R>) =>
+      const startAuto = (envelope: IntentEnvelope<IntentOf<D>, R>) =>
         Effect.suspend(() => {
           const tag = envelope.intent._tag
           const key = intentKeyOf(def, envelope.intent)
-          if (!autoActions) return Effect.logDebug("auto action dropped", tag)
           if (inFlight.has(key)) return Effect.logDebug("auto action already in flight", tag)
           inFlight.add(key)
           const action = Effect.provideContext(runner.run(envelope.intent), envelope.context).pipe(
@@ -260,6 +328,9 @@ export const layerActionsDrain = <D extends AnyDefinition, R = never>(def: D, po
           )
           return bus.runAuto(present(tag, action))
         })
+      const runAuto = (envelope: IntentEnvelope<IntentOf<D>, R>) =>
+        Effect.flatMap(mayRunAuto, (mayRun) =>
+          mayRun ? startAuto(envelope) : Effect.logDebug("auto action dropped", envelope.intent._tag))
       const handle = (envelope: IntentEnvelope<IntentOf<D>, R>) =>
         envelope.origin === "auto"
           ? runAuto(envelope)

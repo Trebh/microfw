@@ -7,3 +7,5 @@ import { Wallet } from "./domain/Wallet.ts"
 export const Ports = makePorts(Auction)
 export const WalletPorts = makePorts(Wallet)
 export const Rpc = makeRpc(Auction, Ports, Authentication)
+/** The wallet's wire contract: its actions need no identity, so no middleware. */
+export const WalletRpc = makeRpc(Wallet, WalletPorts)

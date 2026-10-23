@@ -47,13 +47,8 @@ visible end to end.
 
 Near term. The open gaps, each with what done looks like, are in [docs/TODO.md](docs/TODO.md):
 
-- Transports that bound what a stalled or disconnected client costs, and a page that can tell a
-  call is held.
-- A synchronised deployment that survives a host restart, starts a late instance from a stored
-  model and hands the automatic actions to another instance when theirs stops.
-- A server-owned page that learns its identity from the server, so an island that depends on it
-  (the wallet) needs no claim from the page.
-- Several definitions served by one server, each at its own path.
+- A synchronised log that can be cut at a snapshot, refuses a checkpoint ahead of it, and fences
+  the proposals of an instance that lost the automatic actions.
 - Packages a consumer outside the workspace can install.
 
 Longer term, µFW aims to compete with XState on its own ground — modelling, visualisation and

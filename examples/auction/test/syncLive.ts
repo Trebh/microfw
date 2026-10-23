@@ -12,7 +12,8 @@ import { samPath } from "../src/samPath.ts"
  * Two servers that share an event log (`MUFW_SYNC=host` on the first, `MUFW_SYNC=ws://…/eventlog`
  * on the second) must show the same auction: a bid made through either is on both, and two bids
  * made at once end in the same order on both. The servers need `Submit` and `Representations`
- * (the defaults); only the host runs automatic actions, so the auction opens by itself.
+ * (the defaults); both take part in the lease that picks the instance that runs automatic actions,
+ * so the auction opens by itself on whichever holds it.
  */
 const Host = Config.String("MUFW_SERVER").pipe(Config.withDefault("ws://localhost:3001"))
 const Joiner = Config.String("MUFW_SERVER_2").pipe(Config.withDefault("ws://localhost:3002"))

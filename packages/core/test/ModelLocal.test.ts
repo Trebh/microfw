@@ -1,6 +1,6 @@
 import { assert, describe, it } from "@effect/vitest"
 import { Deferred, Effect, Exit, Fiber, Layer, Option, Stream } from "effect"
-import { AutoActions, HistoryLimit, layerLoopLocal, NoSuchStep } from "../src/index.ts"
+import { AutoActions, HistoryBacklog, HistoryLimit, layerLoopLocal, NoSuchStep } from "../src/index.ts"
 import { Counter, Ports } from "./fixtures/Counter.ts"
 import { collect, settle } from "./support.ts"
 
@@ -162,6 +162,50 @@ describe("layerModelLocal", () => {
       assert.deepStrictEqual(evicted, Exit.fail(new NoSuchStep({ seq: 1 })))
       assert.deepStrictEqual(Option.map(current, (r) => r.count), Option.some(0))
     }).pipe(Effect.provide(LimitedLoop)))
+})
+
+describe("a subscriber to records that stops reading", () => {
+  const present10 = Effect.gen(function*() {
+    const model = yield* Ports.ModelPort
+    yield* Effect.forEach(Array.from({ length: 10 }), () => model.present(inc1), { discard: true })
+  })
+
+  /** Reads the records through a gate that stays shut until the test opens it, so it stalls on the first one. */
+  const stalled = Effect.gen(function*() {
+    const history = yield* Ports.HistoryPort
+    const gate = yield* Deferred.make<void>()
+    const seen = yield* collect(history.records.pipe(Stream.tap(() => Deferred.await(gate))))
+    return { seen, open: Deferred.succeed(gate, undefined) }
+  })
+
+  const Windowed = (limit: number) =>
+    Loop.pipe(
+      Layer.provide(Layer.succeed(HistoryBacklog, 2)),
+      Layer.provide(Layer.succeed(HistoryLimit, limit)),
+      Layer.provide(Layer.succeed(AutoActions, false))
+    )
+
+  it.effect("still receives every record in order when it resumes, while the history retains them", () =>
+    Effect.gen(function*() {
+      const { seen, open } = yield* stalled
+      yield* present10
+
+      yield* open
+      yield* settle
+
+      assert.deepStrictEqual(seen.map((r) => r.seq), [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+    }).pipe(Effect.provide(Windowed(1000))))
+
+  it.effect("is not given the records that fell out of both its window and the retained history", () =>
+    Effect.gen(function*() {
+      const { seen, open } = yield* stalled
+      yield* present10
+
+      yield* open
+      yield* settle
+
+      assert.deepStrictEqual(seen.map((r) => r.seq), [0, 9, 10])
+    }).pipe(Effect.provide(Windowed(3))))
 })
 
 describe("layerModelLocal with an initial model", () => {

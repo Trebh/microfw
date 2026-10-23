@@ -15,7 +15,8 @@ const inferredGroup = RpcGroup.make(
   Rpc.make("Representations", { success: Counter.representation, stream: true }),
   Rpc.make("Dispatch", { payload: Counter.intent, success: Counter.proposal, error: ActionFailure }),
   Rpc.make("History", { success: stepRecordSchema(Counter), stream: true }),
-  Rpc.make("TravelTo", { payload: { seq: Schema.Int }, error: NoSuchStep })
+  Rpc.make("TravelTo", { payload: { seq: Schema.Int }, error: NoSuchStep }),
+  Rpc.make("Replay", { payload: { proposals: Schema.Array(Counter.proposal) } })
 )
 
 const exposedGroup = CounterRpc.exposing(["Submit"])

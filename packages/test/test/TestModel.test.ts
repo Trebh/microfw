@@ -43,7 +43,7 @@ describe("createTestModel", () => {
         present: () => Effect.void,
         representations: Stream.make({ controlState: "low" as const, count: 0 })
       }),
-      Layer.succeed(Ports.HistoryPort, { records: Stream.empty, travelTo: () => Effect.void })
+      Layer.succeed(Ports.HistoryPort, { records: Stream.empty, travelTo: () => Effect.void, replay: () => Effect.void })
     )
     return Effect.gen(function*() {
       const failure = yield* Effect.flip(model.run(pathTo("high")))

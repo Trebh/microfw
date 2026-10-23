@@ -17,7 +17,7 @@ per-request services of the deployment (default `never`, see [Identity](#identit
 | `IntentBus` | `dispatch(intent): Effect<void, never, R>`, `dispatchAuto`, `intents: Stream<IntentEnvelope<_, R>>`, `runAuto(action)`, `interruptAuto` | the local loop: the queue in front of `ActionsDrain`, and the owner of automatic action fibers that `travelTo` interrupts |
 | `ActionRunner` | `run(intent): Effect<proposal, ActionFailure, R>` | `ActionsDrain` |
 | `ModelPort` | `present(proposal)`, `representations: Stream` (current value first) | `ActionsDrain`, the view, `presentDriver` |
-| `HistoryPort` | `records: Stream<StepRecord>` (retained first, then live), `travelTo(seq)` (`NoSuchStep` for an evicted seq) | devtools, test runner |
+| `HistoryPort` | `records: Stream<StepRecord>` (retained first, then live), `travelTo(seq)` (`NoSuchStep` for an evicted seq), `replay(proposals)` (applies them in order without `nap`) | devtools, test runner, `replayInto` |
 
 `IntentPort` is separate from `IntentBus` because a page whose server runs the actions has no
 local queue: its intents go straight to the server.
@@ -34,18 +34,20 @@ never fails; the remote port fails with it.
 | `layerIntentBus` | `IntentBus`, `IntentPort` (local) | — |
 | `layerModelLocal(def, ports, options?)` | `ModelPort`, `HistoryPort` (one state object); `options.initial` replaces `def.initial` as seq 0 | `IntentBus` |
 | `layerActionRunnerLocal` | `ActionRunner` | the actions' services except the ports' `R`, which `run`'s caller supplies |
-| `layerActionsDrain` | — (background fiber) | `IntentBus`, `ActionRunner`, `ModelPort` |
+| `layerActionsDrain` | — (background fiber) | `IntentBus`, `ActionRunner`, `ModelPort`; asks an `AutoActionsGate` when one is provided |
 | `layerLoopLocal(def, ports, options?)` | all five ports, drain running; takes the options of `layerModelLocal` | the actions' services except the ports' `R` |
 | `layerPersistModel(def, ports, key?)` | — (background fiber) | `HistoryPort`, `KeyValueStore` |
 | `layerLoopPersisted(def, ports, key?)` | what `layerLoopLocal` provides, started from the stored model | the actions' services except the ports' `R`, `KeyValueStore` |
-| `layerLoopSynced(def, ports)` | what `layerLoopLocal` provides; `ModelPort.present` appends to the `SyncLog` and returns once the log's entry is applied | the actions' services except the ports' `R`, `SyncLog` |
+| `layerLoopSynced(def, ports, options?)` | what `layerLoopLocal` provides, and `AutoActionsGate`; `ModelPort.present` appends to the `SyncLog` and returns once the log's entry is applied; the instance that holds the log's lease runs the automatic actions; `options`: `resume`, `checkpoints`, `stopped`, `lease` | the actions' services except the ports' `R`, `SyncLog` |
+| `layerLoopSyncedPersisted(def, ports, options?)` | what `layerLoopSynced` provides, resumed from the stored checkpoint (log id, sequence, model, lease) and storing one after each applied entry | the actions' services except the ports' `R`, `SyncLog`, `KeyValueStore` |
 | `layerSyncLogStorage(def)` / `layerSyncLogRemote(def)` / `layerSyncLogClient(def)` | `SyncLog` (the host's storage in-process / over an event-log client protocol / over `EventLogRemoteClient`) | `Storage` / `RpcClient.Protocol` / `EventLogRemoteClient` |
-| `layerSyncServer(def)` / `layerSyncAuthorization` | the event-log RPC handlers and their in-memory `Storage` / `EventLogServerAuthorization`: read by anyone, write only `Proposal` and `Joined` entries | `EventLogServerAuthorization` / — |
+| `layerSyncServer(def)` / `layerSyncAuthorization` | the event-log RPC handlers over the `Storage` in context / `EventLogServerAuthorization`: read by anyone, write only `Proposal`, `Joined` and `Lease` entries | `Storage`, `EventLogServerAuthorization` / — |
+| `layerSyncStorage(def)` | the event-log `Storage` over a `KeyValueStore`: the log and its id survive a restart | `KeyValueStore` |
 | `layerForward(from, to, forward)` | — (background fiber) | `from.ModelPort`, `to.IntentPort` (and `to`'s `R`) |
 | `Rpc.layerIntentPortRemote` / `layerModelRemote` / `layerHistoryRemote` / `layerActionRunnerRemote` | the port | `Rpc.Client` |
-| `Rpc.layerClient` | `Rpc.Client` | `RpcClient.Protocol` (transport chosen by the app), the client half of the authentication middleware |
+| `Rpc.layerClient` | `Rpc.Client`, whose unary calls are counted by the hold layer when it is the protocol | `RpcClient.Protocol` (transport chosen by the app), the client half of the authentication middleware |
 | `Rpc.layerClientTest` | `Rpc.Client` | `Rpc.layerHandlers`, the authentication middleware on both sides (in-process, no serialization) |
-| `Rpc.layerHoldRequestsWhileDisconnected` | `RpcClient.Protocol` that holds a request made while the socket is down | an inner socket `RpcClient.Protocol` that redials without end (see [Deployments](#deployments)) |
+| `Rpc.layerHoldRequestsWhileDisconnected` | `RpcClient.Protocol` that holds a request made while the socket is down until the next connection, whichever client made it, and `HeldRequests`, the count of unary calls of `Rpc.layerClient` waiting | an inner socket `RpcClient.Protocol` that redials without end (see [Deployments](#deployments)) |
 | `Rpc.layerHandlers` | the RPC handlers | `IntentPort`, `ModelPort`, `HistoryPort`, `ActionRunner`, and the ports' `R` except what the middleware provides |
 
 ## Wire contract
@@ -60,14 +62,55 @@ never fails; the remote port fails with it.
 | `Representations` | — | stream of representation | — | read-only |
 | `History` | — | stream of `StepRecord` | — | read-only |
 | `TravelTo` | `{ seq: Int }` | void | `NoSuchStep` | rewrites the server's model; development only |
+| `Replay` | `{ proposals: [proposal] }` | void | — | the server applies the proposals in order, one `step` record each, without running its `nap`; development only, as trusting as `Present` |
 
 `Submit` and `Dispatch` run actions, so `makeRpc(def, ports, authentication)` attaches the
 `authentication` middleware (`RpcMiddleware`, error `Unauthenticated`) to them and to no other RPC.
-`Present` and `TravelTo` stay unauthenticated: they are served only to clients the deployment
+`Present`, `TravelTo` and `Replay` stay unauthenticated: they are served only to clients the deployment
 already trusts with the whole model, and `Representations` and `History` only read.
 
 `Rpc.exposing(tags)` is the group a server serves: an RPC not listed is not routed, so calling it
 fails on the client and changes nothing on the server.
+
+The example adds one RPC of its own beside that contract: `Whoami` (`src/whoami.ts`), with no payload,
+the session's `Bidder` as success and `Unauthenticated` as error, behind the same `Authentication`
+middleware. Its handler returns the `CurrentBidder` the middleware provided, so the answer is what
+the actions would see. It is not in `SamRpcs`: identity (`CurrentBidder`, `Sessions`) is the example's
+domain, and `@mufw/rpc` stays generic over the definition. It is not in `rpcTags` either, so
+`MUFW_RPCS` neither lists nor removes it: `serving(rpcs)` (`src/serverPorts.ts`) is `ServerRpc.exposing(rpcs)`
+plus `WhoamiRpcs`, and `layerServerHandlers` its handlers. The server always serves it because it
+is read-only, runs no action and tells a caller only the identity its own session already has. The client side is the `Whoami` port (`src/domain/Whoami.ts`,
+`{ bidder: Effect<Bidder, Unauthenticated> }`) with `layerWhoamiRemote` over the same protocol as
+`Rpc.layerClient` (a second `RpcClient.make` on one protocol has its own client id), decoding the
+response with the `Bidder` schema; a lost transport is a defect, as in the other remote ports. The
+worker host does not serve it: the `worker` page names its bidder itself.
+
+### Stalled clients
+
+A served stream is pulled one chunk at a time and the server waits for the client's ack before the
+next (the HTTP protocol has no acks, so there the write itself blocks), so a client that stops reading
+stops the handler. What the loop publishes meanwhile is bounded for both streams, in the layer that
+owns the data, so the websocket, the worker and the HTTP route all get it from `Rpc.layerHandlers`
+and `layerModelLocal`:
+
+- **`Representations` keeps the newest.** The handler reads `representations` through a sliding
+  buffer of `RepresentationBacklog` (`@mufw/rpc`, a `Context.Reference`, default 64). A client that
+  falls further behind than that skips to the newest snapshots, which loses nothing: each one is the
+  whole view. A burst that fits in the buffer arrives complete, so a waiter that needs an
+  intermediate representation (`reached` in `@mufw/test`) sees it unless its client stops reading for
+  more than the buffer holds. The HTTP route sets it to 1 at its composition root, because a page
+  there only paints the latest.
+- **`History` keeps nothing for a stalled client.** Records are not snapshots, so none may be
+  skipped. `layerModelLocal` publishes them through a sliding window of `HistoryBacklog` records
+  (`@mufw/core`, default 64) shared by every subscriber, so a subscriber that stops reading cannot
+  make the loop hold more than the window. When it resumes and finds a gap, the stream reads what it
+  missed from the retained records (`HistoryLimit`, default 1000), in seq order and without
+  duplicates: no resubscription is involved, and the client's `undelivered` filter only matters for
+  a lost connection. A subscriber that lags more than the retained records skips the evicted ones,
+  as a subscriber that connects late never sees them; its seqs show the gap.
+
+`packages/rpc/test/Backlog.test.ts` stalls a remote client on its first item and checks both streams;
+`packages/core/test/ModelLocal.test.ts` checks what a stalled `records` subscriber is given.
 
 ### HTTP
 
@@ -103,6 +146,13 @@ Who provides it depends on where the action runs:
   adds it per request. The middleware is `requiredForClient`, so a client cannot be built without
   choosing a session or `layerAuthenticationAnonymous` (what a page that only calls `Present` and
   the read RPCs uses).
+- The page learns the identity the same way it is decided. `Whoami` is the page's port for it
+  (`{ bidder: Effect<Bidder, Unauthenticated> }`): the `serverOwned` and `serverActions` placements
+  provide it with `layerWhoamiRemote`, which sends the same session as the rest of the client's
+  requests and so gets the bidder the server would run an action as; `browserOnly`, `serverModel` and
+  `workerPorts` provide `layerWhoamiFixed(bidder)`, the page's own `?bidder=`, for the same reason
+  `CurrentBidder` is fixed there. Nothing flows from a page's `Whoami` to the server: the server
+  derives every identity it uses from the session alone.
 - The identity has to cross the queue of a server-owned loop. `IntentBus.dispatch` captures the
   services of the dispatching fiber in the `IntentEnvelope`, and `ActionsDrain` runs a user
   intent's action with them; automatic intents carry none, so an action that `nap` triggers must
@@ -132,17 +182,17 @@ Each page of the example is one deployment. Its entry point
 (`src/client/<page>.ts`) calls one placement from `src/client/placements/` and `runPage` (but see
 the `devtools` page below), which
 mounts the view over it plus the devtools layer the entry passes: only the demo and `worker` pass the
-time-travel panel, because only they can rely on `TravelTo` being served. `runPage` also mounts the
-wallet island, for the owner the entry passes (see [Islands](#islands)).
+time-travel panel, because only they can rely on `TravelTo` being served. Every placement `runPage`
+takes also provides the page's `Whoami` (see [Identity](#identity)); `runPage` mounts the wallet island over it (see [Islands](#islands)).
 
 | Page | Model | Actions | Placement layers | RPCs needed |
 |---|---|---|---|---|
-| `browser-only` | browser | browser | bus, drain, local model and runner (`auctionLocal.ts`: permissive credit check, `?bidder=` identity) | none |
-| `server-owned` | server | server | remote `IntentPort`, `ModelPort`, `HistoryPort`, sending `?session=` | `Submit`, `Representations`, `History` |
-| `server-model` | server | browser | local bus, drain, runner (permissive credit check, `?bidder=` identity) + remote model and history, anonymous | `Present`, `Representations`, `History` |
-| `server-actions` | browser | server | local bus, drain, model + remote runner sending `?session=` | `Dispatch` |
+| `browser-only` | browser | browser | bus, drain, local model and runner (`auctionLocal.ts`: permissive credit check, `?bidder=` identity), `layerWhoamiFixed` | none |
+| `server-owned` | server | server | remote `IntentPort`, `ModelPort`, `HistoryPort`, sending `?session=`; remote `Whoami` over the same connection | `Submit`, `Representations`, `History` (`Whoami` is always served) |
+| `server-model` | server | browser | local bus, drain, runner (permissive credit check, `?bidder=` identity) + remote model and history, anonymous; `layerWhoamiFixed` | `Present`, `Representations`, `History` |
+| `server-actions` | browser | server | local bus, drain, model + remote runner sending `?session=`; remote `Whoami` over the same connection | `Dispatch` (`Whoami` is always served) |
 | `devtools` | none | none | remote `HistoryPort` only (`historyOnly.ts`), anonymous; mounts `layerHistoryList` and the connection banner, no view, wallet or `runPage` | `History` |
-| `worker` | worker | worker | remote `IntentPort`, `ModelPort`, `HistoryPort` over `RpcClient.layerProtocolWorker`, anonymous, `?bidder=` sent as the worker's initial message (`placements/worker.ts`); the worker serves them from `layerLoopLocal` (`placements/workerHost.ts`, `auctionLoopLocal`) | `Submit`, `Representations`, `History`, `TravelTo` |
+| `worker` | worker | worker | remote `IntentPort`, `ModelPort`, `HistoryPort` over `RpcClient.layerProtocolWorker`, anonymous, `?bidder=` sent as the worker's initial message (`placements/worker.ts`) and also the page's `layerWhoamiFixed`; the worker serves them from `layerLoopLocal` (`placements/workerHost.ts`, `auctionLoopLocal`) | `Submit`, `Representations`, `History`, `TravelTo` |
 | `index` (demo) | from `?placement=` | | any of the four, chosen at runtime; plus the ticker island, over HTTP (`httpReadOnly.ts`) or the websocket (`socketReadOnly.ts`) from `?ticker=`, and the HTML stream in an `<iframe>` | all, and `Representations` over HTTP |
 
 - Each deployment is built on its own: `vite build --mode <deployment>` takes that page as its only
@@ -159,7 +209,15 @@ wallet island, for the owner the entry passes (see [Islands](#islands)).
   none of the auction's local halves in its page bundle (`auctionLoopLocal`, the worker's, included),
   emit the worker as a file, and, in the module graph built from `src/client/auctionWorker.ts` (a
   page's build emits a worker as an opaque minified file), ship `auctionLoopLocal` and neither the
-  wallet nor the view. A page that calls `layerModelLocal(Auction, …)` outside that module is not seen.
+  wallet nor the view).
+  Before it builds, `check:bundle` parses every module under `src/client` (TypeScript compiler API,
+  `scripts/auctionLocalHalves.ts`) and fails on a call to `layerModelLocal`, `layerActionRunnerLocal`
+  or `layerLoopLocal` whose definition is the auction's (`src/domain/Auction.ts`) outside
+  `placements/auctionLocal.ts`, the only allowed module: the worker host and every placement import
+  that module's exports rather than call the builders. Imports of the builders and of the definition
+  may be aliased or namespaced and the definition may sit in a `const`; the wallet's loop, built with
+  the wallet's definition, and the server's own halves are not in scope. The same scan runs in
+  `pnpm test` (`test/auctionLocalHalves.test.ts`).
 - The `devtools` page is not an auction page: `src/client/devtools.ts` composes the remote history
   (`historyOnly.ts`, which sends no session) with the panel and the connection banner and does not
   call `runPage`. It is read only on purpose: the server it targets serves `History`, not `TravelTo`.
@@ -183,17 +241,27 @@ wallet island, for the owner the entry passes (see [Islands](#islands)).
   adapter; the network server keeps `layerAuthenticationServer`, so nothing a server trusts changes.
   The pool is `{ size: 1, concurrency: Number.MAX_SAFE_INTEGER }`: a streaming request keeps its
   lease on the worker until it ends, so the default of one concurrent request would let the first
-  `Representations` stream starve every other call. `Connection` stays the default (always
-  connected), because the worker protocol cannot report a failed start: `makeProtocolWorker` forks
-  `backing.run` with a retry every second, so the layer
-  builds whether or not the worker comes up, and it calls `RpcClient.ConnectionHooks.onConnect`
-  once, right after the pool hands out its handle, before the worker has been created or has said
-  anything; it never calls `onDisconnect`. A worker that fails to start therefore shows as calls that
-  hang until it is ready (sends are buffered), or that die with `RpcClientError` when the worker
-  raises an error event (`WorkerReceiveError`), and a new `Worker` is spawned every second until one
-  signals readiness. `WorkerError` is in the placement's type only because `layerProtocolWorker`'s
-  signature carries it; nothing in 4.0.5 produces it when the layer builds. The wallet
-  island stays browser-only on the main thread, fed from the worker's representations.
+  `Representations` stream starve every other call. `Connection` follows the worker, not the
+  protocol: `makeProtocolWorker` calls `RpcClient.ConnectionHooks.onConnect` once, right after the
+  pool hands out its handle and before the worker has been created or has said anything, and never
+  `onDisconnect`, and it forks `backing.run` with a retry every second, so the layer builds whether
+  or not the worker comes up. The page therefore wraps the `WorkerPlatform` (`layerWorkerConnection`
+  in `src/client/connection.ts`, merged into the placement's output with `Layer.provideMerge`) and
+  reads each worker's `run`: `connecting` until the first worker says it is ready (the `onSpawn`
+  hook, after the protocol has sent the initial message), `connected` from then on, `disconnected`
+  when `run` ends. `run` ends when the worker raises an `error` event (`WorkerReceiveError`) or when
+  spawning it throws; the protocol then retries after a second, a respawned worker reads
+  `connected` once it is ready, and one that fails again stays `disconnected` instead of flickering
+  through `connecting`. A `messageerror` on the page's side of the port is not listened to by
+  `BrowserWorker`, and a worker that stops without an error event shows no signal. The worker
+  reports its own failure: `auctionWorker.ts` runs with a teardown that re-raises a failed main
+  effect (a first message that does not decode, a server layer that dies) with `reportError` and
+  closes, since a failed `runMain` only logs and leaves a worker that already said it was ready. The
+  calls themselves are not held, as the socket's are: while a worker is down they hang until it is
+  ready (sends are buffered) or die with `RpcClientError` on its error event. `WorkerError` is in
+  the placement's type only because `layerProtocolWorker`'s signature carries it; nothing in 4.0.5
+  produces it when the layer builds. The wallet island stays browser-only on the main thread, fed
+  from the worker's representations.
 - `transport(def, client)` is called once per placement and remote definition; the returned layer
   value is built once, so that definition's remote ports share one connection, and `browser-only`
   never opens one. It builds a protocol of its own (`Layer.fresh`), so two remote definitions never
@@ -207,7 +275,7 @@ wallet island, for the owner the entry passes (see [Islands](#islands)).
   The remote `ModelPort.representations` and `HistoryPort.records` resubscribe after a socket
   error (`@mufw/rpc`): the first representation after the reconnection is the server's current
   one, and `records` drops what it already delivered, or starts over when the server restarted
-  (a new `init` record). A call (`present`, `dispatch`, `run`, `travelTo`) made while the socket
+  (a new `init` record). A call (`present`, `dispatch`, `run`, `travelTo`, `replay`) made while the socket
   is down is held and sent once, after the reconnection, in the order the calls were issued:
   `layerHoldRequestsWhileDisconnected` (`@mufw/rpc`) wraps the client protocol and retries `send`
   every 250 ms for as long as the protocol still carries the error of the dropped socket. Every
@@ -224,14 +292,38 @@ wallet island, for the owner the entry passes (see [Islands](#islands)).
   sending it again cannot apply a bid twice. A call already written when the socket drops is not
   sent again, because the server may have run it and `Submit`, `Present` and `Dispatch` are not
   idempotent: it fails with the socket error, which the remote ports turn into a defect (no port
-  changes its error type). A held call that finds the connection dropped again before it was
-  written fails the same way. A call stays pending, with no timeout, for as long as the server is
-  unreachable; interrupting it abandons it.
+  changes its error type). The protocol broadcasts the error of a dropped socket to every call the
+  client has in flight, a request still waiting in the queue included, and the client cannot fail
+  some of them and not others. The layer therefore keeps that broadcast from the client and fails
+  each request it had written itself: the `send` of a request returns when its response has arrived,
+  not when it is written, and fails with the socket error when the connection is lost first. A request
+  still queued stays queued and is written after the next connection, however many times the
+  connection drops, for any client built over the layer: `Rpc.layerClient`, or the event-log client
+  of a synced instance, which `effect/eventlog` builds with `RpcClient.make`. The encoded request
+  does not say whether its RPC streams, so `Rpc.layerClient` runs each unary call with the
+  `CountedCall` reference set, which the layer reads in the fiber that sends the request: only those
+  calls are counted in `HeldRequests`; a client built any other way is not counted. A call stays pending, with no timeout, for as long as the
+  server is unreachable; interrupting it abandons it. A deadline would turn a held call into a typed
+  failure that the ports must carry or die with, which changes what the domain sees; so the page is
+  told instead (below).
 - Transport state is data outside the SAM representation: `Connection` is a `Context.Reference`
   holding a `Stream<"connecting" | "connected" | "disconnected">`, fed by the protocol's
-  `ConnectionHooks`. `transport()` provides it and the placements merge it into their output with
+  `ConnectionHooks` for a socket and by the worker platform for a worker. `transport()` and
+  `workerPorts` provide it and the placements merge it into their output with
   `Layer.provideMerge`; `runPage` mounts `layerConnectionBanner` over it. A page with no remote
-  port provides nothing, reads the default (always `connected`) and shows no banner.
+  port provides nothing, reads the default (always `connected`) and shows no banner. The calls held
+  while disconnected are data of the same kind: `HeldRequests` (`@mufw/rpc`) is a `Context.Reference`
+  holding a `Stream<number>`, the count of unary calls (not stream subscriptions, which carry no
+  intent and resubscribe by themselves) that have waited more than 200 ms to be written, whether the
+  socket dropped, a request ahead of them (a stream's, say) is waiting, or the first connection has not
+  opened yet. The grace keeps a call that a live socket writes at once from flashing the notice, and
+  the count does not wait for a refused write, which only the request at the head of the queue is
+  made to attempt. The count is provided by `layerHoldRequestsWhileDisconnected` and so by
+  `transport()` through
+  `layerProtocol`; `runPage` mounts `layerHeldNoticeWith` over it (`src/client/heldNotice.ts`, "n
+  actions will be sent once reconnected", hidden at 0). The domain and the representation never see
+  it: the call waits as it always did. A page with no socket (browser only, worker, HTTP) reads the
+  default, 0, and shows no notice.
 - Domain services follow the same rule: `src/domain/CreditCheck.ts` is only the port, the server's
   table is `src/adapters/creditCheckTable.ts` and the browser's stand-in is
   `src/adapters/creditCheckPermissive.ts`, so no page ships the server's limits. `Sessions` and
@@ -271,15 +363,17 @@ and leaves nothing held. Its acceptors are pure and tested with literal models; 
 when it is the bidder's becomes `Reserve`, anything else `Release`, and only a change of that hold
 is forwarded (a wallet starts released, so a first representation without a bid asks nothing).
 
-The wallet's owner is data (`WalletOwner`, an `Option<Bidder>`) that each entry point passes to
-`runPage` from `parseWalletOwner(actions, search)` (`src/client/placement.ts`). Where the actions run
-in the browser or in the worker (`browser-only`, `server-model`, `worker`) it is `?bidder=`, default `alice`, the page's identity
-too. Where they run on the server (`server-owned`, `server-actions`, the demo with `actions:server`) the
-page holds only a `?session=`, the server never tells it whose that is, and a default would silently
-reserve alice's bids on bob's page: the owner is then only an explicit, schema-decoded `?bidder=`, and
-without one it is `None`: the wallet is mounted but `layerForward` does not feed it, and its view says
-"follows no bidder". This is safe because the wallet is the visitor's own and enforces nothing the
-server relies on; a `?bidder=` that differs from the session's bidder only reserves for the wrong person.
+The wallet's owner is the bidder the page's `Whoami` names (`walletOwner`, `src/client/walletOwner.ts`:
+an `Option<Bidder>`, `None` when `Whoami` fails with `Unauthenticated`), asked once when the wallet
+island is built, so the wallet's mount waits for the answer (the rest of the page does not) and a
+call made while the socket is down is held like any other. `layerWalletFeed(owner)` feeds the wallet
+from the auction for a `Some`. Where the actions run in the browser or in the worker (`browser-only`,
+`server-model`, `worker`) `Whoami` is the page's `?bidder=`, default `alice`. Where they run on the
+server (`server-owned`, `server-actions`, the demo with `actions:server`) it is the server's answer for
+the page's `?session=`, so the wallet follows the session's bidder and a `?bidder=` there is ignored. A
+session the server refuses gives `None`: the wallet is mounted but not fed, and its view says "follows
+no bidder". The wallet is the visitor's own and enforces nothing the server relies on. It is tested
+with the server side in-process (`test/WalletOwner.test.ts`).
 
 Nothing about the server changes for an island: it serves each definition it hosts on its own path
 (see [Server](#server)).
@@ -346,7 +440,7 @@ What the comparison decides:
   in the page's DOM, which is why the ticker, a view the page composes, is not on it.
 - **What HTTP and the stream cost, and the socket does not:** each open island holds one response, and
   a browser limits the connections it opens to an origin over HTTP/1.1, so many islands on one origin
-  want HTTP/2; a proxy that buffers responses holds chunks back (the stream sets `x-accel-buffering`
+  want HTTP/2 (see [Connections and HTTP/2](#connections-and-http2)); a proxy that buffers responses holds chunks back (the stream sets `x-accel-buffering`
   and `no-store` against it, and the NDJSON route has the same exposure); and the endpoint is open to
   any origin, so it must stay read-only.
 
@@ -361,44 +455,57 @@ value stops the server at start with a typed error:
 | Variable | Parsed as | Default |
 |---|---|---|
 | `MUFW_RPCS` | `Config.Array(Schema.Literals(rpcTags))` | `Submit,Representations,History` |
-| `MUFW_AUTO_ACTIONS` | `Config.option(Config.Literals(["on", "off"]))` | `on`; `off` for an instance that joins a log |
-| `MUFW_STORE` | `Config.option(Config.NonEmptyString)`: a directory | unset: the model lives in memory |
+| `MUFW_AUTO_ACTIONS` | `Config.withDefault(Config.Literals(["on", "off"]), "on")`: `off` never runs automatic actions; with `MUFW_SYNC`, `on` takes part in the lease | `on` |
+| `MUFW_STORE` | `Config.option(Config.NonEmptyString)`: a directory | unset: the model, and the host's log, live in memory |
 | `MUFW_SSR` | `Config.option(Config.Literals(deployments))`: a built deployment (`demo`, `browser-only`, `server-owned`, `server-model`, `server-actions`) | unset: the server serves no page and no assets |
 | `MUFW_PORT` | `Config.Port` | `3001` |
+| `MUFW_TLS_CERT`, `MUFW_TLS_KEY` | `Config.option(Config.NonEmptyString)` each: paths of a PEM certificate chain and its private key; one without the other is a `TlsConfigError` | unset: plain HTTP/1.1 |
 | `MUFW_SYNC` | `Config.option(Config.schema(SyncTarget))`: `host`, or the `ws://` or `wss://` URL of a host's `/eventlog` (its sync port) | unset: one instance |
 | `MUFW_SYNC_PORT` | `Config.Port`: with `host`, the port of the event-log listener; must differ from `MUFW_PORT` (`SyncConfigError`) | `3101` |
 | `MUFW_SYNC_HOST` | `Config.NonEmptyString`: with `host`, the interface the event-log listener binds | `127.0.0.1` |
 
-Wiring: `RpcServer.layer(Rpc.exposing(rpcs))` + `Rpc.layerHandlers` + the loop from
+Wiring: `RpcServer.layer(serving(rpcs))` (`ServerRpc.exposing(rpcs)` plus `Whoami`, always served) + `layerServerHandlers` + the loop from
 `layerAuctionLoop(store)` (`src/persistence.ts`; with `layerCreditCheckTable` and `AutoActions`,
 `CurrentBidder` left to the request) +
 `layerAuthenticationServer` over `layerSessionsTable` + `RpcServer.layerProtocolWebsocket({ path: samPath(Auction) })`
-(`/sam/auction`) + JSON serialization, served by `HttpRouter.serve` on `NodeHttpServer` at `MUFW_PORT`.
+(`/sam/auction`) + JSON serialization, served by `HttpRouter.serve` on the listener `layerListener` builds (`src/listener.ts`, a `NodeHttpServer`) at `MUFW_PORT`.
 Each served definition gets its own path, `/sam/<def.name>`, so the RPC tags stay those of the wire
-contract; `MUFW_RPCS` applies to every definition. Only the auction is served: the wallet has no
-server side.
+contract; `MUFW_RPCS` applies to every definition. Two are served, the auction and the wallet.
 
-A second `RpcServer.layer` serves `Rpc.exposing(["Representations"])` over HTTP
+The wallet is the second definition (`src/walletServer.ts`): `RpcServer.layer(WalletRpc.exposing(rpcs))`
++ `WalletRpc.layerHandlers` + `RpcServer.layerProtocolWebsocket({ path: samPath(Wallet) })`
+(`/sam/wallet`) + JSON serialization, over its own loop, `layerLoopLocal(Wallet, WalletPorts)`. Both
+definitions' route layers are merged into the one `HttpRouter.serve` and their loops into the one
+`Layer.provide` after it; nothing collides because every key is per definition: `makePorts` prefixes
+its services by `def.name`, `makeRpc` names its client `<name>/rpc/Client`, and each `RpcServer.layer`
+gets its handlers and protocol from its own `Layer.provide`. The wallet's actions read no
+`CurrentBidder`, so no authentication stands in front of them. Its model is one instance of the
+server's, shared by every client of `/sam/wallet`, in memory whatever `MUFW_STORE` and `MUFW_SYNC`
+say, and no page reads it: the pages keep the wallet in their browser, which follows the auction
+(`layerForward`).
+
+Another `RpcServer.layer` serves `Rpc.exposing(["Representations"])` over HTTP
 (`src/httpRoutes.ts`): `RpcServer.layerProtocolHttp({ path: samHttpPath(Auction) })`
 (`POST /sam/auction/http`) with `RpcSerialization.layerNdjson`, beside the websocket route, from the
 same `HttpRouter.serve`, so both protocols serve the one loop (`Loop` is built once and provided to
 every route layer). It does not depend on `MUFW_RPCS`: it is open to any origin, so it serves only
-`Representations`, and `Submit`, `Present`, `Dispatch`, `History` and `TravelTo` are not routed
+`Representations`, and `Submit`, `Present`, `Dispatch`, `History`, `TravelTo` and `Replay` are not routed
 there (the call dies with `Unknown request tag`). `RpcServer.layer` takes one protocol, hence the
 second layer. The same module adds `HttpRouter.cors` (any origin, `POST`, no credentials): a page on
 another origin, such as the vite dev server, preflights the request with `fetch`, and the middleware
 is global to the router, so the rendered page also carries the header (it is public). A subscriber
 is one open `POST`: the response is NDJSON, one `Chunk` line per representation, until the client
-disconnects. HTTP has no acks, so the handlers read `representations` through a one-slot sliding
-buffer (`layerLatestRepresentations`): a reader that stalls skips to the latest snapshot instead of
-making the server keep every one.
+disconnects. The HTTP handlers hold one representation (`RepresentationBacklog` set to 1 by
+`layerLatestOnly` in `src/httpRoutes.ts`): a reader that stalls skips to the latest snapshot instead
+of making the server keep every one (see [Stalled clients](#stalled-clients)).
 
 With `MUFW_STORE` unset the loop is `layerLoopLocal`. With a directory it is `layerLoopPersisted`
 over `layerAtomicFileStore(directory)` (`src/persistence.ts`; `NodeFileSystem`, `NodePath`): one file
 per key, so `<directory>/auction` holds the model as JSON, written after every step and travel (see
-[Persistence](sam-loop.md#persistence), which says what a crash loses). `set` writes
-`<directory>/auction.tmp` and renames it onto the key's file, because `KeyValueStore.layerFileSystem`
-writes in place and a write interrupted at shutdown leaves the file empty.
+[Persistence](sam-loop.md#persistence), which says what a crash or a power loss leaves). `set` writes
+`<directory>/auction.tmp`, syncs it, renames it onto the key's file and syncs the directory, because
+`KeyValueStore.layerFileSystem` writes in place and a write interrupted at shutdown leaves the file
+empty.
 The server starts from that model; a file that does not decode, or a directory that cannot be opened,
 stops the server at start with a typed error. To recover, delete `<directory>/auction` (the auction
 starts from `Auction.initial`) or fix its JSON, then start again. Use one server per directory: two
@@ -409,8 +516,9 @@ With `MUFW_SYNC` the loop is `layerLoopSynced` over a `SyncLog` (`layerAuctionSy
 event-log RPCs (`RpcServer.layer(EventLogRemoteRpcs)` over `layerSyncServer(Auction)` and
 `layerSyncAuthorization`) with `RpcServer.layerProtocolWebsocket({ path: "/eventlog" })` and
 `RpcSerialization.layerSchemaBinary()` in a second `HttpRouter.serve` on its own `NodeHttpServer`, at
-`MUFW_SYNC_HOST:MUFW_SYNC_PORT` (`127.0.0.1:3101` by default), and reads and writes the same in-memory
-`Storage` in-process (`layerSyncLogStorage`). The event log is not on the public port: whoever can
+`MUFW_SYNC_HOST:MUFW_SYNC_PORT` (`127.0.0.1:3101` by default), and reads and writes the same `Storage`
+in-process (`layerSyncLogStorage`): in memory, or `layerSyncStorage` over the file store with
+`MUFW_STORE`. The event log is not on the public port: whoever can
 write to it appends proposals that every instance applies without a session or a credit check, and
 the server's authorization sees a generated key, not the connection, so no secret can guard it. What
 keeps it private is the listener: loopback by default, a private interface when instances run on
@@ -422,17 +530,98 @@ log through `layerSyncLogRemote` over `RpcClient.layerProtocolSocket` (rediallin
 `layerHoldRequestsWhileDisconnected`) and `NodeSocket.layerWebSocket`. The public listener is bound
 before the loop is built and no route exists until the log has been reached and replayed, since every
 route layer needs the loop: an instance started while its host is unreachable accepts connections
-and answers none until then. The server refuses `MUFW_SYNC` with `MUFW_STORE` (a restored
-model is not the log's) and with `TravelTo` in `MUFW_RPCS` (it would move this instance's model away
-from the log's), with a `SyncConfigError`. The host and a single server run automatic actions; an
-instance that joins does not unless `MUFW_AUTO_ACTIONS=on`: exactly one instance should. `pnpm
+and answers none until then. The server refuses `MUFW_SYNC` with `TravelTo` or `Replay` in
+`MUFW_RPCS` (they would move this instance's model away from the log's), with a `SyncConfigError`.
+`MUFW_STORE` combines with it (`layerAuctionSync` takes the store as an option): the loop is then
+`layerLoopSyncedPersisted` over the directory's file store, which holds the instance's checkpoint
+under `<directory>/auction`, and on the host `layerSyncStorage` over the same store holds the log
+(`auction%2Flog%2Fid`, `auction%2Flog%2F<n>`). A checkpoint of another log or a bare model in
+`<directory>/auction` stops the server at start (`SyncLogMismatch`, `SchemaError`) and is left as it
+was. `server.ts` creates one `Deferred` (`syncStopped`), passes it to `layerAuctionSync` as the
+loop's `stopped`, and races `Layer.launch` against it, so an instance whose log was replaced ends the
+process with the `SyncLogMismatch` (exit code 1) instead of serving a model nothing updates. Each
+instance needs a directory of its own. `MUFW_AUTO_ACTIONS` defaults to `on` everywhere: with `MUFW_SYNC`
+every instance that has it takes part in the lease that decides which one runs the automatic actions
+(the first to build against a log nobody has claimed, then whoever takes it over after the holder has
+been silent for 15 seconds), and `off` is an instance that never ticks. A restarted instance holds nothing
+until it wins an epoch, so a lone one resumes ticking after the timeout. `pnpm
 --filter @mufw/example-auction test:sync` (`test/syncLive.ts`) bids on two running servers at once and
-fails unless both hold the same bids in the same order.
+fails unless both hold the same bids in the same order; `test:sync:restart`
+(`test/syncRestartLive.ts`) starts a host and a joiner with stores, restarts the host over its store
+(log, id and model survive, the joiner keeps converging in both directions), restarts the joiner (its
+only record is the checkpoint's model, no entry replayed) and starts the host over an empty store (the
+joiner exits on the mismatch); `test:sync:failover` (`test/syncFailoverLive.ts`) starts a host that
+never ticks and two joiners, kills the one that holds the lease and fails unless nothing ticks until the
+lease has timed out, the other joiner then takes it over and the host and that joiner show the same
+auction as it goes on ticking.
 
 `pnpm start:server` uses the defaults; `pnpm dev:server` serves every RPC for the demo and the
 other pages. The live path test needs `Submit`, `Present`, `Representations`, `History` and `TravelTo`,
 and a server without `MUFW_STORE` or with an empty store directory: its path tests travel to seq 0 and
-expect `Auction.initial`, which a restarted server replaces with the stored model.
+expect `Auction.initial`, which a restarted server replaces with the stored model. The wallet's live
+path test (`test/walletLive.ts`, `test:live:wallet`) replays its shortest paths over `Present` at
+`/sam/wallet` and needs `Present`, `Representations`, `History` and `TravelTo`; its seq 0 is
+`Wallet.initial` on any freshly started server, since the wallet is never persisted or synced.
+
+### Connections and HTTP/2
+
+`layerListener` is the public listener. Without `MUFW_TLS_CERT` and `MUFW_TLS_KEY` it is
+`createServer` behind `layerNodeServer`, a `NodeHttpServer` that tracks its connections:
+HTTP/1.1 on a plain socket. With both it is
+`http2.createSecureServer({ cert, key, allowHTTP1: true })` behind the same `layerNodeServer`,
+and each connection picks `h2` or `http/1.1` by ALPN. The files are read when the layer is built, so
+an unreadable file (`PlatformError`) or a lone variable (`TlsConfigError`) stops the server at start.
+Browsers negotiate HTTP/2 only over TLS, which is why the certificate is the switch. The
+event-log listener of `MUFW_SYNC=host` stays plain HTTP on loopback.
+
+Stopping (`SIGINT`/`SIGTERM`, which `NodeRuntime.runMain` turns into closing the scope) ends every
+connection within a bound, for the public listener and the event-log listener alike, because both
+are built by `layerNodeServer`. `NodeHttpServer` alone would not: it calls `server.close()`, which
+resolves when the last connection ends, and its websocket server waits for each client to answer the
+close frame. One open websocket, never-ending response or silent client then keeps the process up,
+and the instance keeps answering its connected pages. `layerNodeServer` first lets requests in flight
+finish for `SHUTDOWN_GRACE` (2 s; `NodeHttpServer`'s own default is 20 s) and interrupts the rest, so a
+websocket gets its close frame; a second after that it destroys every TCP connection still open. It
+tracks them through the `connection` event, which also sees an upgraded websocket and an HTTP/2
+session, neither of which `closeAllConnections()` closes. The destroy has to run beside the server's
+own finalizers, since those are what wait on the connections, so the server is built in a scope of
+its own that the layer closes together with that timer. Clients reconnect, so ending their connections
+is the intended outcome; `test/listener.test.ts` stops a listener holding a websocket, a websocket
+whose client never answers, and a never-ending `h2` response, plain and TLS, and checks that each
+client sees its connection closed.
+
+`NodeHttpServer` takes the server as an `http.Server` and handles its `request` and `upgrade` events.
+A connection that negotiated `h2` emits `request` with `Http2ServerRequest` and
+`Http2ServerResponse`, whose `writeHead`, `write`, `end`, `drain`, `close` and `writableEnded` are the
+calls the handler makes, so routes, streamed bodies and a client that hangs up work as they do on
+HTTP/1.1. A connection that negotiated `http/1.1` (`allowHTTP1`) emits `request` with the usual
+`IncomingMessage` and `ServerResponse`, and `upgrade`. The one cast in the listener reads the
+`Http2SecureServer` as an `http.Server`; `test/listener.test.ts` runs a request, a never-ending
+response and a websocket upgrade through it with a `node:http2` client and a generated certificate.
+
+Over `h2` every request to the origin is a stream of one connection: `GET /`, `/assets/*`, each
+`<iframe>`'s `GET /stream/<name>`, and the ticker's `POST /sam/auction/http`. Node's default
+`maxConcurrentStreams` is 4294967295 and the listener does not change it, so the browser's own limit
+is the only one.
+
+The websocket is not one of those streams. A browser opens it with an HTTP/1.1 `Upgrade`, on a
+connection of its own, unless the server advertises `SETTINGS_ENABLE_CONNECT_PROTOCOL`
+([RFC 8441](https://www.rfc-editor.org/rfc/rfc8441)); Chromium uses WebSockets over HTTP/2 only on an
+HTTP/2 connection whose server has advertised it
+([Chrome Platform Status](https://chromestatus.com/feature/6251293127475200)). The listener leaves
+`enableConnectProtocol` at Node's default, off, and `NodeHttpServer` would not serve such a stream
+anyway: it turns only HTTP/1.1 `upgrade` events into `HttpServerRequest.upgrade`, and a Node HTTP/2
+server with no `connect` listener answers an extended `CONNECT` with 405.
+
+That connection does not count against the HTTP/1.1 cap. Chromium keeps websockets in a socket pool
+of their own, whose limit per origin is 255 against 6 for the normal pool; its comment gives the
+reason, that websocket connections are long-lived, and notes that Firefox uses 200
+([`net/socket/client_socket_pool_manager.cc`](https://chromium.googlesource.com/chromium/src/net/+/refs/heads/main/socket/client_socket_pool_manager.cc)).
+[RFC 6455 §4.1](https://www.rfc-editor.org/rfc/rfc6455#section-4.1) only requires a client to
+serialize the handshakes to one address, not to cap open sockets. What exhausts the six connections
+are the HTTP stream and the `<iframe>` of each tab, and those are what HTTP/2 multiplexes: with the
+certificate set, more than six `<iframe>`s of `/stream/auction` on one origin all render in Chromium,
+with websockets open beside them, where over HTTP/1.1 the seventh and later stay blank.
 
 ### Server-rendered first paint
 

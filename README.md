@@ -46,7 +46,7 @@ pnpm test
 Run the example (two terminals):
 
 ```sh
-pnpm dev:server   # demo server on :3001: websocket RPC at /sam/auction, every RPC served; Representations also over HTTP at /sam/auction/http
+pnpm dev:server   # demo server on :3001: websocket RPC at /sam/auction and /sam/wallet, every RPC served; the auction's Representations also over HTTP at /sam/auction/http
 pnpm dev:client   # vite on http://localhost:5173
 ```
 
@@ -81,6 +81,11 @@ demo sessions are fixed in `src/adapters/sessionsTable.ts`:
 | `demo-alice` (default) | `alice` |
 | `demo-bob` | `bob` |
 
+A page whose server runs the actions also asks the server whose its session is: `Whoami` (read-only,
+behind the same session check, `src/whoami.ts`) answers with the session's bidder, or fails with
+`Unauthenticated` for a missing or unknown session. The server serves it whatever `MUFW_RPCS` says,
+since it reveals only the caller's own identity; `MUFW_RPCS` does not list it.
+
 Where the actions run in the browser there is no server to vouch for the bidder, and the server
 applies whatever proposal the page presents anyway, so the page states its own identity from
 `?bidder=` (default `alice`) at its composition root. A server that serves only `Submit`,
@@ -89,13 +94,12 @@ applies whatever proposal the page presents anyway, so the page states its own i
 Every auction page (all but `/devtools.html`) also mounts a second island beside the auction: a wallet (`src/domain/Wallet.ts`, credit
 100) with its own loop, root and placement, always in the browser. `layerForward` feeds it from
 the auction: when the leading bid is the page's bidder's, the wallet reserves its amount, and when
-another bidder leads it releases. The wallet's owner is decided per page at its entry point: where
-the actions run in the browser or in the web worker it is `?bidder=` (default `alice`), the page's identity too; where
-they run on the server (`server-owned`, `server-actions`, the demo with `actions:server`) the page
-holds only a `?session=` and cannot learn whose it is, so the wallet follows only an explicit
-`?bidder=` and without one is mounted but fed by nobody ("follows no bidder"). The wallet is the
-visitor's own and the server trusts nothing from it, so a `?bidder=` that does not match the
-session's bidder only makes the wallet reserve for the wrong person. On the demo page,
+another bidder leads it releases. The wallet follows the bidder its page says it is (`Whoami`): where the actions run in the
+browser or in the web worker (`browser-only`, `server-model`, `worker`) that is `?bidder=` (default `alice`), the page's
+identity too; where they run on the server (`server-owned`, `server-actions`, the demo with `actions:server`)
+the page asks the server, which answers from the session the page sends (`Whoami`, below), so the wallet follows
+the session's bidder with no `?bidder=`. A session the server refuses leaves the wallet mounted and fed by
+nobody ("follows no bidder"). The wallet is the visitor's own and the server trusts nothing from it. On the demo page,
 `?placement=model:server,actions:server` runs the auction on the server and the wallet in the browser.
 
 The demo page also mounts a read-only ticker beside the auction (`src/client/ticker.ts`): the server's
@@ -115,11 +119,12 @@ The server is configured, not switched at runtime:
 | Variable | Values | Default |
 |---|---|---|
 | `MUFW_RPCS` | comma-separated RPC tags to serve; the rest are not routed | `Submit,Representations,History` |
-| `MUFW_AUTO_ACTIONS` | `on`, `off` | `on`; `off` for an instance that joins a log with `MUFW_SYNC` |
-| `MUFW_STORE` | a directory: the server loads the auction's model from it at start and writes it after every step (one file per key, `<directory>/auction`); a file that does not decode stops the server: delete `<directory>/auction` (or fix its JSON) and start again | unset: the model lives in memory |
+| `MUFW_AUTO_ACTIONS` | `on`, `off`: `off` never runs automatic actions; with `MUFW_SYNC`, `on` takes part in the lease that picks the one instance that runs them (below) | `on` |
+| `MUFW_STORE` | a directory: the server loads the auction's model from it at start and writes it after every step (one file per key, `<directory>/auction`); with `MUFW_SYNC` it holds the instance's checkpoint instead (the log's id, the last applied sequence, the model, the lease) and, on the host, the log; a file that does not decode stops the server: delete `<directory>/auction` (or fix its JSON) and start again | unset: the model (and the host's log) lives in memory |
 | `MUFW_SSR` | a built deployment: `demo`, `browser-only`, `server-owned`, `server-model`, `server-actions`; a bad value stops the server | unset: no page, no assets |
 | `MUFW_PORT` | the port to listen on | `3001` |
-| `MUFW_SYNC` | `host`: this instance serves the event log at `/eventlog` on its own listener (`MUFW_SYNC_PORT`) and joins it; `ws://<host>:<sync port>/eventlog`: this instance joins the log of that host; with either the server refuses `MUFW_STORE` and `TravelTo` in `MUFW_RPCS` | unset: one instance |
+| `MUFW_TLS_CERT`, `MUFW_TLS_KEY` | paths of a PEM certificate chain and its private key; the public listener then serves HTTPS, and a client picks HTTP/2 or HTTP/1.1 by ALPN, a websocket upgrading over HTTP/1.1 on the same port; one without the other stops the server (the event-log listener of `MUFW_SYNC=host` stays plain HTTP) | unset: plain HTTP/1.1 |
+| `MUFW_SYNC` | `host`: this instance serves the event log at `/eventlog` on its own listener (`MUFW_SYNC_PORT`) and joins it; `ws://<host>:<sync port>/eventlog`: this instance joins the log of that host; with either the server refuses `TravelTo` and `Replay` in `MUFW_RPCS`; `MUFW_STORE` makes the log (host) and the instance's checkpoint survive a restart | unset: one instance |
 | `MUFW_SYNC_PORT` | with `host`: the port of the event-log listener; it must differ from `MUFW_PORT` | `3101` |
 | `MUFW_SYNC_HOST` | with `host`: the interface the event-log listener binds; whoever reaches it can append any proposal, so set it only to a private interface | `127.0.0.1` |
 
@@ -139,9 +144,10 @@ printf '%s\n' '{"_tag":"Request","id":"1","tag":"Representations","payload":null
 
 With `MUFW_STORE` the model survives a restart, the history does not: it starts again from the stored
 model. Only the newest model is written, to `<directory>/auction.tmp` and then renamed onto
-`<directory>/auction`, so a crash never leaves a truncated file (a power loss is not covered: no
-`fsync`). Stopping the server waits for the write in flight; a crash can lose that write and the
-newest pending model, never more. Run one server per directory.
+`<directory>/auction`, so a crash never leaves a truncated file. The file is synced before the rename
+and the directory after it, so a write that has succeeded survives a power loss. Stopping the server
+waits for the write in flight; a crash can lose that write and the newest pending model, never more.
+Run one server per directory (with `MUFW_SYNC` too: see below).
 
 With `MUFW_SYNC` several servers run the auction and agree on it: a bid accepted on one is on all, in
 one order. The host and the instances that join it exchange proposals through an event log
@@ -150,24 +156,48 @@ appends it to the log, and every server, the producer included, applies the log'
 order. Run two servers and watch a bid on one reach the other:
 
 ```sh
-MUFW_SYNC=host pnpm start:server                                                      # :3001, runs the ticks; event log on 127.0.0.1:3101
-MUFW_PORT=3002 MUFW_SYNC=ws://127.0.0.1:3101/eventlog pnpm start:server                # joins; no ticks of its own
+MUFW_SYNC=host pnpm start:server                                                      # :3001; event log on 127.0.0.1:3101
+MUFW_PORT=3002 MUFW_SYNC=ws://127.0.0.1:3101/eventlog pnpm start:server                # joins
 pnpm --filter @mufw/example-auction test:sync   # MUFW_SERVER, MUFW_SERVER_2 override ws://localhost:3001, ws://localhost:3002
 ```
 
 The check needs a fresh auction (start the servers anew), bids as `alice` on the first server and as
 `bob` on the second at the same time, and fails unless both end with the same bids in the same order.
-Run exactly one instance with automatic actions (`MUFW_AUTO_ACTIONS=on`, the default for the host and
-for a single server): each instance computes the same next tick from the same model, so a second
-ticker would double every tick. A joiner defaults to `off`. An instance that starts later replays the
-whole log before it serves, so it shows the auction as the others do; started while its host is
-unreachable, it accepts connections and answers none until it reaches the host. A bid whose
-connection to the log drops is sent again until the log has it, never twice. The log lives in the
-host's memory and its endpoint accepts any writer that sends a proposal, with no session and no
-credit check: it is served on a port of its own, on `127.0.0.1` unless `MUFW_SYNC_HOST` says
-otherwise, and must stay reachable from the other instances only. Restart the joiners whenever the
-host restarts (a host that starts with an empty log is not detected by an instance that still holds
-the old one).
+Automatic actions run on one instance at a time (the lease, below): each instance computes the same
+next tick from the same model, so only the instance that holds the lease runs it. An instance that starts later replays the
+log before it serves, so it shows the auction as the others do (with `MUFW_STORE` it replays only the
+entries after its checkpoint); started while its host is unreachable, it accepts connections and
+answers none until it reaches the host. A bid whose connection to the log drops is sent again until
+the log has it, never twice. The log's endpoint accepts any writer that sends a proposal, with no
+session and no credit check: it is served on a port of its own, on `127.0.0.1` unless
+`MUFW_SYNC_HOST` says otherwise, and must stay reachable from the other instances only.
+
+`MUFW_STORE` combines with `MUFW_SYNC`, and each instance needs a directory of its own. On the host it
+holds the log itself (the files `auction%2Flog%2Fid` and `auction%2Flog%2F<n>`: an id and the entries,
+256 to a file) and its checkpoint, so a restarted
+host serves the same log and the joiners that stayed up go on; on a joiner it holds the checkpoint
+(`<directory>/auction`: the log's id, the last applied sequence, the model and the lease), so a restarted joiner
+reads only what came after. Without `MUFW_STORE` the host's log lives in memory: a restarted host
+starts a new log, and a running joiner that finds it logs `sync log replaced` and stops (exit code 1);
+start it again to join the new log. A stored checkpoint of another log, a checkpoint written without a
+lease, or a bare model stored by an
+instance without `MUFW_SYNC`, stops the server at start without being overwritten: delete
+`<directory>/auction` and start again. `pnpm --filter @mufw/example-auction test:sync:restart` starts a
+host and a joiner of its own, each with a store, on ports 3211, 3311 and 3212, restarts them in turn
+and checks all of this.
+
+Only one instance at a time runs the automatic actions, and the log decides which. Each instance with
+`MUFW_AUTO_ACTIONS=on` (the default, the host and the joiners alike) takes part in a lease kept in the
+log: the first to start against a log nobody has claimed takes it and ticks, the others compute the
+same next tick and drop it. The holder renews the lease every 5 seconds; an instance that has seen no
+renewal for 15 seconds takes the lease over and ticks from the state the auction is in, and the old
+holder, if it was only cut off, stops its automatic actions the moment it reads the entry that took the
+lease away. `MUFW_AUTO_ACTIONS=off` is an instance that never ticks and never claims. An instance that
+restarts holds nothing until it wins the lease again, so a lone instance resumes ticking 15 seconds
+after it restarts. The host carries the log: if it stops, the joiners stop with it. `pnpm --filter
+@mufw/example-auction test:sync:failover` starts a host that never ticks and two joiners of its own on
+ports 3221, 3321, 3222 and 3223, kills the joiner that holds the lease and checks that nothing ticks
+until the lease has timed out, then that the other joiner ticks and the host shows the same auction.
 
 With `MUFW_SSR` the server also renders the page's first paint, so it is visible before the socket
 connects (the bundle then takes over: it renders again over the server's markup, which differs only
@@ -199,12 +229,34 @@ a browser to watch the auction update with no script of the page's own; the cont
 (a `<fieldset disabled>`), so it cannot bid. The demo page embeds it in an `<iframe>`; any other name
 answers 404.
 
+Over HTTP/1.1 a browser opens at most six connections to an origin, and every open island holds
+one for as long as it lives: the HTML stream of an `<iframe>` and an HTTP ticker each keep a response
+open, so a few demo tabs on one origin leave the next ones with blank islands. Over HTTP/2 they are
+streams of one connection. Browsers speak HTTP/2 only over TLS, so the server serves it when it is
+given a certificate, and plain HTTP/1.1 otherwise:
+
+```sh
+brew install mkcert   # once; other systems: https://github.com/FiloSottile/mkcert#installation
+mkcert -install       # once: trusts mkcert's local authority in the system and browser stores (asks for your password); restart the browser afterwards
+pnpm cert             # examples/auction/.certs/localhost.pem and localhost-key.pem, ignored by git
+MUFW_TLS_CERT=$PWD/examples/auction/.certs/localhost.pem MUFW_TLS_KEY=$PWD/examples/auction/.certs/localhost-key.pem pnpm dev:server
+VITE_SERVER_URL=wss://localhost:3001 pnpm dev:client   # the pages read the server as wss:// and https://
+curl -N --http2 https://localhost:3001/stream/auction  # add --cacert "$(mkcert -CAROOT)/rootCA.pem" where curl does not use the system store
+```
+
+The HTTP routes (`GET /`, `/assets/*`, `/stream/<name>`, `POST /sam/auction/http`) are served over
+HTTP/2 to a client that offers it and over HTTP/1.1 to one that does not. The websocket is not an
+HTTP/2 stream: it upgrades over HTTP/1.1 on the same port, so it is a connection of its own. That
+does not count against the six: Chromium keeps websockets in a pool of their own, with 255
+connections per origin, and Firefox allows 200 (see [placement.md](docs/architecture/placement.md#connections-and-http2)).
+`test:live` over TLS needs the same trust: `MUFW_SERVER=wss://localhost:3001 NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"`.
+
 The client is built per deployment, not as one bundle:
 
 | Command | Does |
 |---|---|
 | `pnpm build:client` | one `vite build --mode <deployment>` per page into `examples/auction/dist/<deployment>` (`browser-only`, `server-owned`, `server-model`, `server-actions`, `devtools`, `worker` with its worker file in `assets/`, and `demo` with all four browser/server placements), then `check:bundle` |
-| `pnpm --filter @mufw/example-auction check:bundle` | fails if a deployment ships a local half of the auction it should not (a `server-owned` bundle with its local model or action runner; a `devtools` bundle with any of them, the auction view, the wallet or the travel panel; a `worker` page bundle with any of them, or whose worker file holds the wallet or the view) or lacks one it should; every bundle but `devtools` keeps the wallet's local loop |
+| `pnpm --filter @mufw/example-auction check:bundle` | first fails on a module under `src/client` other than `placements/auctionLocal.ts` that calls `layerModelLocal`, `layerActionRunnerLocal` or `layerLoopLocal` with the auction's definition (a source scan, also run by `pnpm test`); then fails if a deployment ships a local half of the auction it should not (a `server-owned` bundle with its local model or action runner; a `devtools` bundle with any of them, the auction view, the wallet or the travel panel; a `worker` page bundle with any of them, or whose worker file holds the wallet or the view) or lacks one it should; every bundle but `devtools` keeps the wallet's local loop |
 | `pnpm --filter @mufw/example-auction compare:transports` | starts a server of its own on a free port from 4700 to 4799, builds and serves the two bundled ticker pages, and prints first paint and update latency (median, p95) and client JS size for the websocket, HTTP (NDJSON) and HTML stream in headless Chromium; needs `pnpm exec playwright install chromium` once; `MUFW_COMPARE_LOADS`, `MUFW_COMPARE_UPDATES`, `MUFW_COMPARE_WARMUP` set the sample sizes |
 
 Each build has a single entry, so a `server-owned` bundle holds no local model or action runner of
@@ -225,6 +277,16 @@ The live test replays the paths over `Present`, then submits `Open` and a bid wi
 session and checks the accepted bid is alice's, and that a client with no session is refused. The path
 tests travel to seq 0 and expect `Auction.initial` there, so run the live test against a server started
 without `MUFW_STORE`, or with an empty store directory: a stored model is seq 0 of a restarted server.
+
+The server serves a second definition, the example's wallet, at `/sam/wallet` under the same
+`MUFW_RPCS`. It is one in-memory model of its own that no page reads (the pages keep their wallet in the browser), never
+stored or synced. Replay its paths over `Present` against a running server:
+
+```sh
+pnpm --filter @mufw/example-auction test:live:wallet   # MUFW_SERVER overrides ws://localhost:3001
+```
+
+Any freshly started server has `Wallet.initial` at seq 0; `MUFW_AUTO_ACTIONS` and `MUFW_STORE` do not matter to it.
 
 The example's path tests also replay through the rendered view with `domDriver`: on uhtml's fake
 DOM inside `pnpm test`, and in headless Chromium with

@@ -1,5 +1,6 @@
 import { layerActionsDrain, layerIntentBus } from "@mufw/core"
 import { Layer } from "effect"
+import { layerWhoamiFixed } from "../../adapters/whoamiFixed.ts"
 import { layerAuthenticationAnonymous } from "../../authentication.ts"
 import { Auction } from "../../domain/Auction.ts"
 import type { Bidder } from "../../domain/Values.ts"
@@ -9,8 +10,8 @@ import { transport } from "./transport.ts"
 
 /**
  * Model on the server, actions in the browser, acting as `bidder`: the server applies every
- * proposal it receives. It calls no RPC that runs actions, so it sends no session. Needs the
- * server to serve `Present`, `Representations`, `History`.
+ * proposal it receives. It calls no RPC that runs actions, so it sends no session, and `bidder` is
+ * also who the page says it is. Needs the server to serve `Present`, `Representations`, `History`.
  */
 export const serverModel = (bidder: Bidder) => {
   const client = Rpc.layerClient.pipe(Layer.provide(layerAuthenticationAnonymous))
@@ -19,6 +20,7 @@ export const serverModel = (bidder: Bidder) => {
   )
   return layerActionsDrain(Auction, Ports).pipe(
     Layer.provideMerge(Layer.merge(remoteModel, auctionActionRunnerLocal(bidder))),
-    Layer.provideMerge(layerIntentBus(Auction, Ports))
+    Layer.provideMerge(layerIntentBus(Auction, Ports)),
+    Layer.provideMerge(layerWhoamiFixed(bidder))
   )
 }

@@ -1,5 +1,6 @@
 import { assert, describe, it } from "@effect/vitest"
 import { Effect, Layer, Option, Result, Schema, Stream } from "effect"
+import { TestClock } from "effect/testing"
 import {
   AutoActions,
   decodeHistoryJson,
@@ -136,7 +137,7 @@ describe("replayInto", () => {
   const Loop = layerLoopLocal(Counter, Ports).pipe(Layer.provide(Layer.succeed(AutoActions, false)))
   const recorded = [initRecord(0), stepRecord(1, inc2, 2), stepRecord(2, inc1, 3), stepRecord(3, inc4, 7)]
 
-  it.effect("travels to seq, then presents each later recorded proposal, in order", () =>
+  it.effect("travels to seq, then replays each later recorded proposal, in order", () =>
     Effect.gen(function*() {
       const model = yield* Ports.ModelPort
       const live = yield* Ports.HistoryPort
@@ -207,4 +208,16 @@ describe("replayInto", () => {
       assert.deepStrictEqual(yield* Stream.runHead(model.representations), Option.some({ controlState: "high", count: 4 }))
       assert.deepStrictEqual(records.map((record) => record.kind), ["init", "step", "step", "travel"])
     }).pipe(Effect.provide(Loop)))
+
+  it.effect("starts no automatic action when the loop runs them, so a recorded automatic proposal applies once", () =>
+    Effect.gen(function*() {
+      const model = yield* Ports.ModelPort
+      const withAutomaticReset = [initRecord(0), stepRecord(1, inc4, 4), stepRecord(2, reset, 0), stepRecord(3, inc1, 1)]
+
+      yield* replayInto(Ports, withAutomaticReset, 0)
+      yield* settle
+      yield* TestClock.adjust("2 seconds")
+
+      assert.deepStrictEqual(yield* Stream.runHead(model.representations), Option.some({ controlState: "low", count: 1 }))
+    }).pipe(Effect.provide(layerLoopLocal(Counter, Ports))))
 })

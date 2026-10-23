@@ -3,7 +3,6 @@ import {
   exploreGraph,
   type HistoryPort,
   type IntentPort,
-  layerForward,
   type ModelPort,
   toXStateDefinition
 } from "@mufw/core"
@@ -14,24 +13,29 @@ import { Effect, Layer, Option, type Schema } from "effect"
 import type { WorkerError } from "effect/workers/WorkerError"
 import { html, render } from "uhtml"
 import { Auction, exploreAuction, serializeAuction } from "../domain/Auction.ts"
-import { holdForBids } from "../domain/WalletFeed.ts"
+import type { Whoami } from "../domain/Whoami.ts"
 import { Ports, WalletPorts } from "../ports.ts"
 import { makeView } from "../view.ts"
 import { makeWalletView } from "../walletView.ts"
 import { layerConnectionBanner } from "./connectionBanner.ts"
-import type { WalletOwner } from "./placement.ts"
+import { layerHeldNoticeWith } from "./heldNotice.ts"
 import { walletBrowserOnly } from "./placements/walletBrowserOnly.ts"
 import { layerRefusalNoticeWith } from "./refusalNotice.ts"
 import { layerRefusals, Refusals } from "./refusals.ts"
+import { layerWalletFeed, type WalletOwner, walletOwner } from "./walletOwner.ts"
 
 type A = typeof Auction
 
 /**
  * What a page needs from a placement. A placement can fail with the decoding error of its settings.
  * `WorkerError` is in the type only because `RpcClient.layerProtocolWorker`'s signature carries it:
- * a worker that fails to start does not fail the layer, its calls hang or die with `RpcClientError`.
+ * a worker that fails to start does not fail the layer, its calls hang or die with `RpcClientError`
+ * and `Connection` reads `disconnected`.
  */
-export type PagePorts = Layer.Layer<IntentPort<A> | ModelPort<A> | HistoryPort<A>, Schema.SchemaError | WorkerError>
+export type PagePorts = Layer.Layer<
+  IntentPort<A> | ModelPort<A> | HistoryPort<A> | Whoami,
+  Schema.SchemaError | WorkerError
+>
 
 /** Layers a page mounts beside its view, e.g. the time-travel panel. */
 export type PageDevtools = Layer.Layer<never, never, HistoryPort<A>>
@@ -46,6 +50,7 @@ const stripAboveView = () => {
 }
 
 const layerRefusalNotice = layerRefusalNoticeWith(html, render)
+const layerHeldNotice = layerHeldNoticeWith(html, render)
 
 /** The time-travel panel; its row clicks call `TravelTo`, so only pages whose server serves it may mount it. */
 export const layerTimeTravel = (): PageDevtools => layerPanel(Auction, Ports, { root: root("devtools") })
@@ -73,29 +78,29 @@ const describeWalletOwner = (owner: WalletOwner) =>
   })
 
 /**
- * The wallet island: its own loop, root and placement (browser only). With an owner, `layerForward`
- * feeds it from the auction: the owner is the page's claim to the leading bid, decided by the entry
- * point, and nothing the server trusts depends on it. Without one the wallet is mounted and never
- * fed. Its port never refuses, so its mount has nothing to report.
+ * The wallet island: its own loop, root and placement (browser only). It follows the bidder the
+ * placement's `Whoami` names (`layerWalletFeed` feeds it from the auction); a session the server
+ * refuses leaves it mounted and never fed. The bidder is the page's claim to the leading bid and
+ * nothing the server trusts depends on it. Its port never refuses, so its mount has nothing to report.
  */
-const layerWallet = (owner: WalletOwner) => {
-  const view = layerMount(WalletPorts, {
-    root: root("wallet"),
-    view: makeWalletView(`${describeWalletOwner(owner)} · model:client,actions:client`),
-    onRefused: () => Effect.void
-  })
-  const feed = Option.match(owner, {
-    onNone: () => Layer.empty,
-    onSome: (bidder) => layerForward(Ports, WalletPorts, holdForBids(bidder))
-  })
-  return Layer.merge(view, feed).pipe(Layer.provide(walletBrowserOnly))
-}
+const layerWallet = Layer.unwrap(
+  walletOwner.pipe(
+    Effect.map((owner) => {
+      const view = layerMount(WalletPorts, {
+        root: root("wallet"),
+        view: makeWalletView(`${describeWalletOwner(owner)} · model:client,actions:client`),
+        onRefused: () => Effect.void
+      })
+      return Layer.merge(view, layerWalletFeed(owner)).pipe(Layer.provide(walletBrowserOnly))
+    })
+  )
+)
 
 /**
  * Mounts the auction page over `placement`, labelled `label` (placement and identity), with
- * `devtools` beside the view and the wallet island of `walletOwner` below it, until the page is discarded.
+ * `devtools` beside the view and the wallet island below it, until the page is discarded.
  */
-export const runPage = (placement: PagePorts, label: string, devtools: PageDevtools, walletOwner: WalletOwner) => {
+export const runPage = (placement: PagePorts, label: string, devtools: PageDevtools) => {
   const inspector = new URLSearchParams(location.search).get("inspect") === "1" ? makeInspector() : Layer.empty
   const page = Layer.mergeAll(
     layerMount(Ports, {
@@ -103,8 +108,9 @@ export const runPage = (placement: PagePorts, label: string, devtools: PageDevto
       view: makeView(label),
       onRefused: (refused) => Refusals.use((refusals) => refusals.report(refused))
     }),
-    layerWallet(walletOwner),
+    layerWallet,
     layerConnectionBanner(stripAboveView()),
+    layerHeldNotice(stripAboveView()),
     layerRefusalNotice(stripAboveView()),
     devtools,
     inspector
