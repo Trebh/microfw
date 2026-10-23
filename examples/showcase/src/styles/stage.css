@@ -1,4 +1,9 @@
-/* The house: reset, the theatre grid, the proscenium, surtitles, curtain, spotlight, prompter's book. */
+/*
+ * The house: reset, the theatre grid, the proscenium, surtitles, curtain, spotlight, prompter's book.
+ * Acts play inside `#house-stage > .act`, so every shell selector below hangs from an element an act's
+ * markup can never be inside (`#chrome`, `#prompter-book`, `.stage-frame >`) and an act's own
+ * class names (`.stage`, `.card`, `.controls`…) never meet a shell rule.
+ */
 
 *,
 *::before,
@@ -47,7 +52,7 @@ kbd {
   color: var(--paper);
 }
 
-.noscript {
+body > noscript .noscript {
   position: fixed;
   inset: 0;
   display: grid;
@@ -60,7 +65,7 @@ kbd {
 
 /* Theatre */
 
-.theatre {
+#theatre {
   position: fixed;
   inset: 0;
   display: grid;
@@ -72,8 +77,8 @@ kbd {
   isolation: isolate;
 }
 
-.theatre::before,
-.theatre::after {
+#theatre::before,
+#theatre::after {
   content: "";
   position: fixed;
   inset: 0;
@@ -81,13 +86,13 @@ kbd {
   pointer-events: none;
 }
 
-.theatre::before {
+#theatre::before {
   background-image: var(--grain);
   opacity: 0.075;
   mix-blend-mode: overlay;
 }
 
-.theatre::after {
+#theatre::after {
   background: radial-gradient(ellipse 120% 100% at 50% 46%, transparent 52%, color-mix(in oklab, black 62%, transparent));
 }
 
@@ -98,7 +103,7 @@ kbd {
 
 /* Playbill ribbon */
 
-.playbill {
+#chrome .playbill {
   grid-row: 1;
   position: relative;
   z-index: var(--z-chrome);
@@ -111,7 +116,7 @@ kbd {
   box-shadow: 0 0.4rem 1.2rem color-mix(in oklab, black 60%, transparent);
 }
 
-.playbill__house {
+#chrome .playbill__house {
   align-self: center;
   font-size: var(--text-l);
   color: var(--limelight);
@@ -119,7 +124,7 @@ kbd {
   text-transform: none;
 }
 
-.playbill__acts {
+#chrome .playbill__acts {
   display: flex;
   flex: 1;
   min-width: 0;
@@ -127,7 +132,7 @@ kbd {
   scrollbar-width: none;
 }
 
-.playbill__act {
+#chrome .playbill__act {
   display: flex;
   align-items: baseline;
   gap: var(--space-2);
@@ -142,91 +147,104 @@ kbd {
   transition: color var(--dur-base) ease, border-color var(--dur-base) ease, background-color var(--dur-base) ease;
 }
 
-.playbill__act:hover {
+#chrome .playbill__act:hover {
   color: var(--paper);
   background: color-mix(in oklab, black 22%, transparent);
 }
 
-.playbill__act[aria-current="step"] {
+#chrome .playbill__act[aria-current="step"] {
   color: var(--limelight);
   border-bottom-color: var(--limelight);
   background: color-mix(in oklab, black 30%, transparent);
   text-shadow: 0 0 0.9em color-mix(in oklab, var(--limelight) 55%, transparent);
 }
 
-.playbill__key {
+#chrome .playbill__key {
   font-size: var(--text-xs);
   opacity: 0.6;
 }
 
-.playbill__numeral {
+#chrome .playbill__numeral {
   min-width: 1.2ch;
   font-size: var(--text-l);
 }
 
-.playbill__title {
+#chrome .playbill__title {
   font-size: var(--text-s);
 }
 
 @media (max-width: 72rem) {
-  .playbill__act:not([aria-current="step"]) .playbill__title {
+  #chrome .playbill__act:not([aria-current="step"]) .playbill__title {
     display: none;
   }
 }
 
-/* Surtitles: a lit strip above the stage */
+/*
+ * Surtitles: a lit strip above the stage. Its height is fixed (the previous line, and three lines of
+ * the current one) so the stage never moves between cues; a longer line is set smaller, then clamped.
+ */
 
-.surtitles {
+#chrome .surtitles {
+  --surtitle-size: clamp(1.25rem, 1rem + 0.95vw, 1.8rem);
+  --surtitle-leading: 1.18;
   grid-row: 2;
   position: relative;
   z-index: var(--z-chrome);
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  grid-template-rows: auto auto;
+  grid-template-rows: 1.5em calc(3 * var(--surtitle-size) * var(--surtitle-leading));
   column-gap: var(--space-5);
   align-content: center;
-  min-height: clamp(6rem, 15vh, 8.5rem);
-  padding: var(--space-3) var(--space-6) var(--space-3);
+  block-size: calc(1.5 * var(--text-s) + 3 * var(--surtitle-size) * var(--surtitle-leading) + 2 * var(--space-3));
+  padding: var(--space-3) var(--space-6);
+  overflow: hidden;
   background: linear-gradient(color-mix(in oklab, var(--wing-grey) 80%, black), var(--stage-black));
 }
 
-.surtitle {
+#chrome .surtitle {
   grid-column: 1;
   max-width: 62rem;
 }
 
-.surtitle--past {
+#chrome .surtitle--past {
   grid-row: 1;
-  min-height: 1.4em;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: var(--text-s);
+  line-height: 1.5;
   color: var(--chalk);
   opacity: 0.42;
   animation: line-past-a var(--dur-line) var(--ease-line) both;
 }
 
-.surtitle--now {
+#chrome .surtitle--now {
   grid-row: 2;
-  min-height: 2.6em;
-  font-size: var(--text-l);
-  line-height: 1.18;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  overflow: hidden;
+  font-size: var(--surtitle-size);
+  line-height: var(--surtitle-leading);
   color: var(--limelight);
   text-shadow: 0 0 1.1em color-mix(in oklab, var(--limelight) 28%, transparent);
   animation: line-in-a var(--dur-line) var(--ease-line) both;
 }
 
-.surtitle[data-flip="1"].surtitle--past { animation-name: line-past-b; }
-.surtitle[data-flip="1"].surtitle--now { animation-name: line-in-b; }
+#chrome .surtitle--now[data-size="m"] { font-size: calc(var(--surtitle-size) * 0.84); }
+#chrome .surtitle--now[data-size="s"] { font-size: calc(var(--surtitle-size) * 0.7); }
 
-.surtitle .direction {
+#chrome .surtitle[data-flip="1"].surtitle--past { animation-name: line-past-b; }
+#chrome .surtitle[data-flip="1"].surtitle--now { animation-name: line-in-b; }
+
+#chrome .surtitle .direction {
   font-style: italic;
   color: var(--chalk);
   text-shadow: none;
 }
 
-.surtitles__where {
+#chrome .surtitles__where {
   grid-column: 2;
   grid-row: 1 / span 2;
   align-self: end;
@@ -257,7 +275,7 @@ kbd {
 
 /* Proscenium and stage */
 
-.stage-frame {
+#theatre > .stage-frame {
   grid-row: 3;
   position: relative;
   isolation: isolate;
@@ -271,7 +289,7 @@ kbd {
     inset 0 0 5rem color-mix(in oklab, black 78%, transparent);
 }
 
-.stage-frame::before {
+#theatre > .stage-frame::before {
   content: "";
   position: absolute;
   inset: 0 0 auto;
@@ -284,12 +302,12 @@ kbd {
   filter: drop-shadow(0 0.25rem 0.4rem color-mix(in oklab, black 70%, transparent));
 }
 
-.stage {
+.stage-frame > #house-stage {
   position: absolute;
   inset: 0;
 }
 
-.act {
+#house-stage > .act {
   position: absolute;
   inset: 0;
   z-index: var(--z-act);
@@ -299,13 +317,16 @@ kbd {
   scrollbar-color: var(--chalk-faint) transparent;
 }
 
-.act[hidden] {
+#house-stage > .act[hidden] {
   display: none;
 }
 
-/* Spotlight: everything dims but a soft ellipse around the lit element. */
+/*
+ * Spotlight: the stage dims to about half its light, except a soft ellipse around the lit element.
+ * The dark field stays legible: the act is never darker than half of what the ellipse lights.
+ */
 
-.spotlight {
+.stage-frame > .spotlight {
   position: absolute;
   inset: 0;
   z-index: var(--z-spot);
@@ -313,10 +334,11 @@ kbd {
   background:
     radial-gradient(
       ellipse var(--spot-rx) var(--spot-ry) at var(--spot-x) var(--spot-y),
-      color-mix(in oklab, var(--limelight) calc(var(--spot-dim) * 9%), transparent) 0,
-      transparent 58%,
-      color-mix(in oklab, var(--stage-black) calc(var(--spot-dim) * 55%), transparent) 82%,
-      color-mix(in oklab, var(--stage-black) calc(var(--spot-dim) * 88%), transparent) 100%
+      color-mix(in oklab, var(--limelight) calc(var(--spot-dim) * 8%), transparent) 0,
+      transparent 40%,
+      color-mix(in oklab, var(--stage-black) calc(var(--spot-dim) * 14%), transparent) 62%,
+      color-mix(in oklab, var(--stage-black) calc(var(--spot-dim) * 38%), transparent) 84%,
+      color-mix(in oklab, var(--stage-black) calc(var(--spot-dim) * 48%), transparent) 100%
     );
   transition:
     --spot-dim var(--dur-spot) var(--ease-spot),
@@ -326,7 +348,7 @@ kbd {
     --spot-ry 80ms linear;
 }
 
-.spotlight[data-moving="true"] {
+.stage-frame > .spotlight[data-moving="true"] {
   transition:
     --spot-dim var(--dur-spot) var(--ease-spot),
     --spot-x var(--dur-spot) var(--ease-spot),
@@ -337,7 +359,7 @@ kbd {
 
 /* Curtain: two velvet halves; their folds bunch up when open and spread when closed. */
 
-.curtain {
+.stage-frame > .curtain {
   position: absolute;
   inset: 0;
   z-index: var(--z-curtain);
@@ -345,7 +367,7 @@ kbd {
   pointer-events: none;
 }
 
-.curtain__half {
+.stage-frame > .curtain > .curtain__half {
   --fold-pitch: 1.4rem;
   position: absolute;
   inset-block: 0;
@@ -366,7 +388,7 @@ kbd {
     --fold-pitch var(--dur-curtain-half) var(--ease-curtain);
 }
 
-.curtain__half::after {
+.stage-frame > .curtain > .curtain__half::after {
   content: "";
   position: absolute;
   inset-block: 0;
@@ -374,42 +396,42 @@ kbd {
   background: linear-gradient(90deg, var(--limelight-deep), var(--limelight), var(--limelight-deep));
 }
 
-.curtain__half--left {
+.stage-frame > .curtain > .curtain__half--left {
   left: 0;
   translate: -102% 0;
 }
 
-.curtain__half--left::after { right: 0; }
+.stage-frame > .curtain > .curtain__half--left::after { right: 0; }
 
-.curtain__half--right {
+.stage-frame > .curtain > .curtain__half--right {
   right: 0;
   translate: 102% 0;
 }
 
-.curtain__half--right::after { left: 0; }
+.stage-frame > .curtain > .curtain__half--right::after { left: 0; }
 
-[data-curtain="closed"] .curtain__half {
+.stage-frame[data-curtain="closed"] > .curtain > .curtain__half {
   --fold-pitch: 4.6rem;
   translate: 0 0;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .curtain__half {
+  .stage-frame > .curtain > .curtain__half {
     display: none;
   }
 
-  .stage {
+  .stage-frame > #house-stage {
     transition: opacity var(--dur-curtain-half) ease;
   }
 
-  [data-curtain="closed"] .stage {
+  .stage-frame[data-curtain="closed"] > #house-stage {
     opacity: 0;
   }
 }
 
 /* Controls and the fuse */
 
-.controls {
+#chrome .controls {
   grid-row: 4;
   position: relative;
   z-index: var(--z-chrome);
@@ -417,30 +439,30 @@ kbd {
   grid-template-columns: auto minmax(6rem, 1fr) auto;
   align-items: center;
   gap: var(--space-5);
-  padding: var(--space-4) var(--space-6) var(--space-4) var(--space-6);
+  padding: var(--space-4) var(--space-6);
   /* leaves room for the prompter's book tab, which sits over the right end of this row */
   padding-inline-end: 13rem;
 }
 
-.controls__buttons {
+#chrome .controls__buttons {
   display: flex;
   gap: var(--space-3);
 }
 
-.controls__count {
+#chrome .controls__count {
   color: var(--chalk);
   font-size: var(--text-xs);
   white-space: nowrap;
 }
 
-.fuse {
+#chrome .fuse {
   position: relative;
   height: 3px;
   background: var(--chalk-faint);
   transition: --progress var(--dur-fuse) var(--ease-spot);
 }
 
-.fuse::before {
+#chrome .fuse::before {
   content: "";
   position: absolute;
   inset: 0;
@@ -449,7 +471,7 @@ kbd {
   transform-origin: left;
 }
 
-.fuse::after {
+#chrome .fuse::after {
   content: "";
   position: absolute;
   top: 50%;
@@ -464,7 +486,7 @@ kbd {
 
 /* Prompter's book */
 
-.book {
+#prompter-book {
   position: fixed;
   inset: 0 0 0 auto;
   z-index: var(--z-book);
@@ -484,24 +506,24 @@ kbd {
     visibility 0s linear var(--dur-slow);
 }
 
-.book[data-open="true"] {
+#prompter-book[data-open="true"] {
   translate: 0 0;
   visibility: visible;
   transition: translate var(--dur-slow) var(--ease-curtain);
 }
 
-.book__head h2 {
+#prompter-book .book__head h2 {
   font-size: var(--text-xl);
   color: var(--limelight);
 }
 
-.book__head p {
+#prompter-book .book__head p {
   margin-top: var(--space-2);
   font-size: var(--text-s);
   color: var(--chalk);
 }
 
-.book__panel {
+#prompter-book .book__panel {
   display: flex;
   flex: 1 1 auto;
   flex-direction: column;
@@ -509,12 +531,12 @@ kbd {
   min-height: 0;
 }
 
-.book__panel .mufw-export {
+#prompter-book .mufw-export {
   align-self: flex-start;
 }
 
 /* Newest on top. Rows older than the latest are set in ever more degraded cuts of Redaction. */
-.book__panel .mufw-history {
+#prompter-book .mufw-history {
   display: flex;
   flex: 1 1 auto;
   flex-direction: column-reverse;
@@ -524,7 +546,7 @@ kbd {
   scrollbar-color: var(--chalk-faint) transparent;
 }
 
-.book__panel .mufw-history li {
+#prompter-book .mufw-history li {
   padding: 0.4em 0.7em;
   border-bottom: 1px dotted var(--chalk-faint);
   font-size: var(--text-s);
@@ -533,36 +555,36 @@ kbd {
   transition: background-color var(--dur-fast) ease;
 }
 
-.book__panel .mufw-history li:hover {
+#prompter-book .mufw-history li:hover {
   background: color-mix(in oklab, var(--limelight) 12%, transparent);
 }
 
-.book__panel .mufw-history li.mufw-latest {
+#prompter-book .mufw-history li.mufw-latest {
   color: var(--stage-black);
   background: var(--limelight);
   font-weight: 700;
 }
 
-.book__panel .mufw-history li:nth-last-child(n + 2) {
+#prompter-book .mufw-history li:nth-last-child(n + 2) {
   font-family: "Redaction 10", var(--face-body);
 }
 
-.book__panel .mufw-history li:nth-last-child(n + 4) {
+#prompter-book .mufw-history li:nth-last-child(n + 4) {
   font-family: "Redaction 35", var(--face-body);
   color: color-mix(in oklab, var(--paper) 88%, var(--chalk-dim));
 }
 
-.book__panel .mufw-history li:nth-last-child(n + 8) {
+#prompter-book .mufw-history li:nth-last-child(n + 8) {
   font-family: "Redaction 70", var(--face-body);
   color: var(--chalk);
 }
 
-.book__panel .mufw-history li:nth-last-child(n + 14) {
+#prompter-book .mufw-history li:nth-last-child(n + 14) {
   font-family: "Redaction 100", var(--face-body);
   color: var(--chalk-dim);
 }
 
-.book__panel pre {
+#prompter-book pre {
   flex: 0 1 11rem;
   min-height: 0;
   margin: 0;
@@ -575,7 +597,7 @@ kbd {
   color: var(--chalk);
 }
 
-.book-tab {
+#theatre > .book-tab {
   position: fixed;
   right: var(--space-6);
   bottom: var(--space-3);
@@ -583,6 +605,6 @@ kbd {
   transition: translate var(--dur-slow) var(--ease-curtain);
 }
 
-.book[data-open="true"] + .book-tab {
+#prompter-book[data-open="true"] + .book-tab {
   translate: calc(-1 * var(--book-w)) 0;
 }

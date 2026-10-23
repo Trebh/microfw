@@ -1,0 +1,563 @@
+#act-sync .sync {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  align-items: center;
+  row-gap: var(--space-4);
+  height: 100%;
+  min-height: 0;
+}
+
+#act-sync .sync__kicker {
+  grid-column: 1;
+  font-size: var(--text-m);
+  letter-spacing: 0.22em;
+  color: var(--chalk);
+}
+
+#act-sync .sync__kicker span {
+  letter-spacing: 0.04em;
+  text-transform: none;
+  font-weight: 500;
+}
+
+/* The verdict on the two models, lit like a cue light only while it is true. */
+#act-sync .badge {
+  grid-column: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 0.45em 1.1em;
+  border: 1px solid var(--chalk-faint);
+  font-family: var(--face-marquee);
+  font-weight: 800;
+  font-size: var(--text-s);
+  letter-spacing: var(--tracking-marquee);
+  text-transform: uppercase;
+  color: var(--chalk);
+  transition: color var(--dur-base) ease, border-color var(--dur-base) ease;
+}
+
+#act-sync .badge__lamp {
+  width: 0.6em;
+  height: 0.6em;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.5;
+}
+
+#act-sync .badge[data-state="agreed"] {
+  color: var(--cue-green);
+  border-color: color-mix(in oklab, var(--cue-green) 55%, transparent);
+}
+
+/* --glow does not inherit, so the text and the lamp each carry the cue-light animation. */
+#act-sync .badge[data-state="agreed"] .badge__text,
+#act-sync .badge[data-state="agreed"] .badge__lamp {
+  --glow: 0.5;
+  animation: cue-light 2.6s var(--ease-cue-light) infinite;
+}
+
+#act-sync .badge[data-state="agreed"] .badge__text {
+  text-shadow: 0 0 calc(0.25em + var(--glow) * 0.7em) color-mix(in oklab, var(--cue-green) calc(30% + var(--glow) * 50%), transparent);
+}
+
+#act-sync .badge[data-state="agreed"] .badge__lamp {
+  opacity: 1;
+  box-shadow: 0 0 calc(0.4em + var(--glow) * 0.6em) color-mix(in oklab, var(--cue-green) 70%, transparent);
+}
+
+#act-sync .badge[data-state="catching-up"] {
+  color: var(--standby-blue);
+  border-color: color-mix(in oklab, var(--standby-blue) 55%, transparent);
+}
+
+#act-sync .badge[data-state="diverged"] {
+  color: var(--alarm);
+  border-color: var(--alarm);
+}
+
+/* Two booths facing each other across the log, each turned a few degrees towards it. */
+#act-sync .sync__stage {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(19rem, 24rem) minmax(0, 1fr);
+  column-gap: var(--space-6);
+  align-self: stretch;
+  min-height: 0;
+  perspective: 1500px;
+}
+
+#act-sync .win {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-height: 0;
+  padding: var(--space-4) var(--space-5);
+  background: linear-gradient(180deg, color-mix(in oklab, var(--wing-grey) 78%, var(--velvet-deep)), var(--wing-grey) 60%);
+  box-shadow:
+    inset 0 0.3rem 0 var(--velvet),
+    inset 0 0 0 1px var(--chalk-faint),
+    0 1.6rem 3rem -1.2rem black;
+  transition: box-shadow var(--dur-slow) var(--ease-line);
+}
+
+#act-sync .win--a {
+  transform: rotateY(4deg);
+  transform-origin: right center;
+}
+
+#act-sync .win--b {
+  transform: rotateY(-4deg);
+  transform-origin: left center;
+}
+
+#act-sync .win[data-chair="true"] {
+  box-shadow:
+    inset 0 0.3rem 0 var(--limelight),
+    inset 0 0 0 1px color-mix(in oklab, var(--cue-green) 40%, transparent),
+    0 1.6rem 3rem -1.2rem black;
+}
+
+#act-sync .win__head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: baseline;
+  column-gap: var(--space-4);
+  row-gap: var(--space-1);
+}
+
+#act-sync .win__name {
+  font-size: var(--text-l);
+  color: var(--limelight);
+}
+
+#act-sync .win__patron {
+  font-size: var(--text-s);
+  color: var(--chalk);
+}
+
+#act-sync .win__patron em {
+  color: var(--paper);
+}
+
+#act-sync .win__chair {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-xs);
+  letter-spacing: 0.14em;
+  color: var(--chalk-dim);
+  transition: color var(--dur-base) ease;
+}
+
+#act-sync .win__lamp {
+  width: 0.65em;
+  height: 0.65em;
+  border-radius: 50%;
+  background: var(--chalk-faint);
+  transition: background-color var(--dur-base) ease, box-shadow var(--dur-base) ease;
+}
+
+#act-sync .win__chair[data-lit="true"] {
+  color: var(--cue-green);
+}
+
+#act-sync .win__chair[data-lit="true"] .win__lamp {
+  background: var(--cue-green);
+  box-shadow: 0 0 0.9em 0.15em color-mix(in oklab, var(--cue-green) 65%, transparent);
+  animation: sync-lamp 2.6s var(--ease-cue-light) infinite;
+}
+
+@keyframes sync-lamp {
+  0%, 100% { opacity: 0.65; }
+  50% { opacity: 1; }
+}
+
+#act-sync .win__house {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  padding-block: var(--space-2);
+}
+
+#act-sync .win__row {
+  display: flex;
+  gap: 0.4rem;
+}
+
+#act-sync .seat {
+  position: relative;
+  display: grid;
+  place-items: center;
+  inline-size: 2.7rem;
+  block-size: 2.7rem;
+  padding: 0;
+  border: 1px solid var(--chalk-faint);
+  border-radius: 0.55rem 0.55rem 0.15rem 0.15rem;
+  background: transparent;
+  color: var(--chalk);
+  cursor: pointer;
+  transition:
+    background-color var(--dur-base) ease,
+    border-color var(--dur-base) ease,
+    color var(--dur-base) ease,
+    box-shadow var(--dur-base) ease,
+    translate var(--dur-fast) var(--ease-ticket);
+}
+
+#act-sync .seat:disabled {
+  cursor: default;
+}
+
+#act-sync .seat__id {
+  position: absolute;
+  inset: 0.18rem auto auto 0.28rem;
+  font-size: 0.55rem;
+  opacity: 0.75;
+}
+
+#act-sync .seat__by {
+  font-family: var(--face-marquee);
+  font-weight: 800;
+  font-size: 1.15rem;
+  line-height: 1;
+  padding-top: 0.35rem;
+}
+
+#act-sync .seat[data-status="free"]:hover:not(:disabled) {
+  translate: 0 -2px;
+  border-color: var(--limelight);
+  background: color-mix(in oklab, var(--limelight) 16%, transparent);
+  color: var(--limelight);
+}
+
+#act-sync .seat[data-status="held"] {
+  border-color: var(--limelight);
+  background: color-mix(in oklab, var(--limelight) 82%, var(--stage-black));
+  color: var(--ink);
+}
+
+#act-sync .seat[data-status="held"][data-mine="true"] {
+  box-shadow: 0 0 0 2px var(--stage-black), 0 0 0 3px var(--cue-green);
+}
+
+#act-sync .seat[data-status="held"][data-mine="true"]:hover:not(:disabled) {
+  translate: 0 -2px;
+}
+
+#act-sync .seat[data-status="sold"] {
+  border-color: var(--velvet-lit);
+  background: var(--velvet);
+  color: var(--paper);
+}
+
+#act-sync .win__counts,
+#act-sync .win__applied {
+  font-size: var(--text-xs);
+  color: var(--chalk-dim);
+}
+
+#act-sync .win__verdict {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-3);
+  min-height: 3.2em;
+  padding-top: var(--space-3);
+  border-top: 1px dashed var(--chalk-faint);
+  font-size: var(--text-s);
+}
+
+#act-sync .win__verdict-title {
+  flex-basis: 100%;
+  font-size: var(--text-xs);
+  letter-spacing: 0.16em;
+  color: var(--chalk-dim);
+}
+
+#act-sync .win__verdict-seq,
+#act-sync .win__verdict-label {
+  font-size: var(--text-xs);
+  color: var(--chalk);
+}
+
+#act-sync .win__verdict-word {
+  font-weight: 400;
+  font-size: var(--text-m);
+  color: var(--cue-green);
+}
+
+#act-sync .win__verdict-word[data-refused="true"] {
+  color: var(--alarm);
+}
+
+#act-sync .win__quiet {
+  color: var(--chalk-dim);
+  font-style: italic;
+}
+
+#act-sync .win__wire {
+  margin-top: auto;
+  font-size: var(--text-xs);
+}
+
+#act-sync .win__wire--quiet {
+  color: var(--chalk-dim);
+}
+
+/* A closed window is shuttered, not removed: what it last knew stays behind the slats. */
+#act-sync .win__shutter {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: var(--text-xl);
+  letter-spacing: 0.1em;
+  color: var(--velvet-lit);
+  background:
+    repeating-linear-gradient(180deg, color-mix(in oklab, var(--stage-black) 88%, transparent) 0 0.9rem, color-mix(in oklab, var(--wing-grey) 90%, transparent) 0.9rem 1rem);
+  animation: shutter-down var(--dur-slow) var(--ease-curtain) both;
+}
+
+#act-sync .win__shutter[hidden] {
+  display: none;
+}
+
+@keyframes shutter-down {
+  from { clip-path: inset(0 0 100% 0); }
+  to { clip-path: inset(0); }
+}
+
+/* The log is a paper roll: newest entry on top, older ones in ever more degraded cuts. */
+#act-sync .tape {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: var(--space-4) var(--space-6) var(--space-4);
+  color: var(--ink);
+  background:
+    var(--tooth),
+    linear-gradient(172deg, color-mix(in oklab, var(--paper) 94%, white), var(--paper) 45%, color-mix(in oklab, var(--paper) 88%, var(--limelight-deep)));
+  background-blend-mode: multiply, normal;
+  box-shadow:
+    0 0.15rem 0.3rem color-mix(in oklab, black 50%, transparent),
+    0 1.4rem 3rem -0.6rem color-mix(in oklab, black 80%, transparent);
+}
+
+#act-sync .tape::before,
+#act-sync .tape::after {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  inline-size: 0.9rem;
+  background: radial-gradient(circle at 50% 50%, var(--stage-black) 0.17rem, transparent 0.2rem) 0 0 / 100% 1.1rem repeat-y;
+  opacity: 0.85;
+}
+
+#act-sync .tape::before {
+  inset-inline-start: 0;
+}
+
+#act-sync .tape::after {
+  inset-inline-end: 0;
+}
+
+#act-sync .tape__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding-bottom: var(--space-2);
+  border-bottom: 2px solid var(--ink);
+}
+
+#act-sync .tape__title {
+  font-size: var(--text-l);
+}
+
+#act-sync .tape__count {
+  font-size: var(--text-xs);
+}
+
+#act-sync .tape__rows {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  mask-image: linear-gradient(#000 78%, transparent);
+}
+
+#act-sync .tape__row {
+  flex: none;
+  display: grid;
+  grid-template-columns: 2.4rem 5.4rem minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  column-gap: var(--space-2);
+  align-content: center;
+  block-size: 2.8rem;
+  border-bottom: 1px dashed color-mix(in oklab, var(--ink) 28%, transparent);
+}
+
+#act-sync .tape__seq {
+  grid-row: 1;
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+
+#act-sync .tape__event {
+  grid-row: 1;
+  font-size: var(--text-s);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+#act-sync .tape__label {
+  grid-row: 1;
+  font-size: var(--text-xs);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#act-sync .tape__detail {
+  grid-row: 2;
+  grid-column: 2 / -1;
+  font-size: var(--text-xs);
+  font-style: italic;
+  line-height: 1.1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#act-sync .tape__row[data-event="Joined"] {
+  opacity: 0.7;
+}
+
+#act-sync .tape__row[data-event="Lease"] .tape__event,
+#act-sync .tape__row[data-event="Lease"] .tape__label {
+  color: color-mix(in oklab, var(--standby-blue) 45%, var(--ink));
+}
+
+#act-sync .tape__row[data-refused="true"] {
+  box-shadow: inset 0.22rem 0 0 var(--velvet);
+  padding-inline-start: 0.5rem;
+  margin-inline-start: -0.5rem;
+}
+
+#act-sync .tape__row[data-refused="true"] .tape__detail {
+  color: var(--velvet);
+  font-weight: 600;
+}
+
+#act-sync .tape__row:nth-child(n + 2) .tape__event,
+#act-sync .tape__row:nth-child(n + 2) .tape__detail {
+  font-family: "Redaction 10", var(--face-body);
+}
+
+#act-sync .tape__row:nth-child(n + 4) .tape__event,
+#act-sync .tape__row:nth-child(n + 4) .tape__detail {
+  font-family: "Redaction 35", var(--face-body);
+}
+
+#act-sync .tape__row:nth-child(n + 6) .tape__event,
+#act-sync .tape__row:nth-child(n + 6) .tape__detail {
+  font-family: "Redaction 70", var(--face-body);
+}
+
+#act-sync .tape__row:nth-child(n + 8) .tape__event,
+#act-sync .tape__row:nth-child(n + 8) .tape__detail {
+  font-family: "Redaction 100", var(--face-body);
+}
+
+#act-sync .lease {
+  display: grid;
+  gap: var(--space-1);
+  padding-top: var(--space-3);
+  border-top: 2px solid var(--ink);
+}
+
+#act-sync .lease__line {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+#act-sync .lease__title {
+  font-size: var(--text-s);
+  letter-spacing: 0.12em;
+}
+
+#act-sync .lease__epoch,
+#act-sync .lease__note {
+  font-size: var(--text-xs);
+}
+
+#act-sync .lease__holder {
+  font-size: var(--text-m);
+  line-height: 1.05;
+}
+
+#act-sync .lease[data-vacant="true"] .lease__holder {
+  color: var(--velvet);
+  font-style: italic;
+}
+
+#act-sync .lease__meter {
+  --progress: 0;
+  position: relative;
+  block-size: 0.5rem;
+  background: color-mix(in oklab, var(--ink) 18%, transparent);
+  transition: --progress var(--dur-base) linear;
+}
+
+#act-sync .lease__bar {
+  position: absolute;
+  inset: 0;
+  transform-origin: left center;
+  transform: scaleX(var(--progress));
+  background: color-mix(in oklab, var(--velvet) calc(var(--progress) * 100%), var(--cue-green));
+}
+
+#act-sync .sync__controls {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-4);
+}
+
+#act-sync .sync--failed {
+  display: grid;
+  place-content: center;
+  gap: var(--space-3);
+  color: var(--alarm);
+  font-size: var(--text-l);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #act-sync .badge[data-state="agreed"] .badge__text,
+  #act-sync .badge[data-state="agreed"] .badge__lamp,
+  #act-sync .win__chair[data-lit="true"] .win__lamp,
+  #act-sync .win__shutter {
+    animation: none;
+  }
+
+  #act-sync .badge[data-state="agreed"] .badge__text,
+  #act-sync .badge[data-state="agreed"] .badge__lamp {
+    --glow: 0.7;
+  }
+
+  #act-sync .seat[data-status="free"]:hover:not(:disabled),
+  #act-sync .seat[data-status="held"][data-mine="true"]:hover:not(:disabled) {
+    translate: none;
+  }
+}

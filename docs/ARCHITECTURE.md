@@ -47,7 +47,7 @@ flowchart LR
 | Driven ports | `ActionRunner`, `ModelPort`, `HistoryPort`, `KeyValueStore` (model, checkpoint and event-log persistence), `SyncLog` (the ordered log several instances share), and domain services the actions require (`CreditCheck`, `CurrentBidder`); a page's `Whoami` |
 | Driving adapters | the uhtml view, test drivers, RPC handlers on the server, the authentication middleware in front of them |
 | Driven adapters | local layers, remote RPC layers, `KeyValueStore.layerMemory`, the example's `layerAtomicFileStore` (synced temp file + rename + synced directory over `layerFileSystem`), `layerSyncStorage` (the event-log `Storage` over a `KeyValueStore`), `layerCreditCheckTable`/`layerCreditCheckPermissive`, `layerSessionsTable`, `layerCurrentBidderFixed`, `layerWhoamiFixed`/`layerWhoamiRemote`, devtools |
-| Composition roots | one per deployment: `examples/auction/src/client/<page>.ts`, `client/auctionWorker.ts`, `server.ts`, `test/live.ts`, `test/walletLive.ts` |
+| Composition roots | one per deployment: `examples/auction/src/client/<page>.ts`, `client/auctionWorker.ts`, `server.ts`, `test/live.ts`, `test/walletLive.ts`; the showcase's `examples/showcase/src/main.ts` and `src/acts/tour/company.worker.ts` |
 
 Ports are Effect service keys (`Context.Service`) created per definition by `makePorts(def)`;
 adapters are `Layer`s. Choosing a placement is choosing layers in a deployment's composition root;
@@ -63,6 +63,7 @@ flowchart BT
   devtools["@mufw/devtools"] --> core
   test["@mufw/test"] --> core
   example["@mufw/example-auction"] --> rpc & view & devtools & test & core
+  showcase["@mufw/example-showcase"] --> rpc & view & devtools & test & core
 ```
 
 - `@mufw/core` depends on `effect` alone and contains no platform, DOM or transport code.
@@ -72,7 +73,7 @@ flowchart BT
 - `@mufw/rpc` defines the wire contract and remote adapters but no transport; the application
   picks the protocol (websocket, HTTP, worker) and the serialization.
 - Adapter packages never depend on each other.
-- Platform packages (`@effect/platform-node`, `@effect/platform-browser`) appear only in the example.
+- Platform packages (`@effect/platform-node`, `@effect/platform-browser`) appear only in the examples.
 
 Packages are consumed as TypeScript sources (`exports: { ".": "./src/index.ts" }`, plus `"./sync"` for
 `@mufw/core`); vite, vitest and tsx compile them on the fly. There is no build step.
@@ -87,10 +88,12 @@ Code stays inside `Effect`/`Stream`/`Layer` across every package. Effects are ru
 | Browser island | `examples/auction/src/client/ticker.ts` (`runTicker`, called by the demo page's entry point) | `BrowserRuntime.runMain(Layer.launch(ticker))`, on `layerInputScheduler` |
 | Devtools page | `examples/auction/src/client/devtools.ts` | `BrowserRuntime.runMain(Layer.launch(page))`, on `layerInputScheduler` |
 | Stream frame | `examples/auction/src/client/streamEmbed.ts` (`runStreamFrame`, called by the demo page's entry point) | `BrowserRuntime.runMain(show)` |
+| Showcase page | `examples/showcase/src/main.ts` | `BrowserRuntime.runMain(Layer.launch(page))`, with the page's layers wrapped last in `layerInputScheduler` |
 | Node server | `examples/auction/src/server.ts` | `Layer.launch(...).pipe(Effect.raceFirst(Deferred.await(syncStopped)), NodeRuntime.runMain)`: a synced instance whose log was replaced stops the process |
 | Web worker | `examples/auction/src/client/auctionWorker.ts`, the worker's composition root | `BrowserRuntime.runMain(Layer.launch(workerHost.pipe(Layer.provide(BrowserWorkerRunner.layer))))` |
+| Showcase web worker | `examples/showcase/src/acts/tour/company.worker.ts`, the worker's composition root, started by Act V with `{ type: "module" }` | `BrowserRuntime.runMain(Layer.launch(served), { teardown: reportFailureToPage })`: a failure is raised to the page |
 | Live tests and scripts | `examples/auction/test/live.ts`, `test/walletLive.ts`, `test/syncLive.ts`, `test/syncRestartLive.ts`, `test/syncFailoverLive.ts`, `scripts/*.ts` | `NodeRuntime.runMain(program)` |
-| DOM events | `layerMount` dispatch, `layerPanel` and `layerHistoryList` row click and export click | `FiberSet.makeRuntime` captured in the layer: the fiber inherits the layer's services and references (the `Scheduler` among them) and is interrupted with its scope |
+| DOM events | `layerMount` dispatch, `layerPanel` and `layerHistoryList` row click and export click, the showcase deck's key presses (`examples/showcase/src/deck/keys.ts`) | `FiberSet.makeRuntime` captured in the layer: the fiber inherits the layer's services and references (the `Scheduler` among them) and is interrupted with its scope |
 | Tests | every `*.test.ts` | `@effect/vitest` `it.effect` |
 
 ## Data at the edges

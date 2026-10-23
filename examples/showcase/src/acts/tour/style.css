@@ -1,0 +1,435 @@
+#act-tour .tour {
+  display: grid;
+  align-content: start;
+  gap: var(--space-4);
+}
+
+/* The banner and the two import lines that every composition root shares. */
+
+#act-tour .tour__head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: var(--space-6);
+}
+
+#act-tour .tour__kicker {
+  font-size: var(--text-s);
+  letter-spacing: 0.2em;
+  color: var(--limelight);
+}
+
+#act-tour .tour__statement {
+  margin-top: var(--space-2);
+  font-family: var(--face-body);
+  font-size: var(--text-l);
+  font-weight: 400;
+  line-height: 1.02;
+  color: var(--paper);
+}
+
+#act-tour .tour__only {
+  font-style: normal;
+  color: var(--limelight);
+  text-shadow: 0 0 0.9em color-mix(in oklab, var(--limelight) 38%, transparent);
+}
+
+#act-tour .tour__imports {
+  --tilt: 0.5deg;
+  padding: var(--space-2) var(--space-4) var(--space-3);
+}
+
+#act-tour .tour__caption {
+  font-size: 0.66rem;
+  letter-spacing: 0.14em;
+  color: var(--velvet);
+}
+
+#act-tour .tour__imports-same {
+  margin-top: var(--space-1);
+  font-size: 0.66rem;
+  letter-spacing: 0.14em;
+  color: color-mix(in oklab, var(--ink) 62%, transparent);
+}
+
+/* Code on paper: the literal lines of the composition root; the marked ones are only this stage's. */
+
+#act-tour .tour__code {
+  margin: 0;
+  font-size: 0.64rem;
+  line-height: 1.45;
+  white-space: pre;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+#act-tour .tour__code code {
+  font: inherit;
+}
+
+#act-tour .tour__line {
+  display: block;
+  margin-inline: calc(-1 * var(--space-1));
+  padding-inline: var(--space-1);
+  color: color-mix(in oklab, var(--ink) 74%, transparent);
+}
+
+#act-tour .tour__line[data-kind="marked"] {
+  color: var(--ink);
+  background: color-mix(in oklab, var(--limelight) 46%, transparent);
+  box-shadow: inset 2px 0 0 var(--velvet);
+}
+
+#act-tour .tour__line[data-kind="elision"] {
+  opacity: 0.45;
+}
+
+#act-tour .tour__tok--keyword {
+  color: var(--velvet);
+}
+
+#act-tour .tour__tok--string {
+  color: var(--velvet-deep);
+}
+
+#act-tour .tour__tok--type {
+  font-weight: 600;
+}
+
+#act-tour .tour__tok--call {
+  color: color-mix(in oklab, var(--standby-blue) 46%, var(--ink));
+}
+
+#act-tour .tour__tok--number {
+  color: var(--limelight-deep);
+}
+
+#act-tour .tour__tok--comment {
+  color: var(--chalk-dim);
+}
+
+/* Three stages, side by side. */
+
+#act-tour .tour__stages,
+#act-tour .tour__board-cells {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-5);
+}
+
+#act-tour .tour__stage {
+  position: relative;
+  display: grid;
+  align-content: start;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: var(--space-3) var(--space-4) var(--space-4);
+  background: linear-gradient(var(--wing-grey), color-mix(in oklab, var(--wing-grey) 62%, var(--stage-black)));
+  border: 1px solid var(--chalk-faint);
+  border-top: 3px solid var(--limelight);
+}
+
+#act-tour .tour__stage[data-stage="wings"] {
+  border-top-color: var(--standby-blue);
+}
+
+#act-tour .tour__stage[data-stage="town"] {
+  border-top: 3px dashed var(--standby-blue);
+}
+
+#act-tour .tour__stage-head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: var(--space-3);
+}
+
+#act-tour .tour__ordinal {
+  font-size: var(--text-l);
+  color: var(--limelight);
+}
+
+#act-tour .tour__title {
+  font-family: var(--face-body);
+  font-size: var(--text-m);
+  font-weight: 400;
+  color: var(--paper);
+}
+
+#act-tour .tour__where {
+  font-size: 0.66rem;
+  color: var(--chalk);
+}
+
+#act-tour .tour__lamp {
+  font-size: 0.62rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+#act-tour .tour__lamp::before {
+  content: "";
+  display: inline-block;
+  width: 0.55em;
+  height: 0.55em;
+  margin-inline-end: 0.6em;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+#act-tour .tour__lamp[data-state="connecting"] {
+  color: var(--standby-blue);
+  text-shadow: 0 0 0.6em color-mix(in oklab, var(--standby-blue) 38%, transparent);
+}
+
+#act-tour .tour__lamp[data-state="connected"] {
+  --glow: 0.5;
+  color: var(--cue-green);
+  text-shadow:
+    0 0 calc(0.25em + var(--glow) * 0.7em) color-mix(in oklab, var(--cue-green) calc(30% + var(--glow) * 50%), transparent);
+  animation: cue-light 2.6s var(--ease-cue-light) infinite;
+}
+
+#act-tour .tour__lamp[data-state="disconnected"] {
+  color: var(--alarm);
+}
+
+#act-tour .tour__root {
+  --tilt: -0.25deg;
+  min-height: 7.8rem;
+  padding: var(--space-2) var(--space-3) var(--space-3);
+}
+
+#act-tour .tour__stage[data-stage="wings"] .tour__root {
+  --tilt: 0.2deg;
+}
+
+/* Seats: the one view, painted from whatever representation the stage's ports deliver. */
+
+#act-tour .tour__seats {
+  min-height: 8.2rem;
+}
+
+#act-tour .tour__seats:empty::before,
+#act-tour .tour__meter-mount:empty::before {
+  content: "the company has not come on yet";
+  font-size: var(--text-xs);
+  color: var(--chalk-dim);
+}
+
+#act-tour .tour__seat-rows {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 5px;
+}
+
+#act-tour .tour__seat {
+  position: relative;
+  height: 1.8rem;
+  overflow: hidden;
+  cursor: pointer;
+  color: var(--chalk);
+  background: color-mix(in oklab, var(--stage-black) 72%, var(--wing-grey));
+  border: 1px solid var(--chalk-faint);
+  border-radius: 0.7rem 0.7rem 0.2rem 0.2rem;
+  transition:
+    background var(--dur-fast),
+    border-color var(--dur-fast),
+    color var(--dur-fast),
+    translate var(--dur-fast) var(--ease-ticket);
+}
+
+#act-tour .tour__seat-id {
+  font-size: 0.66rem;
+}
+
+#act-tour .tour__seat:hover:not(:disabled) {
+  border-color: var(--limelight);
+  color: var(--paper);
+  translate: 0 -1px;
+}
+
+#act-tour .tour__seat:disabled {
+  cursor: default;
+}
+
+#act-tour .tour__seatmap[data-state="dark"] .tour__seat,
+#act-tour .tour__seatmap[data-state="curtain"] .tour__seat {
+  opacity: 0.45;
+}
+
+#act-tour .tour__seat[data-status="held"] {
+  color: var(--paper);
+  background: var(--velvet-deep);
+  border-color: var(--limelight);
+}
+
+#act-tour .tour__seat[data-status="sold"] {
+  color: var(--paper);
+  background: var(--velvet);
+  border-color: var(--velvet-lit);
+}
+
+/* The fuse burns down for as long as the hold lasts; a seat paid for no longer has one. */
+
+#act-tour .tour__seat-fuse {
+  position: absolute;
+  inset: auto 0 0;
+  height: 3px;
+  background: var(--limelight);
+  transform-origin: left;
+  transform: scaleX(0);
+}
+
+#act-tour .tour__seat[data-status="held"] .tour__seat-fuse {
+  animation: tour-fuse var(--hold) linear forwards;
+}
+
+@keyframes tour-fuse {
+  from { transform: scaleX(1); }
+  to { transform: scaleX(0); }
+}
+
+#act-tour .tour__tally {
+  display: flex;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+  font-size: 0.66rem;
+  color: var(--chalk);
+}
+
+#act-tour .tour__doors {
+  color: var(--limelight);
+}
+
+#act-tour .tour__seatmap[data-state="selling"] .tour__doors,
+#act-tour .tour__seatmap[data-state="full"] .tour__doors {
+  color: var(--cue-green);
+}
+
+#act-tour .tour__note {
+  min-height: 1.1em;
+  margin-top: var(--space-1);
+  font-size: 0.66rem;
+  color: var(--alarm);
+}
+
+/* The board: one stopwatch per stage, on the same scale. */
+
+#act-tour .tour__board {
+  display: grid;
+  gap: var(--space-2);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--chalk-faint);
+}
+
+#act-tour .tour__board-label {
+  font-size: 0.7rem;
+  letter-spacing: 0.16em;
+  color: var(--chalk);
+}
+
+#act-tour .tour__meter-mount {
+  min-height: 4.6rem;
+}
+
+#act-tour .tour__meter {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-areas:
+    "reading bars"
+    "note note";
+  align-items: end;
+  column-gap: var(--space-4);
+  row-gap: var(--space-1);
+}
+
+#act-tour .tour__meter-reading {
+  grid-area: reading;
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-1);
+  min-width: 5.5rem;
+}
+
+#act-tour .tour__meter-figure {
+  font-size: var(--text-l);
+  line-height: 0.85;
+  font-variant-numeric: tabular-nums;
+  color: var(--paper);
+}
+
+#act-tour .tour__meter-unit {
+  font-size: 0.66rem;
+  color: var(--chalk);
+}
+
+#act-tour .tour__meter[data-state="timing"] .tour__meter-figure {
+  color: var(--standby-blue);
+  animation: tour-timing 0.6s ease-in-out infinite alternate;
+}
+
+@keyframes tour-timing {
+  from { opacity: 1; }
+  to { opacity: 0.35; }
+}
+
+#act-tour .tour__meter-bars {
+  grid-area: bars;
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 2.6rem;
+  border-bottom: 1px solid var(--chalk-faint);
+}
+
+#act-tour .tour__meter-bar {
+  flex: 0 0 0.55rem;
+  height: calc(var(--h, 0) * 100%);
+  min-height: 2px;
+  background: var(--limelight);
+  transition: height var(--dur-base) var(--ease-spot);
+}
+
+#act-tour .tour__meter-bar:nth-last-child(n + 4) {
+  opacity: 0.72;
+}
+
+#act-tour .tour__meter-bar:nth-last-child(n + 8) {
+  opacity: 0.45;
+}
+
+#act-tour .tour__meter-bar:last-child {
+  background: var(--cue-green);
+}
+
+#act-tour .tour__meter-note {
+  grid-area: note;
+  font-size: 0.62rem;
+  color: var(--chalk);
+}
+
+#act-tour .tour__board-caption {
+  font-size: 0.62rem;
+  color: var(--chalk-dim);
+}
+
+@media (max-width: 68rem) {
+  #act-tour .tour__head,
+  #act-tour .tour__stages,
+  #act-tour .tour__board-cells {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #act-tour .tour__seat[data-status="held"] .tour__seat-fuse {
+    animation: none;
+    transform: scaleX(1);
+  }
+
+  #act-tour .tour__meter[data-state="timing"] .tour__meter-figure,
+  #act-tour .tour__lamp[data-state="connected"] {
+    animation: none;
+  }
+}

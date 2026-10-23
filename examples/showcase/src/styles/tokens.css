@@ -198,7 +198,7 @@
 /* A ticket, not a pill: notched sides and a perforation. */
 
 .stage-button,
-.book__panel .mufw-export {
+#prompter-book .mufw-export {
   --notch: 0.42em;
   position: relative;
   display: inline-flex;
@@ -229,7 +229,7 @@
 }
 
 .stage-button::before,
-.book__panel .mufw-export::before {
+#prompter-book .mufw-export::before {
   content: "";
   align-self: stretch;
   margin-inline-start: -0.55em;
@@ -238,14 +238,14 @@
 }
 
 .stage-button:hover:not(:disabled),
-.book__panel .mufw-export:hover {
+#prompter-book .mufw-export:hover {
   background-color: var(--limelight);
   translate: 0 -2px;
   rotate: -0.6deg;
 }
 
 .stage-button:active:not(:disabled),
-.book__panel .mufw-export:active {
+#prompter-book .mufw-export:active {
   translate: 0 1px;
   rotate: 0deg;
 }
@@ -296,7 +296,7 @@
 }
 
 .stage-button:focus-visible,
-.book__panel .mufw-export:focus-visible {
+#prompter-book .mufw-export:focus-visible {
   outline: 2px dashed var(--ink);
   outline-offset: -5px;
   background-color: var(--limelight);
@@ -305,5 +305,5 @@
 @media (prefers-reduced-motion: reduce) {
   .live { animation: none; --glow: 0.7; }
   .stage-button:hover:not(:disabled),
-  .book__panel .mufw-export:hover { translate: none; rotate: none; }
+  #prompter-book .mufw-export:hover { translate: none; rotate: none; }
 }

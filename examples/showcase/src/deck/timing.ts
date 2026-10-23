@@ -6,7 +6,9 @@ const unitMillis: Readonly<Record<string, number>> = { ms: 1, s: 1000 }
 export const parseCssMillis = (value: string): number => {
   const match = /^\s*(-?[\d.]+)(ms|s)\s*$/.exec(value)
   if (match === null) return 0
-  return Number(match[1]) * (unitMillis[match[2] ?? "ms"] ?? 1)
+  const millis = Number(match[1]) * (unitMillis[match[2] ?? "ms"] ?? 1)
+  // A malformed number is NaN, and Effect.sleep(NaN) never wakes.
+  return Number.isFinite(millis) ? millis : 0
 }
 
 /**

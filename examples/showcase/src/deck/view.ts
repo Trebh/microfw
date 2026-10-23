@@ -72,6 +72,16 @@ const playbill = (scripts: ReadonlyArray<ActScript>, representation: Representat
     </ol>
   </nav>`
 
+/** Lines up to this long are set at full size; the surtitle strip holds three lines of it. */
+const FULL_SIZE_LIMIT = 140
+const MEDIUM_SIZE_LIMIT = 220
+
+/** The size class of a surtitle: longer lines are set smaller so they still fit the strip's three lines. */
+export const surtitleSize = (line: string): "l" | "m" | "s" => {
+  if (line.length <= FULL_SIZE_LIMIT) return "l"
+  return line.length <= MEDIUM_SIZE_LIMIT ? "m" : "s"
+}
+
 const surtitles = (scripts: ReadonlyArray<ActScript>, representation: Representation) => {
   const script = scripts[representation.actIndex]
   const flip = flipOf(scripts, representation)
@@ -85,7 +95,7 @@ const surtitles = (scripts: ReadonlyArray<ActScript>, representation: Representa
   )
   return html`<section class="surtitles" aria-label="Surtitles">
     <p class="surtitle surtitle--past past-70" data-flip=${String(flip)} aria-hidden="true">${renderSegments(past)}</p>
-    <p class="surtitle surtitle--now" data-flip=${String(flip)} aria-live="polite">${renderSegments(current)}</p>
+    <p class="surtitle surtitle--now" data-flip=${String(flip)} data-size=${surtitleSize(current)} aria-live="polite">${renderSegments(current)}</p>
     <p class="surtitles__where marquee">${script?.numeral ?? ""} ${script?.title ?? ""}</p>
   </section>`
 }

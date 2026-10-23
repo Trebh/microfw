@@ -1,0 +1,593 @@
+/*
+ * Act VI. The house lights are one number, --house-lit (1 up, 0 dark), written on the act's root by
+ * the nested loop's brightness; the act's background and the audience seats read it.
+ */
+
+@property --house-lit { syntax: "<number>"; inherits: true; initial-value: 1; }
+
+#act-within {
+  background:
+    radial-gradient(
+      ellipse 90% 70% at 50% 0%,
+      color-mix(in oklab, var(--limelight) calc(var(--house-lit) * 15%), transparent),
+      transparent 72%
+    ),
+    color-mix(in oklab, var(--stage-black), var(--wing-grey) calc(var(--house-lit) * 70%));
+  transition: --house-lit var(--dur-slow) var(--ease-curtain);
+}
+
+#act-within .within {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: var(--space-4) var(--space-5);
+  height: 100%;
+}
+
+/* Two columns, one per way of composing. */
+
+#act-within .within__column {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+  min-height: 0;
+}
+
+#act-within .within__column + .within__column {
+  padding-inline-start: var(--space-5);
+  border-inline-start: 1px dashed var(--chalk-faint);
+}
+
+#act-within .within__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-3);
+}
+
+#act-within .within__fn {
+  font-family: var(--face-mono);
+  font-size: var(--text-l);
+  font-weight: 500;
+  letter-spacing: -0.03em;
+  color: var(--limelight);
+}
+
+#act-within .within__tagline {
+  font-size: var(--text-m);
+  color: var(--chalk);
+}
+
+#act-within .within__body {
+  display: grid;
+  flex: 1 1 auto;
+  gap: var(--space-3);
+  min-height: 0;
+}
+
+#act-within .within__body--nest {
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  gap: var(--space-4);
+}
+
+#act-within .within__body--forward {
+  grid-template-rows: auto auto minmax(0, 1fr);
+}
+
+#act-within .within__slot {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* The play within the play: a proscenium inside the big one. */
+
+#act-within .within__play {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+#act-within .within__proscenium {
+  padding: var(--space-3);
+  border: 1px solid color-mix(in oklab, var(--limelight) 38%, transparent);
+  background: color-mix(in oklab, var(--stage-black) 72%, var(--wing-grey));
+  box-shadow:
+    inset 0 0 2.4rem color-mix(in oklab, black 70%, transparent),
+    0 0.6rem 1.6rem -0.8rem color-mix(in oklab, black 80%, transparent);
+}
+
+#act-within .within__lamps {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  margin-block-end: var(--space-2);
+  font-family: var(--face-mono);
+  font-size: var(--text-xs);
+}
+
+#act-within .within__lamps-label {
+  margin-inline-end: auto;
+  font-size: var(--text-s);
+  color: var(--chalk);
+}
+
+#act-within .within__lamp {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+  color: var(--chalk-dim);
+  transition: color var(--dur-slow) ease;
+}
+
+#act-within .within__lamp::before {
+  content: "";
+  width: 0.62em;
+  height: 0.62em;
+  border-radius: 50%;
+  background: var(--chalk-faint);
+  transition:
+    background-color var(--dur-slow) ease,
+    box-shadow var(--dur-slow) ease;
+}
+
+#act-within .within__lamp[data-lit="true"] {
+  color: var(--limelight);
+}
+
+#act-within .within__lamp[data-lit="true"]::before {
+  background: var(--limelight);
+  box-shadow: 0 0 0.8em var(--limelight);
+}
+
+#act-within .within__stage {
+  position: relative;
+  display: grid;
+  place-items: center;
+  height: 4.6rem;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse 70% 130% at 50% 110%, color-mix(in oklab, var(--limelight) 36%, transparent), transparent 70%),
+    var(--stage-black);
+  border-block-end: 3px solid var(--velvet-deep);
+}
+
+#act-within .within__title {
+  font-size: var(--text-l);
+  color: var(--limelight);
+  text-shadow: 0 0 0.6em color-mix(in oklab, var(--limelight) 55%, transparent);
+}
+
+#act-within .within__half--l,
+#act-within .within__half--r {
+  position: absolute;
+  inset-block: 0;
+  width: 50%;
+  background:
+    repeating-linear-gradient(90deg, var(--velvet-deep) 0 0.35rem, var(--velvet) 0.35rem 0.9rem),
+    var(--velvet);
+  box-shadow: 0 0 1.2rem color-mix(in oklab, black 70%, transparent);
+  transition: translate var(--dur-slow) var(--ease-curtain);
+}
+
+#act-within .within__half--l { inset-inline-start: 0; }
+#act-within .within__half--r { inset-inline-end: 0; }
+
+#act-within .within__stage[data-open="true"] .within__half--l { translate: -92% 0; }
+#act-within .within__stage[data-open="true"] .within__half--r { translate: 92% 0; }
+
+/* Seats: the audience dims with the house. */
+
+#act-within .within__seats {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 0.25rem;
+  margin-block-start: var(--space-3);
+  opacity: calc(0.4 + var(--house-lit) * 0.6);
+}
+
+#act-within .within__seat {
+  padding: 0.3em 0;
+  border: 1px solid var(--chalk-faint);
+  background: transparent;
+  color: var(--chalk);
+  font-size: var(--text-xs);
+  cursor: pointer;
+  transition:
+    background-color var(--dur-fast) ease,
+    color var(--dur-fast) ease,
+    border-color var(--dur-fast) ease;
+}
+
+#act-within .within__seat:hover:not(:disabled) {
+  border-color: var(--limelight);
+  color: var(--limelight);
+}
+
+#act-within .within__seat[data-status="held"] {
+  border-color: var(--limelight-deep);
+  background: color-mix(in oklab, var(--limelight) 26%, transparent);
+  color: var(--limelight);
+}
+
+#act-within .within__seat[data-status="sold"] {
+  border-color: var(--velvet-lit);
+  background: var(--velvet);
+  color: var(--paper);
+  cursor: default;
+}
+
+#act-within .within__seats[data-size="front"] .within__seat {
+  padding-block: 0.15em;
+}
+
+#act-within .within__tally {
+  min-height: 1.4em;
+  margin-block-start: var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--chalk);
+}
+
+#act-within .within__tally--refused {
+  color: var(--alarm);
+}
+
+#act-within .within__model {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-3);
+  border-inline-start: 2px solid var(--limelight-deep);
+  font-size: var(--text-xs);
+  color: var(--chalk);
+}
+
+#act-within .within__model b {
+  font-weight: 500;
+  color: var(--limelight);
+}
+
+#act-within .within__controls {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+#act-within .within__ticket {
+  justify-content: center;
+  font-size: var(--text-xs);
+}
+
+/* The right: two islands, side by side. */
+
+#act-within .within__islands {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+#act-within .within__island {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3) var(--space-3);
+  border: 1px solid var(--chalk-faint);
+  background: color-mix(in oklab, var(--stage-black) 72%, var(--wing-grey));
+}
+
+#act-within .within__island-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+#act-within .within__island-name {
+  font-size: var(--text-xs);
+  font-weight: 500;
+  color: var(--paper);
+}
+
+#act-within .within__chip {
+  font-size: var(--text-xs);
+  color: var(--chalk);
+}
+
+/* The sign: bulbs round a lit board. */
+
+#act-within .within__sign {
+  --sign-ink: var(--limelight);
+  position: relative;
+  display: grid;
+  flex: 1 1 auto;
+  align-content: center;
+  gap: var(--space-1);
+  padding: 1.7rem var(--space-3);
+  text-align: center;
+  background: var(--stage-black);
+  border: 0.3rem solid var(--wing-grey);
+  box-shadow:
+    0 0 0 1px color-mix(in oklab, var(--sign-ink) 45%, transparent),
+    inset 0 0 1.6rem color-mix(in oklab, var(--sign-ink) 14%, transparent);
+  transition: box-shadow var(--dur-slow) ease;
+}
+
+#act-within .within__sign[data-sign="few"] { --sign-ink: color-mix(in oklab, var(--limelight) 55%, var(--alarm)); }
+#act-within .within__sign[data-sign="sold"] { --sign-ink: var(--alarm); }
+#act-within .within__sign[data-sign="playing"] { --sign-ink: var(--cue-green); }
+
+#act-within .within__sign-text {
+  font-size: var(--text-l);
+  color: var(--sign-ink);
+  text-shadow:
+    0 0 0.35em color-mix(in oklab, var(--sign-ink) 80%, transparent),
+    0 0 1.2em color-mix(in oklab, var(--sign-ink) 45%, transparent);
+}
+
+#act-within .within__sign[data-flip="0"] .within__sign-text { animation: sign-flicker-a 900ms linear both; }
+#act-within .within__sign[data-flip="1"] .within__sign-text { animation: sign-flicker-b 900ms linear both; }
+
+#act-within .within__sign-note {
+  font-size: var(--text-xs);
+  color: var(--chalk);
+}
+
+#act-within .within__bulbs {
+  position: absolute;
+  inset-inline: 0.5rem;
+  height: 0.6rem;
+}
+
+#act-within .within__bulbs--top { top: 0.4rem; }
+#act-within .within__bulbs--bottom { bottom: 0.4rem; }
+
+#act-within .within__bulbs::before,
+#act-within .within__bulbs::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle, var(--sign-ink) 0 0.2rem, transparent 0.27rem) 0 50% / 1.4rem 100% repeat-x;
+  filter: drop-shadow(0 0 0.25rem var(--sign-ink));
+  animation: bulbs-chase 1.4s steps(1) infinite;
+}
+
+#act-within .within__bulbs::after {
+  background-position: 0.7rem 50%;
+  animation-direction: reverse;
+}
+
+#act-within .within__sign[data-sign="sold"] .within__bulbs::before,
+#act-within .within__sign[data-sign="sold"] .within__bulbs::after {
+  animation-duration: 0.5s;
+}
+
+@keyframes bulbs-chase {
+  0% { opacity: 1; }
+  50% { opacity: 0.18; }
+}
+
+@keyframes sign-flicker-a {
+  0% { opacity: 0.04; }
+  9% { opacity: 1; }
+  15% { opacity: 0.08; }
+  24% { opacity: 0.9; }
+  30% { opacity: 0.12; }
+  44% { opacity: 1; }
+  100% { opacity: 1; }
+}
+
+@keyframes sign-flicker-b {
+  0% { opacity: 0.04; }
+  9% { opacity: 1; }
+  15% { opacity: 0.08; }
+  24% { opacity: 0.9; }
+  30% { opacity: 0.12; }
+  44% { opacity: 1; }
+  100% { opacity: 1; }
+}
+
+/* The forward function, as it is written. */
+
+#act-within .within__code {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  overflow: hidden;
+  border-inline-start: 2px solid var(--standby-blue);
+  background: color-mix(in oklab, var(--stage-black) 78%, var(--wing-grey));
+  font-size: 0.7rem;
+  line-height: 1.55;
+  letter-spacing: -0.02em;
+  white-space: pre;
+  color: var(--chalk);
+}
+
+#act-within .within__code code { font: inherit; }
+#act-within .within__code-line { display: block; }
+#act-within .within__tok--keyword { color: var(--velvet-lit); }
+#act-within .within__tok--call { color: var(--limelight); }
+#act-within .within__tok--string { color: var(--cue-green); }
+#act-within .within__tok--arg { color: var(--paper); }
+
+/* History lists: newest first, older rows in ever more degraded cuts. */
+
+#act-within .within__hist {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  padding-block-start: var(--space-2);
+  border-block-start: 1px solid var(--chalk-faint);
+}
+
+#act-within .within__hist-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding-block-end: var(--space-1);
+  font-size: var(--text-xs);
+}
+
+#act-within .within__hist-title { font-weight: 500; color: var(--paper); }
+#act-within .within__hist-count { color: var(--limelight); }
+
+#act-within .within__records {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+#act-within .within__record {
+  display: grid;
+  grid-template-columns: 2.7em minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 0.5em;
+  padding: 0.28em 0.3em;
+  border-block-end: 1px dotted var(--chalk-faint);
+  font-size: var(--text-xs);
+  color: var(--paper);
+}
+
+#act-within .within__seq { color: var(--chalk); }
+#act-within .within__label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--limelight); }
+#act-within .within__record[data-origin="inner"] .within__label { color: var(--standby-blue); }
+
+#act-within .within__parts {
+  font-size: var(--text-s);
+  white-space: nowrap;
+}
+
+#act-within .within__part + .within__part::before {
+  content: "/";
+  margin-inline: 0.15em;
+  font-weight: 400;
+  color: var(--chalk-dim);
+}
+
+#act-within .within__part {
+  font-weight: 400;
+}
+
+#act-within .within__part[data-changed="true"] {
+  box-shadow: inset 0 -2px 0 var(--limelight);
+}
+
+#act-within .within__record:first-child {
+  background: color-mix(in oklab, var(--limelight) 12%, transparent);
+}
+
+#act-within .within__record:first-child[data-parity="0"] { animation: record-in-a var(--dur-base) var(--ease-line) both; }
+#act-within .within__record:first-child[data-parity="1"] { animation: record-in-b var(--dur-base) var(--ease-line) both; }
+
+#act-within .within__record:nth-child(n + 2) .within__parts { font-family: "Redaction 10", var(--face-body); }
+#act-within .within__record:nth-child(n + 4) .within__parts { font-family: "Redaction 35", var(--face-body); }
+#act-within .within__record:nth-child(n + 7) .within__parts { font-family: "Redaction 70", var(--face-body); }
+#act-within .within__record:nth-child(n + 10) .within__parts { font-family: "Redaction 100", var(--face-body); }
+
+#act-within .within__record:nth-child(n + 4) { opacity: 0.86; }
+#act-within .within__record:nth-child(n + 7) { opacity: 0.68; }
+#act-within .within__record:nth-child(n + 10) { opacity: 0.5; }
+
+/* Nest's list has room: label above, both halves of the control state below. */
+#act-within .within__hist--nest .within__record {
+  grid-template-columns: 2.7em minmax(0, 1fr);
+  row-gap: 0.1em;
+  padding-block: 0.4em;
+}
+
+#act-within .within__hist--nest .within__parts { grid-column: 2; }
+
+@keyframes record-in-a {
+  from { translate: 0 -0.6rem; opacity: 0; }
+}
+
+@keyframes record-in-b {
+  from { translate: 0 -0.6rem; opacity: 0; }
+}
+
+#act-within .within__histories {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+  grid-template-rows: minmax(0, 1fr);
+  min-height: 0;
+}
+
+/* The comparison card. */
+
+#act-within .within__compare {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-6);
+  padding: var(--space-3) var(--space-5);
+}
+
+#act-within .within__verdict {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  margin-block-end: var(--space-1);
+}
+
+#act-within .within__verdict code {
+  font-size: var(--text-s);
+  font-weight: 500;
+  color: var(--velvet);
+}
+
+#act-within .within__verdict .marquee {
+  font-size: var(--text-m);
+}
+
+#act-within .within__compare ul {
+  display: grid;
+  gap: var(--space-1);
+  font-size: var(--text-s);
+  line-height: var(--leading-body);
+}
+
+#act-within .within__compare li::before {
+  content: "— ";
+  color: var(--velvet);
+}
+
+@media (max-width: 68rem) {
+  #act-within .within {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto;
+    height: auto;
+  }
+
+  #act-within .within__column + .within__column {
+    padding-inline-start: 0;
+    border-inline-start: 0;
+  }
+
+  #act-within .within__body--nest {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto;
+  }
+
+  #act-within .within__records {
+    flex: 0 0 auto;
+  }
+
+  #act-within .within__compare {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #act-within .within__sign .within__sign-text,
+  #act-within .within__bulbs::before,
+  #act-within .within__bulbs::after,
+  #act-within .within__record:first-child {
+    animation: none;
+  }
+}

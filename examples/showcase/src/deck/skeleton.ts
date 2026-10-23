@@ -36,7 +36,7 @@ export const buildSkeleton = <R>(host: HTMLElement, acts: ReadonlyArray<Act<R>>)
     host,
     html`<div id="chrome"></div>
       <div class="stage-frame" data-curtain="open">
-        <div class="stage" id="stage"></div>
+        <div id="house-stage"></div>
         <div class="spotlight" data-moving="false" aria-hidden="true"></div>
         <div class="curtain" aria-hidden="true">
           <div class="curtain__half curtain__half--left"></div>
@@ -52,7 +52,7 @@ export const buildSkeleton = <R>(host: HTMLElement, acts: ReadonlyArray<Act<R>>)
       </aside>
       <div class="book-tab"></div>`
   )
-  const stage = pick(host, "#stage")
+  const stage = pick(host, "#house-stage")
   const stages = acts.map((act) => {
     const root = actRoot(act.script.id, act.script.title)
     stage.append(root)

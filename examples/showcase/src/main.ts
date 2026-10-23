@@ -47,7 +47,7 @@ const page = Layer.mergeAll(
     render,
     onRefused: (refused) => Effect.logWarning(refused)
   }),
-  layerSpotlight(scripts, { stage: skeleton.stage, overlay: skeleton.spotlight }),
+  layerSpotlight(scripts, { frame: skeleton.frame, stage: skeleton.stage, overlay: skeleton.spotlight }),
   layerCurtain({ frame: skeleton.frame, stage: skeleton.stage }),
   layerHash,
   layerInterruption,

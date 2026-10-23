@@ -5,7 +5,14 @@ import type { BoxOffice } from "../domain/BoxOffice.ts"
 import type { CurrentPatron } from "../domain/CurrentPatron.ts"
 import type { PaymentGateway } from "../domain/PaymentGateway.ts"
 import { finaleAct } from "./finale/index.ts"
+import { loopAct } from "./loop/index.ts"
+import { mapAct } from "./map/index.ts"
 import { overtureAct } from "./overture/index.ts"
+import { rehearsalAct } from "./rehearsal/index.ts"
+import { rewindAct } from "./rewind/index.ts"
+import { syncAct } from "./sync/index.ts"
+import { tourAct } from "./tour/index.ts"
+import { withinAct } from "./within/index.ts"
 
 /** Everything the composition root provides to an act's layer. */
 export type StageServices =
@@ -19,7 +26,17 @@ export type StageServices =
   | CurrentPatron
 
 /** The acts in running order. An act that needs fewer services than `StageServices` fits as it is. */
-export const acts: ReadonlyArray<Act<StageServices>> = [overtureAct, finaleAct]
+export const acts: ReadonlyArray<Act<StageServices>> = [
+  overtureAct,
+  loopAct,
+  rewindAct,
+  mapAct,
+  rehearsalAct,
+  tourAct,
+  withinAct,
+  syncAct,
+  finaleAct
+]
 
 /** What the playbill, the surtitles and the deck's program are made from. */
 export const scripts: ReadonlyArray<ActScript> = acts.map((act) => act.script)

@@ -1,0 +1,639 @@
+@property --rewind-ink { syntax: "<number>"; inherits: false; initial-value: 0; }
+
+#act-rewind {
+  --film: color-mix(in oklab, var(--stage-black) 78%, var(--velvet-deep));
+  --seat-fill: color-mix(in oklab, var(--chalk) 22%, transparent);
+}
+
+#act-rewind .rewind {
+  display: grid;
+  height: 100%;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  grid-template-areas:
+    "head head"
+    "stage side"
+    "transport transport"
+    "film film";
+  gap: var(--space-3) var(--space-6);
+}
+
+/* Head */
+
+#act-rewind .rewind__head {
+  grid-area: head;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-5);
+}
+
+#act-rewind .rewind__title {
+  font-size: var(--text-l);
+  font-style: italic;
+  font-weight: 400;
+  line-height: 1;
+  color: var(--limelight);
+  text-shadow: 0 0 0.4em color-mix(in oklab, var(--limelight) 28%, transparent);
+}
+
+#act-rewind .rewind__counters {
+  display: flex;
+  gap: var(--space-5);
+}
+
+#act-rewind .counter {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+
+#act-rewind .counter dt {
+  color: var(--chalk);
+}
+
+#act-rewind .counter dd {
+  font-size: var(--text-l);
+  color: var(--paper);
+}
+
+/* The seats, small on a frame and large on the stage */
+
+#act-rewind .seat--free { --seat-fill: color-mix(in oklab, var(--chalk) 22%, transparent); }
+#act-rewind .seat--held { --seat-fill: var(--limelight); }
+#act-rewind .seat--sold { --seat-fill: var(--velvet-lit); }
+
+#act-rewind .seats {
+  display: grid;
+  grid-template-columns: repeat(6, 0.7rem);
+  gap: 2px;
+}
+
+#act-rewind .seats .seat {
+  height: 0.5rem;
+  border-radius: 0.35rem 0.35rem 0.1rem 0.1rem;
+  background: var(--seat-fill);
+}
+
+/* The stage: the newest frame, enlarged */
+
+#act-rewind .stage {
+  grid-area: stage;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-height: 0;
+}
+
+#act-rewind .stage__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+#act-rewind .stage__title {
+  font-size: var(--text-m);
+  color: var(--paper);
+}
+
+#act-rewind .stage__title .mono,
+#act-rewind .film__title .mono {
+  margin-inline-start: var(--space-2);
+  font-size: var(--text-xs);
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--chalk);
+}
+
+#act-rewind .stage__counts {
+  display: flex;
+  gap: var(--space-4);
+  font-size: var(--text-s);
+  color: var(--chalk);
+}
+
+#act-rewind .stage__held { color: var(--limelight); }
+#act-rewind .stage__sold { color: var(--velvet-lit); }
+
+#act-rewind .stage__floor {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+
+#act-rewind .house {
+  display: grid;
+  height: 100%;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-rows: repeat(3, minmax(0, 1fr));
+  gap: var(--space-2);
+  transition: opacity var(--dur-slow) ease;
+}
+
+#act-rewind .house[data-phase="dark"] { opacity: 0.35; }
+
+#act-rewind .house .seat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+  padding: 0;
+  border: 1px solid var(--chalk-faint);
+  border-radius: 0.9rem 0.9rem 0.25rem 0.25rem;
+  color: var(--chalk);
+  background: var(--seat-fill);
+  cursor: default;
+  transition:
+    translate var(--dur-fast) var(--ease-ticket),
+    border-color var(--dur-fast) ease,
+    background-color var(--dur-base) ease;
+}
+
+#act-rewind .house .seat--held { color: var(--ink); }
+#act-rewind .house .seat--sold { color: var(--paper); }
+
+#act-rewind .house .seat:not(:disabled) {
+  cursor: pointer;
+}
+
+#act-rewind .house .seat:not(:disabled):hover {
+  translate: 0 -0.2rem;
+  border-color: var(--limelight);
+  background: color-mix(in oklab, var(--limelight) 22%, transparent);
+}
+
+#act-rewind .seat__id {
+  font-size: var(--text-xs);
+}
+
+#act-rewind .seat__by {
+  min-height: 1.2em;
+  font-size: 0.62rem;
+  opacity: 0.8;
+}
+
+/* The wait for a hold to run out is an automatic action offstage; a travel cuts it short. */
+
+#act-rewind .house[data-wait="inflight"] .seat--held {
+  animation: rewind-wait 1.6s var(--ease-cue-light) infinite;
+}
+
+#act-rewind .house[data-wait="interrupted"] .seat--held {
+  outline: 2px dashed var(--alarm);
+  outline-offset: 2px;
+}
+
+#act-rewind .stage__wait {
+  font-size: var(--text-s);
+  line-height: 1.25;
+  color: var(--chalk);
+}
+
+#act-rewind .stage__wait[data-wait="interrupted"] { color: var(--paper); }
+
+#act-rewind .stage__cut {
+  color: var(--alarm);
+  text-shadow: 0 0 0.6em color-mix(in oklab, var(--alarm) 35%, transparent);
+}
+
+#act-rewind .stage__note {
+  min-height: 1.3em;
+  font-size: var(--text-s);
+  font-style: italic;
+  color: var(--limelight);
+}
+
+#act-rewind .stage__doors {
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  translate: -50% -50%;
+}
+
+@keyframes rewind-wait {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--standby-blue) 0%, transparent); }
+  50% { box-shadow: 0 0 0 0.35rem color-mix(in oklab, var(--standby-blue) 55%, transparent); }
+}
+
+/* Ink bleed: a travel washes the stage in sepia ink that spreads and fades. The two names alternate so each travel restarts it. */
+
+#act-rewind .stage__floor::after {
+  content: "";
+  position: absolute;
+  inset: -0.5rem;
+  pointer-events: none;
+  opacity: 0;
+  background: color-mix(in oklab, var(--limelight-deep) 62%, var(--stage-black));
+  mask-image: radial-gradient(
+    circle at 50% 55%,
+    #000 calc(var(--rewind-ink) * 100%),
+    transparent calc(var(--rewind-ink) * 100% + 22%)
+  );
+}
+
+#act-rewind .stage[data-bleed="a"] .stage__floor::after { animation: rewind-ink-a 1.6s var(--ease-line); }
+#act-rewind .stage[data-bleed="b"] .stage__floor::after { animation: rewind-ink-b 1.6s var(--ease-line); }
+#act-rewind .stage[data-bleed="a"] .house { animation: rewind-sepia-a 2s var(--ease-line); }
+#act-rewind .stage[data-bleed="b"] .house { animation: rewind-sepia-b 2s var(--ease-line); }
+
+@keyframes rewind-ink-a {
+  0% { --rewind-ink: 0; opacity: 0.85; }
+  55% { --rewind-ink: 1.2; opacity: 0.85; }
+  100% { --rewind-ink: 1.2; opacity: 0; }
+}
+
+@keyframes rewind-ink-b {
+  0% { --rewind-ink: 0; opacity: 0.85; }
+  55% { --rewind-ink: 1.2; opacity: 0.85; }
+  100% { --rewind-ink: 1.2; opacity: 0; }
+}
+
+@keyframes rewind-sepia-a {
+  from { filter: sepia(1) contrast(1.2) brightness(0.8) blur(1.5px); }
+  to { filter: none; }
+}
+
+@keyframes rewind-sepia-b {
+  from { filter: sepia(1) contrast(1.2) brightness(0.8) blur(1.5px); }
+  to { filter: none; }
+}
+
+/* The other side of the stage: the line about travels, and the replay */
+
+#act-rewind .rewind__side {
+  grid-area: side;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-height: 0;
+}
+
+#act-rewind .never {
+  font-size: var(--text-m);
+  font-style: italic;
+  line-height: 1.15;
+}
+
+#act-rewind .never__line {
+  display: block;
+  color: var(--chalk-dim);
+  font-family: "Redaction 100", var(--face-body);
+  transition: color var(--dur-slow) ease;
+}
+
+#act-rewind .never[data-lit="true"] .never__line {
+  color: var(--limelight);
+  font-family: var(--face-body);
+  text-shadow: 0 0 0.5em color-mix(in oklab, var(--limelight) 28%, transparent);
+}
+
+#act-rewind .never[data-lit="true"][data-bleed="a"] .never__line { animation: rewind-never-a 1.4s var(--ease-line); }
+#act-rewind .never[data-lit="true"][data-bleed="b"] .never__line { animation: rewind-never-b 1.4s var(--ease-line); }
+
+@keyframes rewind-never-a {
+  from { filter: blur(5px) sepia(1); opacity: 0.2; letter-spacing: 0.06em; }
+  to { filter: none; opacity: 1; letter-spacing: 0; }
+}
+
+@keyframes rewind-never-b {
+  from { filter: blur(5px) sepia(1); opacity: 0.2; letter-spacing: 0.06em; }
+  to { filter: none; opacity: 1; letter-spacing: 0; }
+}
+
+#act-rewind .verdict {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-height: 0;
+  padding: var(--space-4) var(--space-5);
+  overflow: hidden;
+  font-size: var(--text-s);
+}
+
+#act-rewind .verdict__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding-bottom: var(--space-2);
+  border-bottom: 3px double var(--ink);
+}
+
+#act-rewind .verdict__head h2 {
+  font-size: var(--text-m);
+  color: var(--velvet);
+}
+
+#act-rewind .verdict__head p {
+  font-size: var(--text-xs);
+}
+
+#act-rewind .verdict__result {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+#act-rewind .verdict__seal {
+  flex: none;
+  padding: 0.1em 0.4em;
+  border: 0.14em double var(--velvet);
+  font-size: var(--text-l);
+  color: var(--velvet);
+  rotate: -5deg;
+  animation: rewind-stamp var(--dur-slow) var(--ease-ticket) backwards;
+}
+
+#act-rewind .verdict__result[data-agrees="false"] .verdict__seal {
+  border-color: var(--alarm);
+  color: var(--alarm);
+}
+
+#act-rewind .verdict__sum {
+  line-height: 1.2;
+}
+
+#act-rewind .verdict__none {
+  font-style: italic;
+  color: color-mix(in oklab, var(--ink) 72%, transparent);
+}
+
+#act-rewind .verdict__rows {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  columns: 2;
+  column-gap: var(--space-5);
+  font-size: var(--text-xs);
+  scrollbar-width: thin;
+}
+
+#act-rewind .verdict__rows li {
+  display: grid;
+  grid-template-columns: 2.4ch minmax(0, 1fr) auto;
+  gap: var(--space-2);
+  padding-block: 0.1rem;
+  break-inside: avoid;
+  border-bottom: 1px dashed color-mix(in oklab, var(--ink) 25%, transparent);
+}
+
+#act-rewind .verdict__rows li[data-equal="false"] {
+  color: var(--alarm);
+}
+
+#act-rewind .verdict__mark {
+  font-weight: 700;
+}
+
+@keyframes rewind-stamp {
+  from { scale: 1.7; opacity: 0; }
+}
+
+/* Transport: the scrubber and the tickets */
+
+#act-rewind .transport {
+  grid-area: transport;
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+}
+
+#act-rewind .transport__scrub {
+  flex: 1;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+#act-rewind .transport__label {
+  font-size: var(--text-m);
+  color: var(--chalk);
+}
+
+#act-rewind .transport__where {
+  min-width: 14ch;
+  font-size: var(--text-xs);
+  color: var(--limelight);
+}
+
+#act-rewind .transport__range {
+  width: 100%;
+  height: 1.6rem;
+  margin: 0;
+  background: transparent;
+  cursor: pointer;
+  appearance: none;
+}
+
+#act-rewind .transport__range:disabled {
+  cursor: default;
+  opacity: 0.4;
+}
+
+#act-rewind .transport__range::-webkit-slider-runnable-track {
+  height: 0.55rem;
+  border-block: 1px solid var(--chalk-faint);
+  background: repeating-linear-gradient(90deg, var(--chalk-faint) 0 0.4rem, transparent 0.4rem 0.75rem);
+}
+
+#act-rewind .transport__range::-moz-range-track {
+  height: 0.55rem;
+  border-block: 1px solid var(--chalk-faint);
+  background: repeating-linear-gradient(90deg, var(--chalk-faint) 0 0.4rem, transparent 0.4rem 0.75rem);
+}
+
+#act-rewind .transport__range::-webkit-slider-thumb {
+  width: 0.9rem;
+  height: 1.5rem;
+  margin-top: -0.52rem;
+  border: 0;
+  border-radius: 0.15rem;
+  background: var(--limelight);
+  box-shadow: 0 0 0.9rem color-mix(in oklab, var(--limelight) 55%, transparent);
+  appearance: none;
+}
+
+#act-rewind .transport__range::-moz-range-thumb {
+  width: 0.9rem;
+  height: 1.5rem;
+  border: 0;
+  border-radius: 0.15rem;
+  background: var(--limelight);
+  box-shadow: 0 0 0.9rem color-mix(in oklab, var(--limelight) 55%, transparent);
+}
+
+#act-rewind .transport .stage-button {
+  flex: none;
+  font-size: var(--text-xs);
+}
+
+#act-rewind .transport__export .mono {
+  font-size: 0.85em;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  opacity: 0.7;
+}
+
+/* The film: one frame per record, oldest left. Age is typography: the older the frame, the more degraded its cut. */
+
+#act-rewind .film {
+  grid-area: film;
+  min-width: 0;
+}
+
+#act-rewind .film__title {
+  padding-bottom: var(--space-1);
+  font-size: var(--text-s);
+  color: var(--chalk);
+}
+
+#act-rewind .film__strip {
+  position: relative;
+  display: flex;
+  gap: 0.4rem;
+  padding: 0.5rem 0.5rem 0.6rem;
+  overflow-x: auto;
+  overflow-y: hidden;
+  background: var(--film);
+  box-shadow: inset 0 0 1.4rem color-mix(in oklab, black 70%, transparent);
+  scrollbar-width: thin;
+  scrollbar-color: var(--chalk-faint) transparent;
+}
+
+#act-rewind .frame {
+  flex: 0 0 8.4rem;
+  height: 9.6rem;
+  opacity: calc(1 - min(var(--age, 0), 11) * 0.04);
+  filter: sepia(calc(min(var(--age, 0), 10) * 0.07));
+  transition: opacity var(--dur-base) ease, filter var(--dur-base) ease;
+  animation: rewind-exposed var(--dur-slow) var(--ease-line) backwards;
+}
+
+#act-rewind .frame:hover,
+#act-rewind .frame[data-selected="true"] {
+  opacity: 1;
+  filter: none;
+}
+
+#act-rewind .frame--travel { flex-basis: 7.4rem; }
+#act-rewind .frame--blank { flex-basis: 22rem; display: grid; place-items: center; padding: var(--space-4); text-align: center; font-style: italic; }
+
+#act-rewind .frame__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  width: 100%;
+  height: 100%;
+  padding: 1.15rem 0.6rem 0.9rem;
+  border: 1px solid var(--chalk-faint);
+  text-align: start;
+  color: var(--paper);
+  cursor: pointer;
+  background:
+    repeating-linear-gradient(90deg, var(--stage-black) 0 0.5rem, transparent 0.5rem 1rem) 0.3rem 0.3rem / 100% 0.45rem no-repeat,
+    repeating-linear-gradient(90deg, var(--stage-black) 0 0.5rem, transparent 0.5rem 1rem) 0.3rem calc(100% - 0.3rem) / 100% 0.45rem no-repeat,
+    color-mix(in oklab, var(--wing-grey) 70%, var(--film));
+  transition: background-color var(--dur-fast) ease;
+}
+
+#act-rewind .frame__body:hover {
+  border-color: var(--limelight-deep);
+}
+
+#act-rewind .frame[data-selected="true"] .frame__body {
+  outline: 2px solid var(--limelight);
+  outline-offset: 1px;
+  border-color: var(--limelight);
+}
+
+#act-rewind .frame--travel .frame__body {
+  background:
+    repeating-linear-gradient(90deg, var(--stage-black) 0 0.5rem, transparent 0.5rem 1rem) 0.3rem 0.3rem / 100% 0.45rem no-repeat,
+    repeating-linear-gradient(90deg, var(--stage-black) 0 0.5rem, transparent 0.5rem 1rem) 0.3rem calc(100% - 0.3rem) / 100% 0.45rem no-repeat,
+    color-mix(in oklab, var(--velvet-deep) 60%, var(--film));
+}
+
+#act-rewind .frame__seq {
+  font-size: var(--text-m);
+  color: var(--limelight-deep);
+}
+
+#act-rewind .frame--init .frame__seq { color: var(--chalk); }
+#act-rewind .frame--travel .frame__seq { color: var(--velvet-lit); }
+
+#act-rewind .frame__title {
+  display: -webkit-box;
+  overflow: hidden;
+  font-size: var(--text-s);
+  line-height: 1.05;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+#act-rewind .frame--travel .frame__title {
+  align-self: flex-start;
+  padding: 0.12em 0.45em;
+  color: var(--ink);
+  background: var(--tooth), var(--paper);
+  background-blend-mode: multiply, normal;
+  box-shadow: 0 0.1rem 0.25rem color-mix(in oklab, black 60%, transparent);
+  rotate: -4deg;
+}
+
+#act-rewind .frame--blank .frame__title {
+  display: block;
+  color: var(--chalk);
+}
+
+#act-rewind .frame__label {
+  margin-top: auto;
+  font-size: 0.66rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--chalk);
+}
+
+#act-rewind .frame__lamp {
+  position: absolute;
+  inset: 0.65rem 0.6rem auto auto;
+  font-size: 0.7rem;
+  letter-spacing: 0.12em;
+  color: var(--cue-green);
+  text-shadow: 0 0 0.6em color-mix(in oklab, var(--cue-green) 55%, transparent);
+}
+
+#act-rewind .frame__body { position: relative; }
+
+@keyframes rewind-exposed {
+  from { opacity: 0; filter: brightness(2.2) sepia(1); translate: 0.7rem 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #act-rewind .stage__floor::after,
+  #act-rewind .stage .house,
+  #act-rewind .never__line,
+  #act-rewind .house[data-wait="inflight"] .seat--held,
+  #act-rewind .verdict__seal,
+  #act-rewind .frame {
+    animation: none !important;
+  }
+
+  #act-rewind .stage[data-bleed="a"] .house,
+  #act-rewind .stage[data-bleed="b"] .house {
+    filter: none;
+  }
+
+  #act-rewind .house[data-wait="inflight"] .seat--held {
+    outline: 2px solid var(--standby-blue);
+    outline-offset: 2px;
+  }
+}

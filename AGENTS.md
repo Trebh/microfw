@@ -16,6 +16,7 @@ packages/view-uhtml  @mufw/view-uhtml  mounts a pure uhtml v4 view; `./ssr` rend
 packages/devtools    @mufw/devtools    time-travel panel, history list, Stately adapter
 packages/test        @mufw/test        model-based path testing
 examples/auction     @mufw/example-auction
+examples/showcase    @mufw/example-showcase    a presentation of µFW as a theatre play: the deck is a definition, each act runs µFW live; browser only
 docs/                ARCHITECTURE.md, architecture/*.md, TODO.md
 ```
 
@@ -32,6 +33,7 @@ docs/                ARCHITECTURE.md, architecture/*.md, TODO.md
 | `pnpm start:server` | server with the production defaults (`MUFW_RPCS=Submit,Representations,History`) |
 | `pnpm cert` | with mkcert installed, writes a trusted-once `localhost` certificate and key to `examples/auction/.certs/`; the server speaks HTTPS and HTTP/2 when `MUFW_TLS_CERT` and `MUFW_TLS_KEY` name them |
 | `pnpm dev:client` | vite on :5173: one page per deployment plus the demo page |
+| `pnpm --filter @mufw/example-showcase dev` | vite on :5180: the showcase, a presentation of µFW in which each act runs µFW live in the browser (`build` and `preview` build and serve it; `typecheck` is part of `pnpm typecheck`) |
 | `pnpm build:client` | one `vite build` per deployment into `examples/auction/dist/<deployment>`, then `check:bundle` |
 | `pnpm --filter @mufw/example-auction test:live` | replays the path tests against a running server started without `MUFW_STORE` (or with an empty store): seq 0 must be `Auction.initial` |
 | `pnpm --filter @mufw/example-auction test:live:wallet` | replays the wallet's path tests against the wallet a running server serves at `/sam/wallet`; any freshly started server has `Wallet.initial` at seq 0 |
@@ -62,7 +64,8 @@ for Effect idioms; do not rely on Effect 3 knowledge.
 - `@mufw/core` depends on `effect` only. `@mufw/rpc` stays platform-free: transports and
   serialization are chosen by the application. Adapter packages do not depend on each other.
 - Placement is decided per deployment, at its composition root (`src/client/<page>.ts` calling one
-  module of `src/client/placements/`, `src/client/auctionWorker.ts`, `server.ts`, `test/live.ts`, `test/walletLive.ts`),
+  module of `src/client/placements/`, `src/client/auctionWorker.ts`, `server.ts`, `test/live.ts`, `test/walletLive.ts`;
+  the showcase's `examples/showcase/src/main.ts` and `src/acts/tour/company.worker.ts`),
   by choosing layers. Only the demo page picks a placement at runtime; never let a visitor choose
   what the server trusts. If moving a part between client and server needs a change outside the
   composition root, the design is wrong: fix the port, not the call site.
@@ -125,8 +128,8 @@ Code stays in `Effect`/`Stream`/`Layer` through every layer of the application. 
 
 | Boundary | Place |
 |---|---|
-| Process entry point | `runPage` in `examples/auction/src/client/app.ts`, `runTicker` in `client/ticker.ts`, `runStreamFrame` in `client/streamEmbed.ts`, `client/devtools.ts`, `client/auctionWorker.ts` (the web worker), `server.ts`, `test/live.ts`, `test/walletLive.ts`, `test/syncLive.ts`, `test/syncRestartLive.ts`, `test/syncFailoverLive.ts`, the `scripts/` |
-| DOM event handler | `layerMount` dispatch, `layerPanel` and `layerHistoryList` row and export clicks, through a `FiberSet.makeRuntime` runner captured from the layer |
+| Process entry point | `runPage` in `examples/auction/src/client/app.ts`, `runTicker` in `client/ticker.ts`, `runStreamFrame` in `client/streamEmbed.ts`, `client/devtools.ts`, `client/auctionWorker.ts` (the web worker), `server.ts`, `test/live.ts`, `test/walletLive.ts`, `test/syncLive.ts`, `test/syncRestartLive.ts`, `test/syncFailoverLive.ts`, the `scripts/`; `examples/showcase/src/main.ts` and `examples/showcase/src/acts/tour/company.worker.ts` (the web worker) |
+| DOM event handler | `layerMount` dispatch, `layerPanel` and `layerHistoryList` row and export clicks, the showcase deck's keys layer (`examples/showcase/src/deck/keys.ts`), through a `FiberSet.makeRuntime` runner captured from the layer |
 | Test harness | `it.effect` / `layer` from `@effect/vitest` |
 
 Anywhere else, return the effect and let the caller compose it. Do not convert an `Effect` to a

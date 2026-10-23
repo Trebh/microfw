@@ -51,6 +51,7 @@ every figure, its baseline and its command are):
 | `@mufw/devtools` | Time-travel panel, history list, Stately inspector adapter |
 | `@mufw/test` | Model-based path testing (returns Effects; test-runner agnostic) |
 | `@mufw/example-auction` | A live auction running in all four browser/server placements and in a web worker |
+| `@mufw/example-showcase` | A presentation of µFW as a theatre play: the deck is itself a SAM definition, and each act runs µFW live in the browser |
 
 ## Quick start
 
@@ -62,7 +63,20 @@ pnpm typecheck
 pnpm test
 ```
 
-Run the example (two terminals):
+Run the showcase (one terminal, no server), then open http://localhost:5180:
+
+```sh
+pnpm --filter @mufw/example-showcase dev
+```
+
+The showcase (`examples/showcase`) is a presentation of the features, and the presentation is µFW: the
+deck (`src/deck/Deck.ts`) is a definition whose model is the act and cue on stage, with its own
+time-travel panel, the prompter's book. Each act (`src/acts/<id>/`, listed in `src/acts/registry.ts`)
+runs µFW live on the stage, over one shared box-office loop (`src/domain/BoxOffice.ts`). It is
+browser-only; `examples/auction` stays the tech demo of the placements. Its domain tests are in
+`examples/showcase/test` and run with `pnpm test`.
+
+Run the auction example (two terminals):
 
 ```sh
 pnpm dev:server   # demo server on :3001: websocket RPC at /sam/auction and /sam/wallet, every RPC served; the auction's Representations also over HTTP at /sam/auction/http
