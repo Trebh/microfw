@@ -1,0 +1,16 @@
+/* Redaction is the voice; its degraded cuts are the past. Each cut is its own family. */
+@import "@fontsource/redaction/400.css";
+@import "@fontsource/redaction/400-italic.css";
+@import "@fontsource/redaction/700.css";
+@import "@fontsource/redaction-10/400.css";
+@import "@fontsource/redaction-35/400.css";
+@import "@fontsource/redaction-70/400.css";
+@import "@fontsource/redaction-100/400.css";
+
+/* Marquee capitals: act numerals, curtain titles, counters. The package maps `./*` to `./*.css`, so no extension. */
+@import "@fontsource/big-shoulders-display/500";
+@import "@fontsource/big-shoulders-display/800";
+@import "@fontsource/big-shoulders-display/900";
+
+/* Code, tags, proposals, sequence numbers. */
+@import "@fontsource-variable/martian-mono/index.css";

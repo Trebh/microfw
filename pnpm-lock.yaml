@@ -79,6 +79,57 @@ importers:
         specifier: ^5.33.3
         version: 5.33.3
 
+  examples/showcase:
+    dependencies:
+      '@effect/platform-browser':
+        specifier: ^4.0.5
+        version: 4.0.5(effect@4.0.5)
+      '@fontsource-variable/martian-mono':
+        specifier: ^5.3.0
+        version: 5.3.0
+      '@fontsource/big-shoulders-display':
+        specifier: ^5.3.0
+        version: 5.3.0
+      '@fontsource/redaction':
+        specifier: ^5.3.0
+        version: 5.3.0
+      '@fontsource/redaction-10':
+        specifier: ^5.3.0
+        version: 5.3.0
+      '@fontsource/redaction-100':
+        specifier: ^5.3.0
+        version: 5.3.0
+      '@fontsource/redaction-35':
+        specifier: ^5.3.0
+        version: 5.3.0
+      '@fontsource/redaction-70':
+        specifier: ^5.3.0
+        version: 5.3.0
+      '@mufw/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@mufw/devtools':
+        specifier: workspace:*
+        version: link:../../packages/devtools
+      '@mufw/rpc':
+        specifier: workspace:*
+        version: link:../../packages/rpc
+      '@mufw/test':
+        specifier: workspace:*
+        version: link:../../packages/test
+      '@mufw/view-uhtml':
+        specifier: workspace:*
+        version: link:../../packages/view-uhtml
+      effect:
+        specifier: ^4.0.5
+        version: 4.0.5
+      uhtml:
+        specifier: ^4.7.1
+        version: 4.7.1
+      vite:
+        specifier: ^8.3.0
+        version: 8.3.4(@types/node@24.19.2)(esbuild@0.28.2)(tsx@4.23.15)
+
   packages/core:
     dependencies:
       effect:
@@ -322,6 +373,27 @@ packages:
     engines: {node: '>=18'}
     cpu: [x64]
     os: [win32]
+
+  '@fontsource-variable/martian-mono@5.3.0':
+    resolution: {integrity: sha512-0wVODx9ILwNnaYC4XCuSaFRYtj1Prd89MRVaSuv2ng6zLiQkS4SepaWEPefs7vqCZS8sbEOA8jb/4F5KNMnGdg==}
+
+  '@fontsource/big-shoulders-display@5.3.0':
+    resolution: {integrity: sha512-d4+Tcsq/WfoKeqWfB6wFdeNDsSYYnilJbSNNpf5w53MlWrGHAc9YvkAjC6id6PgFDiGaFKsXfP0RFAQtpt0bog==}
+
+  '@fontsource/redaction-100@5.3.0':
+    resolution: {integrity: sha512-BaoypxfTL+hL8M6L2iuM1jkowGsG/n7Vcy1mhL16VtRmzKtT6WoPOnfnko06WDmDVG0fh+WOtiptcEG0cA9aAA==}
+
+  '@fontsource/redaction-10@5.3.0':
+    resolution: {integrity: sha512-EukjMqtXDt9hSlOSRTNR6+bmHuYtOpbXrCGTJlw3H85754amhN4zH4sZ75Jr3wkSLR3Jp5PEDcXSkMpu9F05BQ==}
+
+  '@fontsource/redaction-35@5.3.0':
+    resolution: {integrity: sha512-c4n4fgTbYoiyODKvasBWjj1EzV9G+X2oYDgr1PPShIO3rzM50CYvlJ+VCpgBmNyw9l8D/6T1PUmn8ZGgzOlV3g==}
+
+  '@fontsource/redaction-70@5.3.0':
+    resolution: {integrity: sha512-K8jG7NWaOIF+d4kySQBkq+FeMxIoOxwotmK3adBDd6/MTrbPcGijxI46Y5zjjDWmfY/8Rcs2YJlz6XhYjyJylQ==}
+
+  '@fontsource/redaction@5.3.0':
+    resolution: {integrity: sha512-mlVA74kHfyjLPjX2j+93w/0leZAQ4aouFbx6LR8fbfqpaDRFidQnpFbpb+0wVY/MS/k3IbTjQgPjdVI8ymllzw==}
 
   '@jridgewell/resolve-uri@3.1.2':
     resolution: {integrity: sha512-bRISgCIjP20/tbWSPWMEi54QVPRZExkuD9lJL+UIxUKtwVJA8wW1Trb1jMs1RFXo1CBTNZ/5hpC9QvmKWdopKw==}
@@ -1049,6 +1121,20 @@ snapshots:
 
   '@esbuild/win32-x64@0.28.2':
     optional: true
+
+  '@fontsource-variable/martian-mono@5.3.0': {}
+
+  '@fontsource/big-shoulders-display@5.3.0': {}
+
+  '@fontsource/redaction-100@5.3.0': {}
+
+  '@fontsource/redaction-10@5.3.0': {}
+
+  '@fontsource/redaction-35@5.3.0': {}
+
+  '@fontsource/redaction-70@5.3.0': {}
+
+  '@fontsource/redaction@5.3.0': {}
 
   '@jridgewell/resolve-uri@3.1.2': {}
 

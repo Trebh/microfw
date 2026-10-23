@@ -1,0 +1,197 @@
+#act-overture .overture {
+  display: grid;
+  grid-template-columns: minmax(0, 1.12fr) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto;
+  column-gap: var(--space-8);
+  row-gap: var(--space-5);
+  min-height: 100%;
+}
+
+#act-overture .overture__masthead {
+  grid-column: 1;
+  grid-row: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+#act-overture .overture__kicker {
+  font-size: var(--text-m);
+  color: var(--chalk);
+  letter-spacing: 0.22em;
+}
+
+#act-overture .overture__title {
+  position: relative;
+  isolation: isolate;
+  align-self: flex-start;
+  margin-block: var(--space-2) var(--space-3);
+  font-size: clamp(7rem, 22vw, 20rem);
+  font-weight: 700;
+  line-height: 0.8;
+  letter-spacing: -0.03em;
+  color: var(--limelight);
+  text-shadow: 0 0 0.35em color-mix(in oklab, var(--limelight) 38%, transparent);
+  animation: overture-title 1.4s var(--ease-line) both;
+}
+
+/* The past trails behind the present: two echoes of the title in degraded cuts. */
+#act-overture .overture__title::before,
+#act-overture .overture__title::after {
+  content: "µFW";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  text-shadow: none;
+}
+
+#act-overture .overture__title::before {
+  font-family: "Redaction 100", var(--face-body);
+  color: var(--velvet);
+  translate: -0.045em 0.04em;
+}
+
+#act-overture .overture__title::after {
+  font-family: "Redaction 35", var(--face-body);
+  color: color-mix(in oklab, var(--velvet-lit) 70%, transparent);
+  translate: -0.02em 0.018em;
+}
+
+#act-overture .overture__subtitle {
+  max-width: 24ch;
+  font-size: var(--text-xl);
+  font-style: italic;
+  line-height: 1.02;
+  color: var(--paper);
+  animation: overture-rise 1s var(--ease-line) 0.3s both;
+}
+
+#act-overture .overture__heading {
+  margin-bottom: var(--space-3);
+  font-size: var(--text-m);
+  letter-spacing: 0.2em;
+  color: var(--chalk);
+}
+
+#act-overture .overture__heading span {
+  letter-spacing: 0.04em;
+  text-transform: none;
+  font-weight: 500;
+}
+
+#act-overture .overture__cast {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: center;
+}
+
+#act-overture .overture__member {
+  display: grid;
+  grid-template-columns: 2.4rem minmax(0, 1fr) auto;
+  grid-template-areas:
+    "num name code"
+    "num role role";
+  column-gap: var(--space-3);
+  align-items: baseline;
+  padding: var(--space-3) var(--space-3);
+  border-top: 1px dotted var(--chalk-faint);
+  animation: overture-rise 0.9s var(--ease-line) calc(0.15s + var(--i) * 70ms) both;
+}
+
+#act-overture .overture__member:last-child {
+  border-bottom: 1px dotted var(--chalk-faint);
+}
+
+#act-overture .overture__number {
+  grid-area: num;
+  color: var(--velvet-lit);
+}
+
+#act-overture .overture__name {
+  grid-area: name;
+  font-size: var(--text-l);
+  line-height: 1.05;
+  color: var(--paper);
+}
+
+#act-overture .overture__role {
+  grid-area: role;
+  font-size: var(--text-s);
+  color: var(--chalk);
+}
+
+#act-overture .overture__code {
+  grid-area: code;
+  color: var(--standby-blue);
+}
+
+#act-overture .overture__how {
+  grid-column: 1;
+  grid-row: 2;
+  padding: var(--space-3) 0;
+}
+
+#act-overture .overture__hints {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  gap: var(--space-2) var(--space-5);
+}
+
+#act-overture .overture__hint {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+}
+
+#act-overture .overture__hint dt {
+  display: flex;
+  flex: 0 0 7.2rem;
+  gap: var(--space-1);
+}
+
+#act-overture .overture__hint dd {
+  font-size: var(--text-s);
+  color: var(--chalk);
+}
+
+#act-overture kbd {
+  padding: 0.1em 0.5em;
+  border: 1px solid var(--chalk-faint);
+  border-bottom-width: 3px;
+  border-radius: 0.2em;
+  font-size: var(--text-xs);
+  color: var(--paper);
+  background: var(--wing-grey);
+}
+
+@keyframes overture-title {
+  from { opacity: 0; scale: 1.06; filter: blur(12px); }
+  to { opacity: 1; scale: 1; filter: blur(0); }
+}
+
+@keyframes overture-rise {
+  from { opacity: 0; translate: 0 0.8rem; }
+  to { opacity: 1; translate: 0 0; }
+}
+
+@media (max-width: 62rem) {
+  #act-overture .overture {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto;
+  }
+
+  #act-overture .overture__cast,
+  #act-overture .overture__how,
+  #act-overture .overture__masthead {
+    grid-column: 1;
+    grid-row: auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #act-overture .overture__title,
+  #act-overture .overture__subtitle,
+  #act-overture .overture__member {
+    animation: none;
+  }
+}

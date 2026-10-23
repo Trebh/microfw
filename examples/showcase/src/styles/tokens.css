@@ -1,0 +1,309 @@
+/*
+ * Design tokens and the utilities acts build on. Acts use these names, never raw colours or faces.
+ *
+ *   .marquee      Big Shoulders capitals: act numerals, titles, counters, labels on the bill.
+ *   .mono         Martian Mono: code, tags, proposals, sequence numbers, keys.
+ *   .past-10 .past-35 .past-70 .past-100
+ *                 Redaction's degraded cuts. The older a record, step or line, the more degraded
+ *                 the cut: 10 is last minute, 100 is long gone. Never use one for something current.
+ *   .live         Cue-light green with a breathing glow: something is running now.
+ *   .offstage     Standby blue: something is in flight, away from the stage (an action, a worker, a wire).
+ *   .paper-card   A sheet of paper on the dark stage (playbills, receipts, notes). `.paper-card--torn`
+ *                 gives it a torn bottom edge.
+ *   .stage-button A ticket-shaped button. `aria-pressed="true"` or `aria-expanded="true"` lights it velvet;
+ *                 `:disabled` greys it. A `<span class="lamp">` inside it is a cue light that burns green while pressed.
+ *
+ * Registered properties (@property) are animatable: --spot-*, --progress, --glow, --fold-pitch.
+ * Durations and easings are variables; `prefers-reduced-motion: reduce` shortens them in one place,
+ * and the stage reads `--dur-curtain-half` from here, so a sleep that waits on a transition never
+ * disagrees with the transition.
+ */
+
+@property --spot-x { syntax: "<length>"; inherits: false; initial-value: 0px; }
+@property --spot-y { syntax: "<length>"; inherits: false; initial-value: 0px; }
+@property --spot-rx { syntax: "<length>"; inherits: false; initial-value: 0px; }
+@property --spot-ry { syntax: "<length>"; inherits: false; initial-value: 0px; }
+@property --spot-dim { syntax: "<number>"; inherits: false; initial-value: 0; }
+@property --progress { syntax: "<number>"; inherits: true; initial-value: 0; }
+@property --glow { syntax: "<number>"; inherits: false; initial-value: 0; }
+@property --fold-pitch { syntax: "<length>"; inherits: false; initial-value: 1rem; }
+
+:root {
+  color-scheme: dark;
+
+  /* Palette */
+  --stage-black: #0c0a09;
+  --wing-grey: #1c1917;
+  --velvet: #8a1c2b;
+  --limelight: #ffd27a;
+  --paper: #efe6d3;
+  --chalk: #b9b1a3;
+  --cue-green: #7cf2a1;
+  --standby-blue: #7aa7ff;
+  --alarm: #ff6b5a;
+
+  --velvet-deep: color-mix(in oklab, var(--velvet) 48%, var(--stage-black));
+  --velvet-lit: color-mix(in oklab, var(--velvet) 78%, var(--limelight));
+  --limelight-deep: color-mix(in oklab, var(--limelight) 62%, var(--stage-black));
+  --chalk-faint: color-mix(in oklab, var(--chalk) 22%, transparent);
+  --chalk-dim: color-mix(in oklab, var(--chalk) 62%, var(--stage-black));
+  --ink: var(--stage-black);
+
+  /* Faces */
+  --face-body: "Redaction", "Martian Mono Variable", serif;
+  --face-marquee: "Big Shoulders Display", "Redaction", sans-serif;
+  --face-mono: "Martian Mono Variable", monospace;
+
+  /* Type scale (fluid) */
+  --text-xs: clamp(0.7rem, 0.66rem + 0.2vw, 0.8rem);
+  --text-s: clamp(0.85rem, 0.8rem + 0.25vw, 1rem);
+  --text-m: clamp(1.05rem, 0.96rem + 0.4vw, 1.32rem);
+  --text-l: clamp(1.4rem, 1.1rem + 1.2vw, 2.1rem);
+  --text-xl: clamp(2.1rem, 1.4rem + 2.8vw, 4.2rem);
+  --text-2xl: clamp(3.2rem, 1.6rem + 6vw, 8rem);
+  --text-mega: clamp(6rem, 2rem + 20vw, 22rem);
+  --leading-tight: 0.92;
+  --leading-body: 1.32;
+  --tracking-marquee: 0.06em;
+
+  /* Spacing */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2.25rem;
+  --space-7: 3.5rem;
+  --space-8: 5.5rem;
+
+  /* Easing */
+  --ease-curtain: cubic-bezier(0.65, 0, 0.25, 1);
+  --ease-spot: cubic-bezier(0.22, 0.8, 0.2, 1);
+  --ease-line: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-ticket: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-cue-light: ease-in-out;
+
+  /* Durations */
+  --dur-fast: 140ms;
+  --dur-base: 280ms;
+  --dur-slow: 600ms;
+  --dur-line: 700ms;
+  --dur-spot: 900ms;
+  --dur-curtain-half: 450ms;
+  --dur-fuse: 700ms;
+
+  /* Z layers: act, spotlight, curtain and pelmet stack inside the stage frame; the rest on the page */
+  --z-act: 1;
+  --z-spot: 5;
+  --z-curtain: 7;
+  --z-pelmet: 8;
+  --z-chrome: 10;
+  --z-book: 30;
+  --z-book-tab: 31;
+  --z-grain: 40;
+
+  /* Shape */
+  --pelmet-h: 1.1rem;
+  --book-w: min(36rem, 92vw);
+  --perforation: 2px dashed color-mix(in oklab, var(--ink) 38%, transparent);
+
+  /* Texture: film grain and paper tooth, inline so there is nothing to fetch */
+  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .55 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  --tooth: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='p'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.55' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .35 0 0 0 0 .28 0 0 0 0 .18 0 0 0 .5 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23p)'/%3E%3C/svg%3E");
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-fast: 1ms;
+    --dur-base: 1ms;
+    --dur-slow: 1ms;
+    --dur-line: 1ms;
+    --dur-spot: 1ms;
+    --dur-fuse: 1ms;
+    --dur-curtain-half: 200ms;
+  }
+}
+
+/* Faces */
+
+.marquee {
+  font-family: var(--face-marquee);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-marquee);
+  line-height: var(--leading-tight);
+}
+
+.mono {
+  font-family: var(--face-mono);
+  font-weight: 400;
+  font-size: 0.82em;
+  letter-spacing: -0.01em;
+}
+
+.past-10 { font-family: "Redaction 10", var(--face-body); }
+.past-35 { font-family: "Redaction 35", var(--face-body); }
+.past-70 { font-family: "Redaction 70", var(--face-body); }
+.past-100 { font-family: "Redaction 100", var(--face-body); }
+
+/* Light and wiring */
+
+.live {
+  --glow: 0.5;
+  color: var(--cue-green);
+  text-shadow:
+    0 0 calc(0.25em + var(--glow) * 0.7em) color-mix(in oklab, var(--cue-green) calc(30% + var(--glow) * 50%), transparent);
+  animation: cue-light 2.6s var(--ease-cue-light) infinite;
+}
+
+@keyframes cue-light {
+  0%, 100% { --glow: 0.35; }
+  50% { --glow: 1; }
+}
+
+.offstage {
+  color: var(--standby-blue);
+  text-shadow: 0 0 0.6em color-mix(in oklab, var(--standby-blue) 38%, transparent);
+}
+
+/* Paper */
+
+.paper-card {
+  position: relative;
+  padding: var(--space-5);
+  color: var(--ink);
+  background:
+    var(--tooth),
+    linear-gradient(172deg, color-mix(in oklab, var(--paper) 94%, white), var(--paper) 45%, color-mix(in oklab, var(--paper) 88%, var(--limelight-deep)));
+  background-blend-mode: multiply, normal;
+  box-shadow:
+    0 1px 0 color-mix(in oklab, white 55%, transparent) inset,
+    0 0.15rem 0.3rem color-mix(in oklab, black 50%, transparent),
+    0 1.4rem 3rem -0.6rem color-mix(in oklab, black 80%, transparent);
+  rotate: var(--tilt, 0deg);
+}
+
+.paper-card--torn {
+  padding-block-end: calc(var(--space-5) + 0.9rem);
+  clip-path: polygon(
+    0 0, 100% 0, 100% calc(100% - 0.8rem),
+    96% 100%, 92% calc(100% - 0.7rem), 88% 100%, 84% calc(100% - 0.8rem), 80% 100%,
+    76% calc(100% - 0.6rem), 72% 100%, 68% calc(100% - 0.8rem), 64% 100%, 60% calc(100% - 0.7rem),
+    56% 100%, 52% calc(100% - 0.8rem), 48% 100%, 44% calc(100% - 0.6rem), 40% 100%,
+    36% calc(100% - 0.8rem), 32% 100%, 28% calc(100% - 0.7rem), 24% 100%, 20% calc(100% - 0.8rem),
+    16% 100%, 12% calc(100% - 0.6rem), 8% 100%, 4% calc(100% - 0.8rem), 0 100%
+  );
+}
+
+/* A ticket, not a pill: notched sides and a perforation. */
+
+.stage-button,
+.book__panel .mufw-export {
+  --notch: 0.42em;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0.55em 1.15em 0.55em 1.5em;
+  border: 0;
+  color: var(--ink);
+  background:
+    var(--tooth),
+    var(--paper);
+  background-blend-mode: multiply, normal;
+  font-family: var(--face-marquee);
+  font-weight: 800;
+  font-size: var(--text-s);
+  letter-spacing: var(--tracking-marquee);
+  text-transform: uppercase;
+  line-height: 1;
+  cursor: pointer;
+  mask:
+    radial-gradient(circle var(--notch) at 0 50%, #0000 97%, #000) left / 51% 100% no-repeat,
+    radial-gradient(circle var(--notch) at 100% 50%, #0000 97%, #000) right / 51% 100% no-repeat;
+  transition:
+    translate var(--dur-fast) var(--ease-ticket),
+    rotate var(--dur-fast) var(--ease-ticket),
+    background-color var(--dur-fast) ease,
+    color var(--dur-fast) ease;
+}
+
+.stage-button::before,
+.book__panel .mufw-export::before {
+  content: "";
+  align-self: stretch;
+  margin-inline-start: -0.55em;
+  margin-inline-end: 0.25em;
+  border-inline-start: var(--perforation);
+}
+
+.stage-button:hover:not(:disabled),
+.book__panel .mufw-export:hover {
+  background-color: var(--limelight);
+  translate: 0 -2px;
+  rotate: -0.6deg;
+}
+
+.stage-button:active:not(:disabled),
+.book__panel .mufw-export:active {
+  translate: 0 1px;
+  rotate: 0deg;
+}
+
+.stage-button[aria-pressed="true"],
+.stage-button[aria-expanded="true"] {
+  color: var(--paper);
+  background: linear-gradient(var(--velvet-lit), var(--velvet));
+}
+
+.stage-button[aria-pressed="true"]::before,
+.stage-button[aria-expanded="true"]::before {
+  border-inline-start-color: color-mix(in oklab, var(--paper) 45%, transparent);
+}
+
+.stage-button:disabled {
+  color: var(--chalk-dim);
+  background: color-mix(in oklab, var(--paper) 22%, var(--wing-grey));
+  cursor: default;
+}
+
+.stage-button kbd {
+  font-family: var(--face-mono);
+  font-weight: 400;
+  font-size: 0.8em;
+  padding: 0.1em 0.4em;
+  border: 1px solid color-mix(in oklab, currentColor 45%, transparent);
+}
+
+.stage-button .lamp {
+  width: 0.6em;
+  height: 0.6em;
+  border-radius: 50%;
+  background: color-mix(in oklab, var(--ink) 30%, transparent);
+  transition: background-color var(--dur-base) ease, box-shadow var(--dur-base) ease;
+}
+
+.stage-button[aria-pressed="true"] .lamp {
+  background: var(--cue-green);
+  box-shadow: 0 0 0.8em 0.15em color-mix(in oklab, var(--cue-green) 70%, transparent);
+}
+
+/* Focus: a limelight ring everywhere; inside the ticket, where the notch mask would cut it off. */
+
+:focus-visible {
+  outline: 2px solid var(--limelight);
+  outline-offset: 3px;
+}
+
+.stage-button:focus-visible,
+.book__panel .mufw-export:focus-visible {
+  outline: 2px dashed var(--ink);
+  outline-offset: -5px;
+  background-color: var(--limelight);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .live { animation: none; --glow: 0.7; }
+  .stage-button:hover:not(:disabled),
+  .book__panel .mufw-export:hover { translate: none; rotate: none; }
+}

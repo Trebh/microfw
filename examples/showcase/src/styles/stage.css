@@ -1,0 +1,588 @@
+/* The house: reset, the theatre grid, the proscenium, surtitles, curtain, spotlight, prompter's book. */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  overflow: hidden;
+  background: var(--stage-black);
+  color: var(--paper);
+  font-family: var(--face-body);
+  font-size: var(--text-m);
+  line-height: var(--leading-body);
+  font-synthesis: none;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+h1, h2, h3, p, ol, ul, dl, dd, figure {
+  margin: 0;
+}
+
+ol, ul {
+  padding: 0;
+  list-style: none;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+}
+
+kbd {
+  font-family: var(--face-mono);
+}
+
+::selection {
+  background: var(--velvet);
+  color: var(--paper);
+}
+
+.noscript {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  gap: var(--space-3);
+  padding: var(--space-6);
+  text-align: center;
+  font-size: var(--text-l);
+}
+
+/* Theatre */
+
+.theatre {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  background:
+    radial-gradient(ellipse 85% 60% at 50% 0%, color-mix(in oklab, var(--limelight) 8%, transparent), transparent 72%),
+    var(--stage-black);
+  isolation: isolate;
+}
+
+.theatre::before,
+.theatre::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-grain);
+  pointer-events: none;
+}
+
+.theatre::before {
+  background-image: var(--grain);
+  opacity: 0.075;
+  mix-blend-mode: overlay;
+}
+
+.theatre::after {
+  background: radial-gradient(ellipse 120% 100% at 50% 46%, transparent 52%, color-mix(in oklab, black 62%, transparent));
+}
+
+/* The chrome root adds no box of its own: its children take the grid rows. */
+#chrome {
+  display: contents;
+}
+
+/* Playbill ribbon */
+
+.playbill {
+  grid-row: 1;
+  position: relative;
+  z-index: var(--z-chrome);
+  display: flex;
+  align-items: stretch;
+  gap: var(--space-5);
+  padding: 0 var(--space-5);
+  background: linear-gradient(var(--velvet-deep), var(--velvet) 70%, var(--velvet-deep));
+  border-bottom: 1px solid color-mix(in oklab, var(--limelight) 55%, transparent);
+  box-shadow: 0 0.4rem 1.2rem color-mix(in oklab, black 60%, transparent);
+}
+
+.playbill__house {
+  align-self: center;
+  font-size: var(--text-l);
+  color: var(--limelight);
+  letter-spacing: 0.02em;
+  text-transform: none;
+}
+
+.playbill__acts {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.playbill__act {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  height: 100%;
+  padding: var(--space-3) var(--space-3);
+  border: 0;
+  border-bottom: 3px solid transparent;
+  background: transparent;
+  color: color-mix(in oklab, var(--paper) 62%, var(--velvet));
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color var(--dur-base) ease, border-color var(--dur-base) ease, background-color var(--dur-base) ease;
+}
+
+.playbill__act:hover {
+  color: var(--paper);
+  background: color-mix(in oklab, black 22%, transparent);
+}
+
+.playbill__act[aria-current="step"] {
+  color: var(--limelight);
+  border-bottom-color: var(--limelight);
+  background: color-mix(in oklab, black 30%, transparent);
+  text-shadow: 0 0 0.9em color-mix(in oklab, var(--limelight) 55%, transparent);
+}
+
+.playbill__key {
+  font-size: var(--text-xs);
+  opacity: 0.6;
+}
+
+.playbill__numeral {
+  min-width: 1.2ch;
+  font-size: var(--text-l);
+}
+
+.playbill__title {
+  font-size: var(--text-s);
+}
+
+@media (max-width: 72rem) {
+  .playbill__act:not([aria-current="step"]) .playbill__title {
+    display: none;
+  }
+}
+
+/* Surtitles: a lit strip above the stage */
+
+.surtitles {
+  grid-row: 2;
+  position: relative;
+  z-index: var(--z-chrome);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: auto auto;
+  column-gap: var(--space-5);
+  align-content: center;
+  min-height: clamp(6rem, 15vh, 8.5rem);
+  padding: var(--space-3) var(--space-6) var(--space-3);
+  background: linear-gradient(color-mix(in oklab, var(--wing-grey) 80%, black), var(--stage-black));
+}
+
+.surtitle {
+  grid-column: 1;
+  max-width: 62rem;
+}
+
+.surtitle--past {
+  grid-row: 1;
+  min-height: 1.4em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-s);
+  color: var(--chalk);
+  opacity: 0.42;
+  animation: line-past-a var(--dur-line) var(--ease-line) both;
+}
+
+.surtitle--now {
+  grid-row: 2;
+  min-height: 2.6em;
+  font-size: var(--text-l);
+  line-height: 1.18;
+  color: var(--limelight);
+  text-shadow: 0 0 1.1em color-mix(in oklab, var(--limelight) 28%, transparent);
+  animation: line-in-a var(--dur-line) var(--ease-line) both;
+}
+
+.surtitle[data-flip="1"].surtitle--past { animation-name: line-past-b; }
+.surtitle[data-flip="1"].surtitle--now { animation-name: line-in-b; }
+
+.surtitle .direction {
+  font-style: italic;
+  color: var(--chalk);
+  text-shadow: none;
+}
+
+.surtitles__where {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: end;
+  text-align: end;
+  font-size: var(--text-s);
+  color: var(--chalk);
+}
+
+@keyframes line-in-a {
+  from { opacity: 0; translate: 0 0.5em; filter: blur(3px); }
+  to { opacity: 1; translate: 0 0; filter: blur(0); }
+}
+
+@keyframes line-in-b {
+  from { opacity: 0; translate: 0 0.5em; filter: blur(3px); }
+  to { opacity: 1; translate: 0 0; filter: blur(0); }
+}
+
+@keyframes line-past-a {
+  from { opacity: 1; translate: 0 1.6em; color: var(--limelight); }
+  to { opacity: 0.42; translate: 0 0; color: var(--chalk); }
+}
+
+@keyframes line-past-b {
+  from { opacity: 1; translate: 0 1.6em; color: var(--limelight); }
+  to { opacity: 0.42; translate: 0 0; color: var(--chalk); }
+}
+
+/* Proscenium and stage */
+
+.stage-frame {
+  grid-row: 3;
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  margin-inline: var(--space-5);
+  background: var(--stage-black);
+  box-shadow:
+    0 0 0 1px color-mix(in oklab, var(--limelight) 42%, transparent),
+    0 0 0 0.55rem var(--wing-grey),
+    0 0 0 calc(0.55rem + 1px) var(--chalk-faint),
+    inset 0 0 5rem color-mix(in oklab, black 78%, transparent);
+}
+
+.stage-frame::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: var(--z-pelmet);
+  height: var(--pelmet-h);
+  pointer-events: none;
+  background:
+    radial-gradient(1rem 0.85rem at 50% 0, var(--velvet) 98%, transparent) 0 0 / 2rem var(--pelmet-h) repeat-x,
+    linear-gradient(var(--velvet-deep), var(--velvet)) 0 0 / 100% 0.35rem no-repeat;
+  filter: drop-shadow(0 0.25rem 0.4rem color-mix(in oklab, black 70%, transparent));
+}
+
+.stage {
+  position: absolute;
+  inset: 0;
+}
+
+.act {
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-act);
+  overflow: auto;
+  padding: calc(var(--pelmet-h) + var(--space-5)) var(--space-6) var(--space-5);
+  scrollbar-width: thin;
+  scrollbar-color: var(--chalk-faint) transparent;
+}
+
+.act[hidden] {
+  display: none;
+}
+
+/* Spotlight: everything dims but a soft ellipse around the lit element. */
+
+.spotlight {
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-spot);
+  pointer-events: none;
+  background:
+    radial-gradient(
+      ellipse var(--spot-rx) var(--spot-ry) at var(--spot-x) var(--spot-y),
+      color-mix(in oklab, var(--limelight) calc(var(--spot-dim) * 9%), transparent) 0,
+      transparent 58%,
+      color-mix(in oklab, var(--stage-black) calc(var(--spot-dim) * 55%), transparent) 82%,
+      color-mix(in oklab, var(--stage-black) calc(var(--spot-dim) * 88%), transparent) 100%
+    );
+  transition:
+    --spot-dim var(--dur-spot) var(--ease-spot),
+    --spot-x 80ms linear,
+    --spot-y 80ms linear,
+    --spot-rx 80ms linear,
+    --spot-ry 80ms linear;
+}
+
+.spotlight[data-moving="true"] {
+  transition:
+    --spot-dim var(--dur-spot) var(--ease-spot),
+    --spot-x var(--dur-spot) var(--ease-spot),
+    --spot-y var(--dur-spot) var(--ease-spot),
+    --spot-rx var(--dur-spot) var(--ease-spot),
+    --spot-ry var(--dur-spot) var(--ease-spot);
+}
+
+/* Curtain: two velvet halves; their folds bunch up when open and spread when closed. */
+
+.curtain {
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-curtain);
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.curtain__half {
+  --fold-pitch: 1.4rem;
+  position: absolute;
+  inset-block: 0;
+  width: 50.6%;
+  background:
+    repeating-linear-gradient(
+      90deg,
+      color-mix(in oklab, black 52%, transparent) 0,
+      transparent calc(var(--fold-pitch) * 0.42),
+      color-mix(in oklab, white 9%, transparent) calc(var(--fold-pitch) * 0.7),
+      transparent calc(var(--fold-pitch) * 0.9),
+      color-mix(in oklab, black 52%, transparent) var(--fold-pitch)
+    ),
+    linear-gradient(180deg, var(--velvet-deep), var(--velvet) 38%, var(--velvet-deep));
+  box-shadow: 0 0 2.5rem color-mix(in oklab, black 70%, transparent);
+  transition:
+    translate var(--dur-curtain-half) var(--ease-curtain),
+    --fold-pitch var(--dur-curtain-half) var(--ease-curtain);
+}
+
+.curtain__half::after {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  width: 0.4rem;
+  background: linear-gradient(90deg, var(--limelight-deep), var(--limelight), var(--limelight-deep));
+}
+
+.curtain__half--left {
+  left: 0;
+  translate: -102% 0;
+}
+
+.curtain__half--left::after { right: 0; }
+
+.curtain__half--right {
+  right: 0;
+  translate: 102% 0;
+}
+
+.curtain__half--right::after { left: 0; }
+
+[data-curtain="closed"] .curtain__half {
+  --fold-pitch: 4.6rem;
+  translate: 0 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .curtain__half {
+    display: none;
+  }
+
+  .stage {
+    transition: opacity var(--dur-curtain-half) ease;
+  }
+
+  [data-curtain="closed"] .stage {
+    opacity: 0;
+  }
+}
+
+/* Controls and the fuse */
+
+.controls {
+  grid-row: 4;
+  position: relative;
+  z-index: var(--z-chrome);
+  display: grid;
+  grid-template-columns: auto minmax(6rem, 1fr) auto;
+  align-items: center;
+  gap: var(--space-5);
+  padding: var(--space-4) var(--space-6) var(--space-4) var(--space-6);
+  /* leaves room for the prompter's book tab, which sits over the right end of this row */
+  padding-inline-end: 13rem;
+}
+
+.controls__buttons {
+  display: flex;
+  gap: var(--space-3);
+}
+
+.controls__count {
+  color: var(--chalk);
+  font-size: var(--text-xs);
+  white-space: nowrap;
+}
+
+.fuse {
+  position: relative;
+  height: 3px;
+  background: var(--chalk-faint);
+  transition: --progress var(--dur-fuse) var(--ease-spot);
+}
+
+.fuse::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, var(--velvet-lit), var(--limelight));
+  transform: scaleX(var(--progress));
+  transform-origin: left;
+}
+
+.fuse::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: calc(var(--progress) * 100%);
+  width: 0.6rem;
+  height: 0.6rem;
+  translate: -50% -50%;
+  border-radius: 50%;
+  background: var(--limelight);
+  box-shadow: 0 0 0.9rem 0.25rem color-mix(in oklab, var(--limelight) 70%, transparent);
+}
+
+/* Prompter's book */
+
+.book {
+  position: fixed;
+  inset: 0 0 0 auto;
+  z-index: var(--z-book);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  width: var(--book-w);
+  padding: var(--space-5);
+  background: var(--tooth), var(--wing-grey);
+  background-blend-mode: soft-light, normal;
+  border-inline-start: 1px solid var(--velvet-lit);
+  box-shadow: -2rem 0 4rem color-mix(in oklab, black 65%, transparent);
+  translate: 100% 0;
+  visibility: hidden;
+  transition:
+    translate var(--dur-slow) var(--ease-curtain),
+    visibility 0s linear var(--dur-slow);
+}
+
+.book[data-open="true"] {
+  translate: 0 0;
+  visibility: visible;
+  transition: translate var(--dur-slow) var(--ease-curtain);
+}
+
+.book__head h2 {
+  font-size: var(--text-xl);
+  color: var(--limelight);
+}
+
+.book__head p {
+  margin-top: var(--space-2);
+  font-size: var(--text-s);
+  color: var(--chalk);
+}
+
+.book__panel {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-height: 0;
+}
+
+.book__panel .mufw-export {
+  align-self: flex-start;
+}
+
+/* Newest on top. Rows older than the latest are set in ever more degraded cuts of Redaction. */
+.book__panel .mufw-history {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column-reverse;
+  min-height: 0;
+  overflow: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--chalk-faint) transparent;
+}
+
+.book__panel .mufw-history li {
+  padding: 0.4em 0.7em;
+  border-bottom: 1px dotted var(--chalk-faint);
+  font-size: var(--text-s);
+  color: var(--paper);
+  cursor: pointer;
+  transition: background-color var(--dur-fast) ease;
+}
+
+.book__panel .mufw-history li:hover {
+  background: color-mix(in oklab, var(--limelight) 12%, transparent);
+}
+
+.book__panel .mufw-history li.mufw-latest {
+  color: var(--stage-black);
+  background: var(--limelight);
+  font-weight: 700;
+}
+
+.book__panel .mufw-history li:nth-last-child(n + 2) {
+  font-family: "Redaction 10", var(--face-body);
+}
+
+.book__panel .mufw-history li:nth-last-child(n + 4) {
+  font-family: "Redaction 35", var(--face-body);
+  color: color-mix(in oklab, var(--paper) 88%, var(--chalk-dim));
+}
+
+.book__panel .mufw-history li:nth-last-child(n + 8) {
+  font-family: "Redaction 70", var(--face-body);
+  color: var(--chalk);
+}
+
+.book__panel .mufw-history li:nth-last-child(n + 14) {
+  font-family: "Redaction 100", var(--face-body);
+  color: var(--chalk-dim);
+}
+
+.book__panel pre {
+  flex: 0 1 11rem;
+  min-height: 0;
+  margin: 0;
+  padding-top: var(--space-3);
+  overflow: auto;
+  border-top: 1px solid var(--chalk-faint);
+  font-family: var(--face-mono);
+  font-size: var(--text-xs);
+  line-height: 1.5;
+  color: var(--chalk);
+}
+
+.book-tab {
+  position: fixed;
+  right: var(--space-6);
+  bottom: var(--space-3);
+  z-index: var(--z-book-tab);
+  transition: translate var(--dur-slow) var(--ease-curtain);
+}
+
+.book[data-open="true"] + .book-tab {
+  translate: calc(-1 * var(--book-w)) 0;
+}
