@@ -104,6 +104,8 @@
 
   /* Shape */
   --pelmet-h: 1.1rem;
+  --canvas-w: 1400px;
+  --canvas-h: 660px;
   --book-w: min(36rem, 92vw);
   --perforation: 2px dashed color-mix(in oklab, var(--ink) 38%, transparent);
 
@@ -122,6 +124,23 @@
     --dur-fuse: 1ms;
     --dur-curtain-half: 200ms;
   }
+}
+
+/*
+ * The canvas the acts play on is a fixed 1400×660 box that the shell scales to the stage frame, so
+ * its type is fixed too: an act looks the same at every viewport, and nothing inside it reads a
+ * viewport unit. The chrome around the stage keeps the fluid scale from :root.
+ */
+#house-stage {
+  --text-xs: 0.8rem;
+  --text-s: 1rem;
+  --text-m: 1.32rem;
+  --text-l: 2.1rem;
+  --text-xl: 3.9rem;
+  --text-2xl: 7rem;
+  --text-mega: 20rem;
+  font-size: var(--text-m);
+  line-height: var(--leading-body);
 }
 
 /* Faces */

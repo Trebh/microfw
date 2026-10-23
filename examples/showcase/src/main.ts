@@ -15,6 +15,7 @@ import { layerKeys } from "./deck/keys.ts"
 import { layerPrompterBook } from "./deck/prompterBook.ts"
 import { buildSkeleton } from "./deck/skeleton.ts"
 import { layerSpotlight } from "./deck/spotlight.ts"
+import { layerStageScale } from "./deck/stageScale.ts"
 import { makeDeckView } from "./deck/view.ts"
 import { BoxOffice, BoxOfficePorts, Patron } from "./domain/BoxOffice.ts"
 
@@ -49,6 +50,7 @@ const page = Layer.mergeAll(
   }),
   layerSpotlight(scripts, { frame: skeleton.frame, stage: skeleton.stage, overlay: skeleton.spotlight }),
   layerCurtain({ frame: skeleton.frame, stage: skeleton.stage }),
+  layerStageScale({ frame: skeleton.frame, stage: skeleton.stage }),
   layerHash,
   layerInterruption,
   layerKeys(scripts.map((script) => script.id)),

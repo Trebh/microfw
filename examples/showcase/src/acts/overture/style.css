@@ -1,10 +1,14 @@
+/*
+ * The act's box is the canvas's content area (1328×594): the masthead and the hints stack on the
+ * left, the cast stands on the right, and nothing grows past the box.
+ */
 #act-overture .overture {
   display: grid;
-  grid-template-columns: minmax(0, 1.12fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   grid-template-rows: minmax(0, 1fr) auto;
-  column-gap: var(--space-8);
-  row-gap: var(--space-5);
-  min-height: 100%;
+  column-gap: var(--space-7);
+  row-gap: var(--space-4);
+  height: 100%;
 }
 
 #act-overture .overture__masthead {
@@ -13,6 +17,7 @@
   display: flex;
   flex-direction: column;
   justify-content: center;
+  min-height: 0;
 }
 
 #act-overture .overture__kicker {
@@ -26,7 +31,7 @@
   isolation: isolate;
   align-self: flex-start;
   margin-block: var(--space-2) var(--space-3);
-  font-size: clamp(7rem, 22vw, 20rem);
+  font-size: 15rem;
   font-weight: 700;
   line-height: 0.8;
   letter-spacing: -0.03em;
@@ -58,8 +63,8 @@
 }
 
 #act-overture .overture__subtitle {
-  max-width: 24ch;
-  font-size: var(--text-xl);
+  max-width: 22ch;
+  font-size: 2.8rem;
   font-style: italic;
   line-height: 1.02;
   color: var(--paper);
@@ -93,7 +98,7 @@
     "num role role";
   column-gap: var(--space-3);
   align-items: baseline;
-  padding: var(--space-3) var(--space-3);
+  padding: 0.4rem var(--space-3);
   border-top: 1px dotted var(--chalk-faint);
   animation: overture-rise 0.9s var(--ease-line) calc(0.15s + var(--i) * 70ms) both;
 }
@@ -109,7 +114,7 @@
 
 #act-overture .overture__name {
   grid-area: name;
-  font-size: var(--text-l);
+  font-size: 1.7rem;
   line-height: 1.05;
   color: var(--paper);
 }
@@ -128,13 +133,11 @@
 #act-overture .overture__how {
   grid-column: 1;
   grid-row: 2;
-  padding: var(--space-3) 0;
 }
 
 #act-overture .overture__hints {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
-  gap: var(--space-2) var(--space-5);
+  gap: var(--space-1);
 }
 
 #act-overture .overture__hint {
@@ -172,20 +175,6 @@
 @keyframes overture-rise {
   from { opacity: 0; translate: 0 0.8rem; }
   to { opacity: 1; translate: 0 0; }
-}
-
-@media (max-width: 62rem) {
-  #act-overture .overture {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto;
-  }
-
-  #act-overture .overture__cast,
-  #act-overture .overture__how,
-  #act-overture .overture__masthead {
-    grid-column: 1;
-    grid-row: auto;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {

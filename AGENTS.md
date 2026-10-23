@@ -129,7 +129,7 @@ Code stays in `Effect`/`Stream`/`Layer` through every layer of the application. 
 | Boundary | Place |
 |---|---|
 | Process entry point | `runPage` in `examples/auction/src/client/app.ts`, `runTicker` in `client/ticker.ts`, `runStreamFrame` in `client/streamEmbed.ts`, `client/devtools.ts`, `client/auctionWorker.ts` (the web worker), `server.ts`, `test/live.ts`, `test/walletLive.ts`, `test/syncLive.ts`, `test/syncRestartLive.ts`, `test/syncFailoverLive.ts`, the `scripts/`; `examples/showcase/src/main.ts` and `examples/showcase/src/acts/tour/company.worker.ts` (the web worker) |
-| DOM event handler | `layerMount` dispatch, `layerPanel` and `layerHistoryList` row and export clicks, the showcase deck's keys layer (`examples/showcase/src/deck/keys.ts`), through a `FiberSet.makeRuntime` runner captured from the layer |
+| DOM event handler | `layerMount` dispatch, `layerPanel` and `layerHistoryList` row and export clicks, the showcase's key presses, hash changes and spotlight observers (`examples/showcase/src/deck/keys.ts`, `hash.ts`, `spotlight.ts`) and Act VII's window controls (`src/acts/sync/index.ts`), through a `FiberSet.makeRuntime` runner captured from the layer |
 | Test harness | `it.effect` / `layer` from `@effect/vitest` |
 
 Anywhere else, return the effect and let the caller compose it. Do not convert an `Effect` to a

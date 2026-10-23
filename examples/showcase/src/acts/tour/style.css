@@ -1,7 +1,11 @@
 #act-tour .tour {
+  --tour-text-xs: 0.74rem;
+  --tour-text-s: 0.8rem;
+  --tour-text-m: 1.2rem;
+  --tour-text-l: 1.9rem;
   display: grid;
   align-content: start;
-  gap: var(--space-4);
+  gap: var(--space-3);
 }
 
 /* The banner and the two import lines that every composition root shares. */
@@ -9,20 +13,20 @@
 #act-tour .tour__head {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  align-items: end;
+  align-items: center;
   gap: var(--space-6);
 }
 
 #act-tour .tour__kicker {
-  font-size: var(--text-s);
+  font-size: var(--tour-text-s);
   letter-spacing: 0.2em;
   color: var(--limelight);
 }
 
 #act-tour .tour__statement {
-  margin-top: var(--space-2);
+  margin-top: var(--space-1);
   font-family: var(--face-body);
-  font-size: var(--text-l);
+  font-size: var(--tour-text-l);
   font-weight: 400;
   line-height: 1.02;
   color: var(--paper);
@@ -36,7 +40,7 @@
 
 #act-tour .tour__imports {
   --tilt: 0.5deg;
-  padding: var(--space-2) var(--space-4) var(--space-3);
+  padding: var(--space-2) var(--space-4) var(--space-2);
 }
 
 #act-tour .tour__caption {
@@ -56,8 +60,8 @@
 
 #act-tour .tour__code {
   margin: 0;
-  font-size: 0.64rem;
-  line-height: 1.45;
+  font-size: 0.68rem;
+  line-height: 1.4;
   white-space: pre;
   overflow-x: auto;
   scrollbar-width: none;
@@ -114,16 +118,17 @@
 #act-tour .tour__board-cells {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--space-5);
+  column-gap: var(--space-5);
 }
 
 #act-tour .tour__stage {
   position: relative;
   display: grid;
-  align-content: start;
-  gap: var(--space-2);
+  grid-row: span 4;
+  grid-template-rows: subgrid;
+  row-gap: var(--space-2);
   min-width: 0;
-  padding: var(--space-3) var(--space-4) var(--space-4);
+  padding: var(--space-2) var(--space-4) var(--space-3);
   background: linear-gradient(var(--wing-grey), color-mix(in oklab, var(--wing-grey) 62%, var(--stage-black)));
   border: 1px solid var(--chalk-faint);
   border-top: 3px solid var(--limelight);
@@ -145,13 +150,13 @@
 }
 
 #act-tour .tour__ordinal {
-  font-size: var(--text-l);
+  font-size: var(--tour-text-l);
   color: var(--limelight);
 }
 
 #act-tour .tour__title {
   font-family: var(--face-body);
-  font-size: var(--text-m);
+  font-size: var(--tour-text-m);
   font-weight: 400;
   color: var(--paper);
 }
@@ -196,8 +201,7 @@
 
 #act-tour .tour__root {
   --tilt: -0.25deg;
-  min-height: 7.8rem;
-  padding: var(--space-2) var(--space-3) var(--space-3);
+  padding: var(--space-2) var(--space-3) var(--space-2);
 }
 
 #act-tour .tour__stage[data-stage="wings"] .tour__root {
@@ -207,13 +211,13 @@
 /* Seats: the one view, painted from whatever representation the stage's ports deliver. */
 
 #act-tour .tour__seats {
-  min-height: 8.2rem;
+  min-height: 7.8rem;
 }
 
 #act-tour .tour__seats:empty::before,
 #act-tour .tour__meter-mount:empty::before {
   content: "the company has not come on yet";
-  font-size: var(--text-xs);
+  font-size: var(--tour-text-xs);
   color: var(--chalk-dim);
 }
 
@@ -225,7 +229,7 @@
 
 #act-tour .tour__seat {
   position: relative;
-  height: 1.8rem;
+  height: 1.6rem;
   overflow: hidden;
   cursor: pointer;
   color: var(--chalk);
@@ -319,7 +323,7 @@
 #act-tour .tour__board {
   display: grid;
   gap: var(--space-2);
-  padding-top: var(--space-3);
+  padding-top: var(--space-2);
   border-top: 1px solid var(--chalk-faint);
 }
 
@@ -330,7 +334,7 @@
 }
 
 #act-tour .tour__meter-mount {
-  min-height: 4.6rem;
+  min-height: 3.8rem;
 }
 
 #act-tour .tour__meter {
@@ -353,7 +357,7 @@
 }
 
 #act-tour .tour__meter-figure {
-  font-size: var(--text-l);
+  font-size: var(--tour-text-l);
   line-height: 0.85;
   font-variant-numeric: tabular-nums;
   color: var(--paper);
@@ -379,7 +383,7 @@
   display: flex;
   align-items: flex-end;
   gap: 3px;
-  height: 2.6rem;
+  height: 2.2rem;
   border-bottom: 1px solid var(--chalk-faint);
 }
 
@@ -412,14 +416,6 @@
 #act-tour .tour__board-caption {
   font-size: 0.62rem;
   color: var(--chalk-dim);
-}
-
-@media (max-width: 68rem) {
-  #act-tour .tour__head,
-  #act-tour .tour__stages,
-  #act-tour .tour__board-cells {
-    grid-template-columns: minmax(0, 1fr);
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {

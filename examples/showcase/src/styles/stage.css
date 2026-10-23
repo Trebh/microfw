@@ -173,30 +173,36 @@ body > noscript .noscript {
   font-size: var(--text-s);
 }
 
-@media (max-width: 72rem) {
+@media (max-width: 92rem) {
   #chrome .playbill__act:not([aria-current="step"]) .playbill__title {
     display: none;
   }
 }
 
 /*
- * Surtitles: a lit strip above the stage. Its height is fixed (the previous line, and three lines of
- * the current one) so the stage never moves between cues; a longer line is set smaller, then clamped.
+ * Surtitles: a lit strip above the stage. Its height is fixed per breakpoint (the previous line, and
+ * the lines of the current one, in rem) so the stage never moves between cues; a longer line is set
+ * smaller, then clamped.
  */
 
 #chrome .surtitles {
-  --surtitle-size: clamp(1.25rem, 1rem + 0.95vw, 1.8rem);
+  --surtitle-size: 1.5rem;
   --surtitle-leading: 1.18;
+  --surtitle-lines: 3;
+  --surtitle-past-row: 1.5rem;
+  --surtitle-pad: var(--space-3);
   grid-row: 2;
   position: relative;
   z-index: var(--z-chrome);
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  grid-template-rows: 1.5em calc(3 * var(--surtitle-size) * var(--surtitle-leading));
+  grid-template-rows: var(--surtitle-past-row) calc(var(--surtitle-lines) * var(--surtitle-size) * var(--surtitle-leading));
   column-gap: var(--space-5);
   align-content: center;
-  block-size: calc(1.5 * var(--text-s) + 3 * var(--surtitle-size) * var(--surtitle-leading) + 2 * var(--space-3));
-  padding: var(--space-3) var(--space-6);
+  block-size: calc(
+    var(--surtitle-past-row) + var(--surtitle-lines) * var(--surtitle-size) * var(--surtitle-leading) + 2 * var(--surtitle-pad)
+  );
+  padding: var(--surtitle-pad) var(--space-6);
   overflow: hidden;
   background: linear-gradient(color-mix(in oklab, var(--wing-grey) 80%, black), var(--stage-black));
 }
@@ -222,8 +228,8 @@ body > noscript .noscript {
   grid-row: 2;
   display: -webkit-box;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
-  line-clamp: 3;
+  -webkit-line-clamp: var(--surtitle-lines);
+  line-clamp: var(--surtitle-lines);
   overflow: hidden;
   font-size: var(--surtitle-size);
   line-height: var(--surtitle-leading);
@@ -302,19 +308,28 @@ body > noscript .noscript {
   filter: drop-shadow(0 0.25rem 0.4rem color-mix(in oklab, black 70%, transparent));
 }
 
+/*
+ * The canvas: acts are laid out on a fixed box and the stage-scale layer sets `--stage-scale` so the
+ * whole box fits the frame; what the frame has left over is the stage-black letterbox. The scale is
+ * never animated: the spotlight measures the lit element against it.
+ */
 .stage-frame > #house-stage {
   position: absolute;
-  inset: 0;
+  top: 50%;
+  left: 50%;
+  width: var(--canvas-w);
+  height: var(--canvas-h);
+  transform: translate(-50%, -50%) scale(var(--stage-scale, 1));
+  transform-origin: center;
 }
 
+/* `clip`, not `hidden`: a clipped box is never scrolled, not even by `scrollIntoView` on a descendant. */
 #house-stage > .act {
   position: absolute;
   inset: 0;
   z-index: var(--z-act);
-  overflow: auto;
+  overflow: clip;
   padding: calc(var(--pelmet-h) + var(--space-5)) var(--space-6) var(--space-5);
-  scrollbar-width: thin;
-  scrollbar-color: var(--chalk-faint) transparent;
 }
 
 #house-stage > .act[hidden] {
@@ -441,7 +456,7 @@ body > noscript .noscript {
   gap: var(--space-5);
   padding: var(--space-4) var(--space-6);
   /* leaves room for the prompter's book tab, which sits over the right end of this row */
-  padding-inline-end: 13rem;
+  padding-inline-end: 16rem;
 }
 
 #chrome .controls__buttons {
@@ -607,4 +622,57 @@ body > noscript .noscript {
 
 #prompter-book[data-open="true"] + .book-tab {
   translate: calc(-1 * var(--book-w)) 0;
+}
+
+/*
+ * Short viewports: the chrome gives the stage its height back. The playbill is thinner, the surtitles
+ * are two lines at a smaller size without the previous line, and the controls are slimmer; the strip
+ * is again one fixed height, so the stage still never moves between cues.
+ */
+@media (max-height: 800px) {
+  #chrome .playbill {
+    gap: var(--space-4);
+  }
+
+  #chrome .playbill__house,
+  #chrome .playbill__numeral {
+    font-size: var(--text-m);
+  }
+
+  #chrome .playbill__act {
+    padding-block: var(--space-1);
+  }
+
+  #chrome .surtitles {
+    --surtitle-size: 1.2rem;
+    --surtitle-lines: 2;
+    --surtitle-past-row: 0rem;
+    --surtitle-pad: var(--space-2);
+  }
+
+  #chrome .surtitle {
+    max-width: 66rem;
+  }
+
+  #chrome .surtitle--past {
+    display: none;
+  }
+
+  #chrome .surtitles__where {
+    font-size: var(--text-xs);
+  }
+
+  #chrome .controls {
+    padding-block: var(--space-2);
+    gap: var(--space-4);
+  }
+
+  #chrome .controls .stage-button,
+  #theatre > .book-tab .stage-button {
+    padding-block: 0.4em;
+  }
+
+  #theatre > .book-tab {
+    bottom: var(--space-2);
+  }
 }

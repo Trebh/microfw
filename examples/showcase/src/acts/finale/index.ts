@@ -102,7 +102,7 @@ const finale = (recorded: Tally) =>
       <h1 class="finale__title">Good night.</h1>
     </header>
 
-    <section class="finale__bill paper-card paper-card--torn" data-spot="bill" aria-labelledby="finale-bill" style="--tilt: -0.9deg">
+    <section class="finale__bill paper-card paper-card--torn" data-spot="bill" aria-labelledby="finale-bill">
       <header class="finale__bill-head">
         <h2 class="marquee" id="finale-bill">The bill</h2>
         <p class="mono">what µFW costs · measured against plain uhtml</p>

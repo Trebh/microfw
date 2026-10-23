@@ -48,7 +48,9 @@ const prefersReducedMotion = () => window.matchMedia("(prefers-reduced-motion: r
 /**
  * Lights the element the current cue's `spot` names, or the whole stage when the cue has none.
  * The ellipse travels over the spot's own duration, is measured again when it arrives, and then
- * follows the target and the stage: a resize of either, scrolling, and the curtain opening on the act.
+ * follows the target and the stage: a resize of either, a new `--stage-scale` (the canvas is scaled
+ * to the frame, and the ellipse lives in the frame's own coordinates), scrolling, and the curtain
+ * opening on the act.
  * A spot the act's markup does not carry is logged and the stage stays fully lit.
  */
 export const layerSpotlight = (scripts: ReadonlyArray<ActScript>, roots: SpotlightRoots) =>
@@ -73,13 +75,14 @@ export const layerSpotlight = (scripts: ReadonlyArray<ActScript>, roots: Spotlig
         Effect.sync(() => new ResizeObserver(follow)),
         (observer) => Effect.sync(() => observer.disconnect())
       )
-      const curtainMoves = yield* Effect.acquireRelease(
+      const stageMoves = yield* Effect.acquireRelease(
         Effect.sync(() => new MutationObserver(follow)),
         (observer) => Effect.sync(() => observer.disconnect())
       )
       yield* Effect.acquireRelease(
         Effect.sync(() => {
-          curtainMoves.observe(frame, { attributes: true, attributeFilter: ["data-curtain"] })
+          stageMoves.observe(frame, { attributes: true, attributeFilter: ["data-curtain"] })
+          stageMoves.observe(stage, { attributes: true, attributeFilter: ["style"] })
           window.addEventListener("resize", follow)
           window.addEventListener("scroll", follow, { capture: true, passive: true })
         }),
