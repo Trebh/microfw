@@ -6,6 +6,7 @@ Living document: change it in the same commit that changes what it describes. De
 - [architecture/placement.md](architecture/placement.md) — ports, layers, the RPC contract, the placements (browser, server, web worker)
 - [architecture/testing.md](architecture/testing.md) — graph exploration and model-based path testing
 - [architecture/devtools.md](architecture/devtools.md) — time-travel panel, history list and export, Stately adapter
+- [architecture/performance.md](architecture/performance.md) — what a page ships, what a step, an interaction and a server cost, measured against plain baselines, and where the costs come from
 
 ## Shape of the system
 

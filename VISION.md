@@ -42,6 +42,9 @@ visible end to end.
   the edges: process entry points, DOM event handlers, test harnesses.
 - **Boring and small.** Prefer a pure function to a service, and a service to a framework feature.
 - **Observable by default.** Every step is recorded and can be replayed, travelled to, inspected.
+- **Honest about cost.** Speed and size are a tradeoff, not the pitch: µFW pays for Effect, schemas
+  at every cut point and a recorded loop. The cost is measured against plain baselines and
+  published ([performance](docs/architecture/performance.md)), never hidden or tuned away.
 
 ## Where it is going
 
@@ -49,6 +52,8 @@ Near term. The open gaps, each with what done looks like, are in [docs/TODO.md](
 
 - A synchronised log that can be cut at a snapshot, refuses a checkpoint ahead of it, and fences
   the proposals of an instance that lost the automatic actions.
+- A browser page that ships only the loop it runs and shows a click's step in the click's frame,
+  and a history bounded by the memory it holds as well as by its records.
 - Packages a consumer outside the workspace can install.
 
 Longer term, µFW aims to compete with XState on its own ground — modelling, visualisation and
@@ -61,6 +66,8 @@ chart library cannot: moving parts of the loop across the network without touchi
   be mounted the way `@mufw/view-uhtml` mounts uhtml.
 - Hiding Effect. µFW is an Effect library and expects Effect in its users' code.
 - Statecharts as the source of truth. Diagrams are derived from the definition, never the reverse.
+- Winning benchmarks or the smallest bundle. A page or a server that needs them should not put its
+  hot path through the loop.
 
 ## How we will know it works
 

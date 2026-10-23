@@ -39,6 +39,10 @@ docs/                ARCHITECTURE.md, architecture/*.md, TODO.md
 | `pnpm --filter @mufw/example-auction test:sync:restart` | starts a host and a joiner of its own, each with a `MUFW_STORE`, on :3211 (log on :3311) and :3212; restarts the host over its store, then the joiner, then the host over an empty store, and fails unless the log, the model and the convergence survive the first two and the joiner stops on the third |
 | `pnpm --filter @mufw/example-auction test:sync:failover` | starts a host that never ticks (`MUFW_AUTO_ACTIONS=off`) and two joiners of its own on :3221 (log on :3321), :3222 and :3223; kills the first joiner, which holds the lease, and fails unless nothing ticks until the lease has timed out, then the second joiner ticks, and the host and it show the same auction (takes about 30 seconds) |
 | `pnpm --filter @mufw/example-auction compare:transports` | starts a server of its own, builds the two ticker pages and prints first paint and update latency of the websocket, HTTP and HTML-stream islands in headless Chromium (once: `pnpm exec playwright install chromium`) |
+| `pnpm --filter @mufw/example-auction bench:bundle` | builds the Effect floors, the bench pages (`scripts/bench/pages/`: counter and 1000-row list, plain uhtml and µFW) and every deployment in memory and prints gzip/brotli size, size per origin and the largest modules |
+| `pnpm --filter @mufw/example-auction bench:loop` | in Node: the cost of a step, an intent, concurrent presenters, subscribers, schema boundaries and history records, against a plain reducer |
+| `pnpm --filter @mufw/example-auction bench:browser` | cold load and click latency of the bench pages and `browser-only` in headless Chromium at each `BENCH_CPU_RATES` throttling rate (default `1,4`), with µFW/uhtml ratios; ports 4600–4699 |
+| `pnpm --filter @mufw/example-auction bench:server` | starts servers of its own on ports 4800–4999: `Present`/`Submit` throughput and latency, `Representations` fan-out, RSS as history fills, synced host and joiner latency |
 
 A change is done when `pnpm typecheck` and `pnpm test` pass and the changed behaviour has been
 exercised: a UI change in the browser, a server change against a running server.
@@ -171,6 +175,7 @@ code as it is. Update the affected document in the same change that makes it fal
 | user-facing behaviour, commands, packages | README.md |
 | direction, principles, non-goals | VISION.md |
 | a port, layer, contract, boundary or design decision | docs/ARCHITECTURE.md and the matching page |
+| a change that moves a measured cost (bundle, startup, step, interaction, server) | docs/architecture/performance.md, with the figures of a fresh run of the `bench:*` script that measures it |
 | a gap found or closed | docs/TODO.md (add it, or delete the item) |
 | a rule for contributors | AGENTS.md |
 

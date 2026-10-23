@@ -16,7 +16,11 @@
     "test:sync": "tsx test/syncLive.ts",
     "test:sync:restart": "tsx test/syncRestartLive.ts",
     "test:sync:failover": "tsx test/syncFailoverLive.ts",
-    "compare:transports": "tsx scripts/compare-transports.ts"
+    "compare:transports": "tsx scripts/compare-transports.ts",
+    "bench:bundle": "tsx scripts/bench-bundle.ts",
+    "bench:loop": "node --expose-gc --import tsx scripts/bench-loop.ts",
+    "bench:browser": "tsx scripts/bench-browser.ts",
+    "bench:server": "tsx scripts/bench-server.ts"
   },
   "dependencies": {
     "effect": "^4.0.5",

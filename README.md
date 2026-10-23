@@ -22,6 +22,24 @@ Status: **proof of concept**. APIs move freely; there is no build step and nothi
 - **Devtools.** A time-travel panel, a read-only history list, JSON export of a history, and an adapter for the
   [Stately inspector](https://stately.ai/docs/inspector) that draws the state and sequence diagrams.
 
+## What it costs
+
+µFW trades speed and size for a typed, recorded, relocatable loop, and says so. Measured against
+the same pages written in plain uhtml ([performance.md](docs/architecture/performance.md), where
+every figure, its baseline and its command are):
+
+- **Bundle.** The smallest µFW page ships about twenty times the JavaScript of the plain page, tens
+  of KiB gzipped, most of it the Effect runtime and `Schema`; part of it is synchronisation code
+  the page never runs ([TODO](docs/TODO.md#performance)).
+- **Startup.** First content takes two to three times as long, script time three to ten times.
+- **Interaction.** A click shows its step one frame later than the plain page
+  ([TODO](docs/TODO.md#performance)); a frame is far inside the 200 ms of a good INP.
+- **Steps.** A step costs a few microseconds over the reducer it runs, and an intent's round trip
+  tens; both are fixed costs that matter for trivial steps and fade as the domain does more work.
+- **Server.** One definition is one serialised writer, so proposals per second do not grow with
+  connections; every update sends the whole representation to every subscriber; history is
+  bounded by records, not bytes.
+
 ## Packages
 
 | Package | Role |
@@ -258,6 +276,10 @@ The client is built per deployment, not as one bundle:
 | `pnpm build:client` | one `vite build --mode <deployment>` per page into `examples/auction/dist/<deployment>` (`browser-only`, `server-owned`, `server-model`, `server-actions`, `devtools`, `worker` with its worker file in `assets/`, and `demo` with all four browser/server placements), then `check:bundle` |
 | `pnpm --filter @mufw/example-auction check:bundle` | first fails on a module under `src/client` other than `placements/auctionLocal.ts` that calls `layerModelLocal`, `layerActionRunnerLocal` or `layerLoopLocal` with the auction's definition (a source scan, also run by `pnpm test`); then fails if a deployment ships a local half of the auction it should not (a `server-owned` bundle with its local model or action runner; a `devtools` bundle with any of them, the auction view, the wallet or the travel panel; a `worker` page bundle with any of them, or whose worker file holds the wallet or the view) or lacks one it should; every bundle but `devtools` keeps the wallet's local loop |
 | `pnpm --filter @mufw/example-auction compare:transports` | starts a server of its own on a free port from 4700 to 4799, builds and serves the two bundled ticker pages, and prints first paint and update latency (median, p95) and client JS size for the websocket, HTTP (NDJSON) and HTML stream in headless Chromium; needs `pnpm exec playwright install chromium` once; `MUFW_COMPARE_LOADS`, `MUFW_COMPARE_UPDATES`, `MUFW_COMPARE_WARMUP` set the sample sizes |
+| `pnpm --filter @mufw/example-auction bench:bundle` | builds in memory, minified, the Effect floors, the four bench pages (`scripts/bench/pages/`: a counter and a 1000-row list, each in plain uhtml and in µFW) and every deployment, and prints raw, gzip and brotli size per entry, the minified size per origin (Effect module, `@mufw/*`, uhtml, Stately, app) and the 20 largest modules |
+| `pnpm --filter @mufw/example-auction bench:loop` | in Node, the cost of one step (plain reducer, `applyProposal`, `ModelPort.present`, `IntentPort.dispatch` to its record) for the bench counter, the bench list and the auction, concurrent presenters, representation subscribers, schema and JSON boundary costs, heap per history record; `BENCH_SECONDS`, `BENCH_OPS`, `BENCH_WARMUP_SECONDS` |
+| `pnpm --filter @mufw/example-auction bench:browser` | builds and serves the bench pages and `browser-only`, and prints cold first content, script time, heap, click→DOM and click→next frame in headless Chromium at each CPU throttling rate in `BENCH_CPU_RATES` (default `1,4`), with the µFW/uhtml ratios; ports 4600–4699; `BENCH_LOADS`, `BENCH_INTERACTIONS`, `BENCH_WARMUP` |
+| `pnpm --filter @mufw/example-auction bench:server` | starts servers of its own on ports 4800–4999 and prints `Present` and `Submit` throughput and latency over websockets with 1 to 200 connections, `Representations` fan-out to up to 1000 subscribers, server RSS as history fills, and the latency a synced host and joiner add; `BENCH_SECONDS`, `BENCH_SCENARIOS`, `BENCH_PRESENTERS`, `BENCH_SUBMITTERS`, `BENCH_SUBSCRIBERS`, `BENCH_MEMORY_STEPS`, `BENCH_SYNC_BIDS` |
 
 Each build has a single entry, so a `server-owned` bundle holds no local model or action runner of
 the auction, the permissive credit check is only in builds that run actions in the browser or in a worker, and the

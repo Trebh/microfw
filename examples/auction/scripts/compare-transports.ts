@@ -15,6 +15,7 @@ import { Auction, type Proposal } from "../src/domain/Auction.ts"
 import { Amount, Bidder } from "../src/domain/Values.ts"
 import { Ports, Rpc } from "../src/ports.ts"
 import { samPath, samStreamPath } from "../src/samPath.ts"
+import { kib, ms, type Summary, summarize, table } from "./stats.ts"
 
 /**
  * Compares the three ways a read-only island can follow the server's auction, each in headless
@@ -65,21 +66,6 @@ const failWith = (message: string) => (error: unknown) =>
  * calibrated; `Clock` has no such epoch reading.
  */
 const epochMs = () => performance.timeOrigin + performance.now()
-
-const percentile = (sorted: ReadonlyArray<number>, fraction: number) => {
-  const rank = Math.ceil(fraction * sorted.length)
-  return sorted[Math.max(0, rank - 1)] ?? Number.NaN
-}
-
-interface Summary {
-  readonly median: number
-  readonly p95: number
-}
-
-const summarize = (samples: ReadonlyArray<number>): Summary => {
-  const sorted = [...samples].sort((a, b) => a - b)
-  return { median: percentile(sorted, 0.5), p95: percentile(sorted, 0.95) }
-}
 
 // ---------------------------------------------------------------------------------------------
 // What the page reports
@@ -451,9 +437,6 @@ const measureCase = Effect.fn("measureCase")(function*(run: Run, measured: Case)
 // Report
 // ---------------------------------------------------------------------------------------------
 
-const ms = (value: number) => value.toFixed(1)
-const kib = (bytes: number) => (bytes / 1024).toFixed(1)
-
 const columns = (measured: Measured) => [
   measured.name,
   `${ms(measured.firstPaint.median)} / ${ms(measured.firstPaint.p95)}`,
@@ -462,11 +445,6 @@ const columns = (measured: Measured) => [
 ]
 
 const HEADER = ["transport", "first paint ms (median / p95)", "update ms (median / p95)", "client JS KiB (raw / gzip)"]
-
-const table = (rows: ReadonlyArray<ReadonlyArray<string>>) => {
-  const widths = HEADER.map((_, column) => Math.max(...rows.map((row) => row[column]?.length ?? 0)))
-  return rows.map((row) => row.map((cell, column) => cell.padEnd(widths[column] ?? 0)).join("  ").trimEnd()).join("\n")
-}
 
 const program = Effect.gen(function*() {
   const settings = yield* Settings
