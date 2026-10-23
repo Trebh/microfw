@@ -1,6 +1,6 @@
 # Placement
 
-Living document. Source of truth: `packages/core/src/Ports.ts`, `Layers.ts`, `Forward.ts`, `Persistence.ts`, `Sync.ts`,
+Living document. Source of truth: `packages/core/src/Ports.ts`, `Layers.ts`, `Forward.ts`, `Persistence.ts`, `Sync.ts`, `SyncPersistence.ts`,
 `packages/rpc/src/index.ts`, `examples/auction/src/client/`, `examples/auction/src/server.ts` and the route modules beside it.
 
 Placement is a deployment decision. Each deployment has its own composition root, which chooses
@@ -49,6 +49,9 @@ never fails; the remote port fails with it.
 | `Rpc.layerClientTest` | `Rpc.Client` | `Rpc.layerHandlers`, the authentication middleware on both sides (in-process, no serialization) |
 | `Rpc.layerHoldRequestsWhileDisconnected` | `RpcClient.Protocol` that holds a request made while the socket is down until the next connection, whichever client made it, and `HeldRequests`, the count of unary calls of `Rpc.layerClient` waiting | an inner socket `RpcClient.Protocol` that redials without end (see [Deployments](#deployments)) |
 | `Rpc.layerHandlers` | the RPC handlers | `IntentPort`, `ModelPort`, `HistoryPort`, `ActionRunner`, and the ports' `R` except what the middleware provides |
+
+`layerLoopSynced`, `layerLoopSyncedPersisted`, the `layerSync*` layers and the lease and checkpoint
+schemas are imported from `@mufw/core/sync`; every other `@mufw/core` layer above comes from the entry.
 
 ## Wire contract
 
@@ -104,7 +107,8 @@ and `layerModelLocal`:
   skipped. `layerModelLocal` publishes them through a sliding window of `HistoryBacklog` records
   (`@mufw/core`, default 64) shared by every subscriber, so a subscriber that stops reading cannot
   make the loop hold more than the window. When it resumes and finds a gap, the stream reads what it
-  missed from the retained records (`HistoryLimit`, default 1000), in seq order and without
+  missed from the retained records (bounded by `HistoryLimit`, default 1000, and by
+  `HistoryRetainedSize`), in seq order and without
   duplicates: no resubscription is involved, and the client's `undelivered` filter only matters for
   a lost connection. A subscriber that lags more than the retained records skips the evicted ones,
   as a subscriber that connects late never sees them; its seqs show the gap.
@@ -209,7 +213,12 @@ takes also provides the page's `Whoami` (see [Identity](#identity)); `runPage` m
   none of the auction's local halves in its page bundle (`auctionLoopLocal`, the worker's, included),
   emit the worker as a file, and, in the module graph built from `src/client/auctionWorker.ts` (a
   page's build emits a worker as an opaque minified file), ship `auctionLoopLocal` and neither the
-  wallet nor the view).
+  wallet nor the view). A page that imports only the local loop (`scripts/bench/pages/counter-mufw.ts`,
+  built in memory from its entry) must carry no module of `effect/eventlog` or `effect/encoding` that
+  the plain `Schema` floor does not (`Schema` itself imports `encoding/Base64`): the synchronisation
+  layers are exported by `@mufw/core/sync`, not by the `@mufw/core` entry, so a page that does not
+  import them cannot bundle them. The page must also carry `Layers.ts` of `@mufw/core`, the control
+  that the check looks at a local loop and not at an empty bundle.
   Before it builds, `check:bundle` parses every module under `src/client` (TypeScript compiler API,
   `scripts/auctionLocalHalves.ts`) and fails on a call to `layerModelLocal`, `layerActionRunnerLocal`
   or `layerLoopLocal` whose definition is the auction's (`src/domain/Auction.ts`) outside

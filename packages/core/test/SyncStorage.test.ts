@@ -2,7 +2,7 @@ import { assert, describe, it } from "@effect/vitest"
 import { Context, Effect, Exit, Layer, Scope } from "effect"
 import { EventJournal } from "effect/eventlog"
 import { KeyValueStore } from "effect/persistence"
-import { layerSyncStorage, SyncLog } from "../src/index.ts"
+import { layerSyncStorage, SyncLog } from "../src/SyncEntry.ts"
 import { Counter } from "./fixtures/Counter.ts"
 import { countsOf, currentRepresentation, harnessOver, instanceOn, readLog, sharedStore } from "./fixtures/SyncHarness.ts"
 

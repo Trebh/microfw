@@ -9,7 +9,7 @@ import {
   layerSyncStorage,
   type SyncLog,
   type SyncLogMismatch
-} from "@mufw/core"
+} from "@mufw/core/sync"
 import { layerHoldRequestsWhileDisconnected, type RpcTag } from "@mufw/rpc"
 import { type Deferred, Effect, Layer, Option, Schedule, Schema } from "effect"
 import { EventLogMessage, type EventLogRemote, EventLogServerUnencrypted } from "effect/eventlog"

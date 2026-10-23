@@ -66,6 +66,9 @@ for Effect idioms; do not rely on Effect 3 knowledge.
   by choosing layers. Only the demo page picks a placement at runtime; never let a visitor choose
   what the server trusts. If moving a part between client and server needs a change outside the
   composition root, the design is wrong: fix the port, not the call site.
+- A browser root provides `layerInputScheduler` (`@mufw/view-uhtml`) with `Layer.provide`, last,
+  around the whole page. Provided lower, the loop's queue keeps the default scheduler and a click
+  shows its step one frame late. The web worker and the server keep the default.
 
 ### Dependency injection and inversion
 

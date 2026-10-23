@@ -2,6 +2,8 @@ import type { AnyDefinition, DispatchRefused, IntentOf, Ports, RepresentationOf 
 import { Effect, FiberSet, Layer, Stream } from "effect"
 import type { Hole } from "uhtml"
 
+export { inputBudgetMillis, layerInputScheduler } from "./Scheduler.ts"
+
 /** A pure view: representation in, template out; user events become intents through `dispatch`. */
 export type View<Repr, Intent> = (representation: Repr, dispatch: (intent: Intent) => void) => Hole
 

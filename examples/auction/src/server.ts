@@ -1,5 +1,6 @@
 import { NodeRuntime } from "@effect/platform-node"
-import { AutoActions, type SyncLogMismatch } from "@mufw/core"
+import { AutoActions } from "@mufw/core"
+import type { SyncLogMismatch } from "@mufw/core/sync"
 import { type RpcTag, rpcTags } from "@mufw/rpc"
 import { Config, Deferred, Effect, Layer, Option, Schema } from "effect"
 import { HttpRouter } from "effect/http"

@@ -7,7 +7,7 @@ import {
   toXStateDefinition
 } from "@mufw/core"
 import { layerPanel, layerStately, replayOnStart } from "@mufw/devtools"
-import { layerMount } from "@mufw/view-uhtml"
+import { layerInputScheduler, layerMount } from "@mufw/view-uhtml"
 import { createBrowserInspector } from "@statelyai/inspect"
 import { Effect, Layer, Option, type Schema } from "effect"
 import type { WorkerError } from "effect/workers/WorkerError"
@@ -114,6 +114,6 @@ export const runPage = (placement: PagePorts, label: string, devtools: PageDevto
     layerRefusalNotice(stripAboveView()),
     devtools,
     inspector
-  ).pipe(Layer.provide(placement), Layer.provide(layerRefusals))
+  ).pipe(Layer.provide(placement), Layer.provide(layerRefusals), Layer.provide(layerInputScheduler))
   BrowserRuntime.runMain(Layer.launch(page))
 }

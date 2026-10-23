@@ -2,18 +2,16 @@ import { Context, Effect, Exit, Layer, Option, Scope, Stream } from "effect"
 import { EventLogMessage, EventLogRemote, EventLogServerUnencrypted } from "effect/eventlog"
 import { KeyValueStore } from "effect/persistence"
 import { RpcTest } from "effect/rpc"
+import { AutoActions, type HistoryPortShape, type ModelPortShape } from "../../src/index.ts"
 import {
-  AutoActions,
-  type HistoryPortShape,
   layerLoopSynced,
   layerSyncAuthorization,
   layerSyncLogClient,
   layerSyncLogStorage,
   layerSyncServer,
-  type ModelPortShape,
   SyncLog,
   type SyncOptions
-} from "../../src/index.ts"
+} from "../../src/SyncEntry.ts"
 import { collect } from "../support.ts"
 import { Counter, Ports } from "./Counter.ts"
 

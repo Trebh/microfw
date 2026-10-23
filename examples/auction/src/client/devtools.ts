@@ -1,5 +1,6 @@
 import { BrowserRuntime } from "@effect/platform-browser"
 import { layerHistoryList } from "@mufw/devtools"
+import { layerInputScheduler } from "@mufw/view-uhtml"
 import { Layer } from "effect"
 import { Auction } from "../domain/Auction.ts"
 import { Ports } from "../ports.ts"
@@ -15,6 +16,6 @@ const root = (id: string) => document.getElementById(id)!
 const page = Layer.merge(
   layerHistoryList(Auction, Ports, { root: root("devtools") }),
   layerConnectionBanner(root("connection"))
-).pipe(Layer.provide(historyOnly))
+).pipe(Layer.provide(historyOnly), Layer.provide(layerInputScheduler))
 
 BrowserRuntime.runMain(Layer.launch(page))

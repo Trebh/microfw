@@ -1,6 +1,7 @@
 import { NodeFileSystem } from "@effect/platform-node"
 import { assert, describe, it } from "@effect/vitest"
-import { AutoActions, type SyncLogMismatch } from "@mufw/core"
+import { AutoActions } from "@mufw/core"
+import type { SyncLogMismatch } from "@mufw/core/sync"
 import { Context, Deferred, Effect, Exit, FileSystem, Layer, Option, Schedule, Scope, Stream } from "effect"
 import { layerCreditCheckTable } from "../src/adapters/creditCheckTable.ts"
 import { Amount, Bidder } from "../src/domain/Values.ts"

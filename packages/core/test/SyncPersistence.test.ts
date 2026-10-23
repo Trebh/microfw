@@ -1,7 +1,8 @@
 import { assert, describe, it } from "@effect/vitest"
 import { Context, Effect, Exit, Layer, Scope } from "effect"
 import { KeyValueStore } from "effect/persistence"
-import { AutoActions, layerLoopSyncedPersisted, LogId, type SyncLog } from "../src/index.ts"
+import { AutoActions } from "../src/index.ts"
+import { layerLoopSyncedPersisted, LogId, type SyncLog } from "../src/SyncEntry.ts"
 import { Counter, Ports } from "./fixtures/Counter.ts"
 import {
   countsOf,

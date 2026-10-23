@@ -135,4 +135,49 @@ const checkLocalHalvesSource = Effect.fn("checkLocalHalvesSource")(function*() {
   })
 })
 
-NodeRuntime.runMain(checkLocalHalvesSource().pipe(Effect.andThen(Effect.forEach(expectations, checkDeployment, { discard: true }))))
+/**
+ * A page that runs only the local loop must not carry the synchronisation code, which `@mufw/core/sync`
+ * keeps out of the `@mufw/core` entry: that code is what pulls `effect/eventlog` and `effect/encoding`
+ * (`SchemaBinary`) in. `Schema` itself imports `effect/encoding/Base64`, so what the plain `Schema` floor
+ * carries from those two directories is allowed; any other module of them in the page is a leak.
+ * A module the bundler reports with no rendered code was tree-shaken away and is not carried.
+ */
+const SYNC_DIRECTORIES = ["/effect/dist/encoding/", "/effect/dist/eventlog/"]
+const LOCAL_LOOP_PAGE = "scripts/bench/pages/counter-mufw.ts"
+const SCHEMA_FLOOR = "scripts/bench/floors/effect-schema.ts"
+/** The module of `@mufw/core` that builds the local loop: the control that the page is the one this check means. */
+const LOCAL_LOOP_MODULE = "/packages/core/src/Layers.ts"
+
+const carriedModules = (outputs: ReadonlyArray<Rollup.RollupOutput>) =>
+  outputs
+    .flatMap((bundle) => bundle.output)
+    .flatMap((file) => file.type === "chunk" ? Object.entries(file.modules) : [])
+    .filter(([, module]) => module.renderedLength > 0)
+    .map(([id]) => id)
+
+const isSyncModule = (id: string) => SYNC_DIRECTORIES.some((directory) => id.includes(directory))
+
+const effectModuleName = (id: string) => id.slice(id.indexOf("/effect/dist/") + 1)
+
+const localLoopProblems = (page: ReadonlyArray<string>, schemaFloor: ReadonlyArray<string>) => {
+  const allowed = new Set(schemaFloor.filter(isSyncModule))
+  const leaked = page.filter((id) => isSyncModule(id) && !allowed.has(id))
+  const staleFloor = allowed.size === 0 ? [`${SCHEMA_FLOOR} carries no module of ${SYNC_DIRECTORIES.join(" or ")}`] : []
+  const staleEntry = page.some((id) => id.endsWith(LOCAL_LOOP_MODULE)) ? [] : [`${LOCAL_LOOP_PAGE} carries no ${LOCAL_LOOP_MODULE}`]
+  return [...staleFloor, ...staleEntry, ...leaked.map((id) => `carries ${effectModuleName(id)}`)]
+}
+
+const checkLocalLoopPage = Effect.fn("checkLocalLoopPage")(function*() {
+  const page = carriedModules(yield* buildEntry(LOCAL_LOOP_PAGE))
+  const schemaFloor = carriedModules(yield* buildEntry(SCHEMA_FLOOR))
+  const problems = localLoopProblems(page, schemaFloor)
+  if (problems.length > 0) return yield* new BundleCheckFailure({ deployment: "local-loop", message: `local-loop: ${problems.join(", ")}` })
+  yield* Console.log("ok local-loop")
+})
+
+NodeRuntime.runMain(
+  checkLocalHalvesSource().pipe(
+    Effect.andThen(checkLocalLoopPage()),
+    Effect.andThen(Effect.forEach(expectations, checkDeployment, { discard: true }))
+  )
+)

@@ -28,6 +28,7 @@ export const summarize = (samples: ReadonlyArray<number>): Summary => {
 
 export const ms = (value: number) => value.toFixed(1)
 export const kib = (bytes: number) => (bytes / 1024).toFixed(1)
+export const mib = (bytes: number) => (bytes / 2 ** 20).toFixed(1)
 
 /** Rows padded to aligned columns, the first row being the header. */
 export const table = (rows: ReadonlyArray<ReadonlyArray<string>>) => {

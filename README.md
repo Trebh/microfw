@@ -29,24 +29,25 @@ the same pages written in plain uhtml ([performance.md](docs/architecture/perfor
 every figure, its baseline and its command are):
 
 - **Bundle.** The smallest µFW page ships about twenty times the JavaScript of the plain page, tens
-  of KiB gzipped, most of it the Effect runtime and `Schema`; part of it is synchronisation code
-  the page never runs ([TODO](docs/TODO.md#performance)).
-- **Startup.** First content takes two to three times as long, script time three to ten times.
-- **Interaction.** A click shows its step one frame later than the plain page
-  ([TODO](docs/TODO.md#performance)); a frame is far inside the 200 ms of a good INP.
+  of KiB gzipped, most of it the Effect runtime and `Schema`.
+- **Startup.** First content takes two to three times as long, script time three to seven times.
+- **Interaction.** Pages run on `layerInputScheduler`, which runs the fiber hops of a click as
+  microtasks in the task of the click, so its step is shown in the same task as in the plain page;
+  Effect's default scheduler posts each hop as a macrotask, which a browser holds until the next
+  frame. A fiber that keeps working still yields to the event loop after a few milliseconds.
 - **Steps.** A step costs a few microseconds over the reducer it runs, and an intent's round trip
   tens; both are fixed costs that matter for trivial steps and fade as the domain does more work.
 - **Server.** One definition is one serialised writer, so proposals per second do not grow with
   connections; every update sends the whole representation to every subscriber; history is
-  bounded by records, not bytes.
+  bounded by records and by an estimate of the bytes they retain.
 
 ## Packages
 
 | Package | Role |
 |---|---|
-| `@mufw/core` | Definition, nesting, pure step, ports, local layers, forwarding between definitions, graph exploration, history export and replay, model persistence, event-log synchronisation |
+| `@mufw/core` | Definition, nesting, pure step, ports, local layers, forwarding between definitions, graph exploration, history export and replay, model persistence; the `./sync` entry (`@mufw/core/sync`) holds event-log synchronisation, so a page that never syncs does not ship it |
 | `@mufw/rpc` | Wire contract and remote adapters of the ports (platform-free) |
-| `@mufw/view-uhtml` | Mounts a pure [uhtml](https://github.com/WebReflection/uhtml) v4 view (`layerMount`; `layerMountReadOnly` for an island that only reads the model); the `./ssr` entry renders a view to markup in Node (`makeSsr`) |
+| `@mufw/view-uhtml` | Mounts a pure [uhtml](https://github.com/WebReflection/uhtml) v4 view (`layerMount`; `layerMountReadOnly` for an island that only reads the model); `layerInputScheduler`, the scheduler a browser page runs on so a click is rendered in its own task; the `./ssr` entry renders a view to markup in Node (`makeSsr`) |
 | `@mufw/devtools` | Time-travel panel, history list, Stately inspector adapter |
 | `@mufw/test` | Model-based path testing (returns Effects; test-runner agnostic) |
 | `@mufw/example-auction` | A live auction running in all four browser/server placements and in a web worker |
@@ -274,7 +275,7 @@ The client is built per deployment, not as one bundle:
 | Command | Does |
 |---|---|
 | `pnpm build:client` | one `vite build --mode <deployment>` per page into `examples/auction/dist/<deployment>` (`browser-only`, `server-owned`, `server-model`, `server-actions`, `devtools`, `worker` with its worker file in `assets/`, and `demo` with all four browser/server placements), then `check:bundle` |
-| `pnpm --filter @mufw/example-auction check:bundle` | first fails on a module under `src/client` other than `placements/auctionLocal.ts` that calls `layerModelLocal`, `layerActionRunnerLocal` or `layerLoopLocal` with the auction's definition (a source scan, also run by `pnpm test`); then fails if a deployment ships a local half of the auction it should not (a `server-owned` bundle with its local model or action runner; a `devtools` bundle with any of them, the auction view, the wallet or the travel panel; a `worker` page bundle with any of them, or whose worker file holds the wallet or the view) or lacks one it should; every bundle but `devtools` keeps the wallet's local loop |
+| `pnpm --filter @mufw/example-auction check:bundle` | first fails on a module under `src/client` other than `placements/auctionLocal.ts` that calls `layerModelLocal`, `layerActionRunnerLocal` or `layerLoopLocal` with the auction's definition (a source scan, also run by `pnpm test`); then fails if a page that imports only the local loop (`scripts/bench/pages/counter-mufw.ts`) bundles a module of `effect/eventlog` or `effect/encoding` beyond the ones `Schema` itself needs; then fails if a deployment ships a local half of the auction it should not (a `server-owned` bundle with its local model or action runner; a `devtools` bundle with any of them, the auction view, the wallet or the travel panel; a `worker` page bundle with any of them, or whose worker file holds the wallet or the view) or lacks one it should; every bundle but `devtools` keeps the wallet's local loop |
 | `pnpm --filter @mufw/example-auction compare:transports` | starts a server of its own on a free port from 4700 to 4799, builds and serves the two bundled ticker pages, and prints first paint and update latency (median, p95) and client JS size for the websocket, HTTP (NDJSON) and HTML stream in headless Chromium; needs `pnpm exec playwright install chromium` once; `MUFW_COMPARE_LOADS`, `MUFW_COMPARE_UPDATES`, `MUFW_COMPARE_WARMUP` set the sample sizes |
 | `pnpm --filter @mufw/example-auction bench:bundle` | builds in memory, minified, the Effect floors, the four bench pages (`scripts/bench/pages/`: a counter and a 1000-row list, each in plain uhtml and in µFW) and every deployment, and prints raw, gzip and brotli size per entry, the minified size per origin (Effect module, `@mufw/*`, uhtml, Stately, app) and the 20 largest modules |
 | `pnpm --filter @mufw/example-auction bench:loop` | in Node, the cost of one step (plain reducer, `applyProposal`, `ModelPort.present`, `IntentPort.dispatch` to its record) for the bench counter, the bench list and the auction, concurrent presenters, representation subscribers, schema and JSON boundary costs, heap per history record; `BENCH_SECONDS`, `BENCH_OPS`, `BENCH_WARMUP_SECONDS` |

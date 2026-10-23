@@ -1,6 +1,6 @@
 import { BrowserRuntime } from "@effect/platform-browser"
 import { type IntentOf, layerLoopLocal, type RepresentationOf } from "@mufw/core"
-import { layerMount, type View } from "@mufw/view-uhtml"
+import { layerInputScheduler, layerMount, type View } from "@mufw/view-uhtml"
 import { Effect, Layer } from "effect"
 import { html } from "uhtml"
 import { Counter, CounterPorts } from "../counter.ts"
@@ -15,6 +15,6 @@ const page = layerMount(CounterPorts, {
   root: document.getElementById("app")!,
   view,
   onRefused: () => Effect.void
-}).pipe(Layer.provide(layerLoopLocal(Counter, CounterPorts)))
+}).pipe(Layer.provide(layerLoopLocal(Counter, CounterPorts)), Layer.provide(layerInputScheduler))
 
 BrowserRuntime.runMain(Layer.launch(page))

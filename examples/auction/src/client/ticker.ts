@@ -1,6 +1,6 @@
 import { BrowserRuntime } from "@effect/platform-browser"
 import type { ModelPort } from "@mufw/core"
-import { layerMountReadOnly } from "@mufw/view-uhtml"
+import { layerInputScheduler, layerMountReadOnly } from "@mufw/view-uhtml"
 import { Layer, type Schema } from "effect"
 import type { Auction } from "../domain/Auction.ts"
 import { Ports } from "../ports.ts"
@@ -23,7 +23,8 @@ export interface TickerTransport {
 export const runTicker = (root: Element, transport: TickerTransport) => {
   const view = makeTickerView(transport.source)
   const ticker = layerMountReadOnly(Ports, { root, view }).pipe(
-    Layer.provide(transport.placement)
+    Layer.provide(transport.placement),
+    Layer.provide(layerInputScheduler)
   )
   BrowserRuntime.runMain(Layer.launch(ticker))
 }

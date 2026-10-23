@@ -10,7 +10,7 @@ import {
   type LeaseState,
   SyncLog,
   type SyncCheckpoint
-} from "../src/index.ts"
+} from "../src/SyncEntry.ts"
 import { Counter } from "./fixtures/Counter.ts"
 import { countsOf, harness, instanceOn, stoppableOn } from "./fixtures/SyncHarness.ts"
 import { settle } from "./support.ts"

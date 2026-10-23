@@ -1,6 +1,6 @@
 # The SAM loop
 
-Living document. Source of truth: `packages/core/src/Definition.ts`, `Step.ts`, `History.ts`, `Layers.ts`, `Persistence.ts`, `Sync.ts`, `Nest.ts`.
+Living document. Source of truth: `packages/core/src/Definition.ts`, `Step.ts`, `History.ts`, `Layers.ts`, `Persistence.ts`, `Sync.ts`, `SyncLease.ts`, `SyncStorage.ts`, `SyncPersistence.ts`, `Nest.ts`.
 
 ## Definition
 
@@ -135,6 +135,19 @@ Interruption (a travel, or the scope closing) is not a defect and is not logged.
   (`Context.Reference<number>`, default 1000), the initial record included in the count. When a
   commit exceeds the limit the oldest records after seq 0 are evicted. A limit below 2 keeps the
   initial record and the newest one.
+- The records are bounded by size as well: `HistoryRetainedSize` (`Context.Reference<number>`, default
+  64 MiB, in approximate bytes, `Infinity` for none). Each record holds its own model, and a collection
+  that a step copies is held once per record, so a model that grows (the auction's `bids`) would make
+  a count bound grow with it. A record's size is `footprint` of its model and representation against
+  its predecessor's: the walk stops at every node that is `===` to the node at the same path, counts
+  16 bytes per array or object plus 8 per slot or key and a string's length, and costs the part the
+  step changed, never a full encoding. An unchanged model costs nothing; a copy of an N-element
+  array costs about `8 * N`. The running total is kept as records come and go. After a commit the
+  oldest records after seq 0 are evicted while the count exceeds `HistoryLimit` or the total exceeds
+  the size bound; seq 0 (not counted: it is held whatever its size) and the newest record are always
+  kept, even when that record alone is over the bound. A `travel` record costs nothing, since it
+  shares the model of the record it travelled to. The size is an estimate: evicting a record can
+  leave its successor holding parts it was counted as sharing with it.
 - Seqs are never reused: the retained records are seq 0 followed by a consecutive window starting at
   the oldest kept seq. `records` replays them, not the evicted gap.
 - A subscriber to `records` is bounded too: live records are published through a sliding window of
@@ -241,6 +254,9 @@ memory, a directory of files or any other implementation.
 
 `Sync.ts` runs one definition on several servers that converge on one model. The mechanism is
 `effect/eventlog`; core only requires the services, and the application picks the transport.
+Everything in this section is imported from `@mufw/core/sync` (`SyncEntry.ts`), not from the
+`@mufw/core` entry: `effect/eventlog` and `effect/encoding/SchemaBinary` come with it, and a page that
+only runs the local loop must not ship them (`check:bundle` fails when it does).
 
 **The log is the sequencer.** Acceptors are pure but not commutative (a bid is accepted or rejected
 against the highest bid so far), so the instances must apply the same proposals in the same order.
@@ -260,7 +276,7 @@ writes reach its `Storage` (`remoteSequence`, assigned inside one transaction). 
 | `layerSyncAuthorization` | `EventLogServerAuthorization`: any identity may read; a write is refused (`Unauthorized` to the client) unless every entry is a `Proposal`, a `Joined` or a `Lease`. It does not say who may write: the endpoint is for trusted instances only |
 | `layerSyncLogStorage(def)` | a `SyncLog` over the server's own `Storage`: the host process appends and reads in-process, in the same transaction and sequence as the RPC writers; the log's id is the storage's |
 | `layerSyncLogClient(def)`, `layerSyncLogRemote(def)` | a `SyncLog` over `EventLogRemote.makeUnencrypted` and a generated identity; the first needs `EventLogRemoteClient`, the second the client `RpcClient.Protocol` (websocket, `RpcSerialization.layerSchemaBinary`: entries are binary) |
-| `layerLoopSyncedPersisted(def, ports, options?)`, `loadCheckpoint(def, key?)` | `layerLoopSynced` that resumes from the stored checkpoint and stores one after each applied entry (see [below](#persisting-an-instance-of-a-log)); requires `KeyValueStore` and `SyncLog` |
+| `layerLoopSyncedPersisted(def, ports, options?)`, `loadCheckpoint(def, key?)` (`SyncPersistence.ts`) | `layerLoopSynced` that resumes from the stored checkpoint and stores one after each applied entry (see [below](#persisting-an-instance-of-a-log)); requires `KeyValueStore` and `SyncLog` |
 | `AutoActionsGate` | `Context.Service` with `open: Effect<boolean>`: the actions drain asks it each time an automatic intent is about to start and drops the intent unless it is open and `AutoActions` is true. `layerLoopSynced` provides it, open while the instance holds the lease |
 | `leaseOutcome`, `applyLease`, `LeaseState`, `Lease`, `noLease`, `LeaseTimings` (`SyncLease.ts`) | the pure rule every instance applies to lease entries, the schemas of the lease in the log and in a checkpoint, and the timings (`renewEvery`, `timeout`) that `options.lease` takes |
 

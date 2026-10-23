@@ -29,8 +29,8 @@ import { summarize, table } from "./stats.ts"
  *    server needed to catch up after the load stopped, are read from `History`.
  * 4. Fan-out: S websocket subscribers to `Representations`, one `Present` every 20 ms; the delay
  *    from sending an update to the moment the last subscriber has a representation that includes it.
- * 5. Server memory (RSS and V8 heap used) when idle, after 1000 steps (the history's retention
- *    limit) and after 5000.
+ * 5. Server memory (RSS and V8 heap used) when idle, after 1000 steps (the history's record
+ *    limit) and after 5000; the history also stops at `HistoryRetainedSize` of estimated size.
  * 6. `Present` against a synced host and against a joiner of its log (`MUFW_SYNC`), next to the
  *    same client against a server without sync.
  *
@@ -564,12 +564,12 @@ const presentTable = (settings: Settings, connectionCounts: ReadonlyArray<number
   })
 
 const presentSequential = (settings: Settings) =>
-  heading(1, "Present round trip, one client, one bid after the other: latency in ms per step, steps/s, server CPU and RSS during the window. Every step copies the model's bids array and each of the 1000 history records holds its own model, so cost grows with the number of bids in the model").pipe(
+  heading(1, "Present round trip, one client, one bid after the other: latency in ms per step, steps/s, server CPU and RSS during the window. Every step copies the model's bids array, so cost grows with the number of bids in the model; the history keeps up to 1000 records and 64 MiB of estimated retained size (HistoryRetainedSize), so the copies it holds are bounded by whichever limit is reached first").pipe(
     Effect.andThen(presentTable(settings, [1]))
   )
 
 const presentConcurrent = (settings: Settings) =>
-  heading(2, "Present with N connections, each sequential, bids from one shared counter: total steps/s, latency in ms per step across all connections. Every step copies the model's bids array and each of the 1000 history records holds its own model, so cost grows with the number of bids in the model").pipe(
+  heading(2, "Present with N connections, each sequential, bids from one shared counter: total steps/s, latency in ms per step across all connections. Every step copies the model's bids array, so cost grows with the number of bids in the model; the history keeps up to 1000 records and 64 MiB of estimated retained size (HistoryRetainedSize), so the copies it holds are bounded by whichever limit is reached first").pipe(
     Effect.andThen(presentTable(settings, settings.presenters))
   )
 
@@ -892,7 +892,7 @@ const memoryScenario = (settings: Settings) =>
   Effect.gen(function*() {
     yield* heading(
       5,
-      "Server memory in MiB (RSS and V8 heap in use, no garbage collection forced) as one client sends bids; the history keeps 1000 records, but the model's bids array grows with every accepted bid"
+      "Server memory in MiB (RSS and V8 heap in use, no garbage collection forced, so garbage is included) as one client sends bids; the history keeps up to 1000 records and 64 MiB of estimated retained size (HistoryRetainedSize), while the model's bids array grows with every accepted bid"
     )
     const rows = yield* memoryRows(settings.memorySteps)
     yield* Console.log(table([MEMORY_HEADER, ...rows]))

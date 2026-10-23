@@ -23,6 +23,7 @@ import {
   type RepresentationOf,
   type ServicesOf
 } from "./Definition.ts"
+import { footprint } from "./Footprint.ts"
 import type { HistoryPortShape, IntentBusShape, IntentEnvelope, ModelPortShape, Ports } from "./Ports.ts"
 import { applyProposal, NoSuchStep, type StepKind, type StepRecord } from "./Step.ts"
 
@@ -49,10 +50,31 @@ export class AutoActionsGate extends Context.Service<AutoActionsGate, {
  * How many records `layerModelLocal` keeps, the initial record (seq 0) included. Seq 0 is never
  * evicted, so a consumer can always reset with `travelTo(0)`; after it the oldest records go
  * first and `travelTo` them fails with `NoSuchStep`. Seqs are never reused. A limit below 2
- * keeps the initial record and the newest one.
+ * keeps the initial record and the newest one. `HistoryRetainedSize` bounds the same records by
+ * size.
  */
 export const HistoryLimit = Context.Reference<number>("@mufw/core/HistoryLimit", {
   defaultValue: () => 1000
+})
+
+/**
+ * How much the retained records after seq 0 may cost together, in approximate bytes (default
+ * 64 MiB). A record costs the part of its model and representation that its predecessor does not
+ * already hold, because an unchanged element is shared by reference: a step that changes a counter
+ * costs a few dozen bytes, a step that copies an N-element collection costs about `8 * N`, so a
+ * model that grows makes each record dearer and fewer of them fit. After a commit the oldest
+ * records after seq 0 are evicted while the count exceeds `HistoryLimit` or the total exceeds this
+ * size; seq 0 (held whatever its size, so not counted) and the newest record are always kept, even
+ * when that record alone exceeds the size. A `travel` record costs nothing: it shares the model of
+ * the record it travelled to.
+ *
+ * The figure is an estimate (see `footprint`), not a measure of the heap. Evicting a record can
+ * leave its successor holding parts it was counted as sharing with it, so the retained heap may
+ * exceed the bound by the parts a still-retained record introduced and an evicted one shared.
+ * `Infinity` disables the bound.
+ */
+export const HistoryRetainedSize = Context.Reference<number>("@mufw/core/HistoryRetainedSize", {
+  defaultValue: () => 64 * 1024 * 1024
 })
 
 /**
@@ -95,19 +117,28 @@ interface ModelStore<D extends AnyDefinition> {
   readonly representation: SubscriptionRef.SubscriptionRef<RepresentationOf<D>>
   /** Oldest first: the initial record, then the retained window, whose seqs are consecutive. */
   readonly records: Array<StepRecord<D>>
+  /** `sizes[i]` is what `records[i]` adds to retention (`footprint`); seq 0 and a `travel` record add 0. */
+  readonly sizes: Array<number>
+  /** The sum of `sizes`: what the retained records cost beyond the initial record. */
+  retainedSize: number
   readonly retention: number
+  readonly maxRetainedSize: number
   readonly published: PubSub.PubSub<StepRecord<D>>
 }
 
 const makeStore = <D extends AnyDefinition>(def: D, initial: ModelOf<D>) =>
   Effect.gen(function*() {
     const limit = yield* HistoryLimit
+    const maxRetainedSize = yield* HistoryRetainedSize
     const backlog = yield* HistoryBacklog
     const store: ModelStore<D> = {
       model: yield* Ref.make<ModelOf<D>>(initial),
       representation: yield* SubscriptionRef.make<RepresentationOf<D>>(def.state(initial)),
       records: [],
+      sizes: [],
+      retainedSize: 0,
       retention: Math.max(2, limit),
+      maxRetainedSize,
       published: yield* PubSub.sliding<StepRecord<D>>(Math.max(1, backlog))
     }
     return store
@@ -129,19 +160,43 @@ const recordAt = <D extends AnyDefinition>(store: ModelStore<D>, seq: number) =>
   return store.records[1 + seq - oldest.seq]
 }
 
+/** What a step adds to retention: the part of its model and representation its predecessor does not hold. */
+const retainedBy = <D extends AnyDefinition>(transition: Transition<D>, previous: StepRecord<D> | undefined) => {
+  if (transition.kind !== "step" || previous === undefined) return 0
+  return footprint(transition.model, previous.model) + footprint(transition.representation, previous.representation)
+}
+
+const exceedsBounds = <D extends AnyDefinition>(store: ModelStore<D>, evicted: number, freed: number) => {
+  const remaining = store.records.length - evicted
+  if (remaining > store.retention) return true
+  return remaining > 2 && store.retainedSize - freed > store.maxRetainedSize
+}
+
+/** Drops the oldest records after seq 0 until both bounds hold, keeping seq 0 and the newest record. */
 const evictOldest = <D extends AnyDefinition>(store: ModelStore<D>) => {
-  const excess = store.records.length - store.retention
-  if (excess > 0) store.records.splice(1, excess)
+  let evicted = 0
+  let freed = 0
+  while (exceedsBounds(store, evicted, freed)) {
+    freed += store.sizes[1 + evicted] ?? 0
+    evicted++
+  }
+  if (evicted === 0) return
+  store.records.splice(1, evicted)
+  store.sizes.splice(1, evicted)
+  store.retainedSize -= freed
 }
 
 const commit = <D extends AnyDefinition>(store: ModelStore<D>, transition: Transition<D>) =>
   Effect.gen(function*() {
     const at = yield* Clock.currentTimeMillis
-    const lastSeq = store.records.at(-1)?.seq ?? -1
-    const record: StepRecord<D> = { seq: lastSeq + 1, at, ...transition }
+    const previous = store.records.at(-1)
+    const record: StepRecord<D> = { seq: (previous?.seq ?? -1) + 1, at, ...transition }
+    const size = retainedBy(transition, previous)
     yield* Ref.set(store.model, transition.model)
     yield* SubscriptionRef.set(store.representation, transition.representation)
     store.records.push(record)
+    store.sizes.push(size)
+    store.retainedSize += size
     evictOldest(store)
     yield* PubSub.publish(store.published, record)
   })

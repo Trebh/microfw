@@ -7,6 +7,7 @@ import {
   type HistoryPort,
   type HistoryPortShape,
   HistoryLimit,
+  HistoryRetainedSize,
   type IntentBus,
   type IntentOf,
   type IntentPort,
@@ -27,7 +28,7 @@ import { Auction, type Proposal as AuctionProposal } from "../src/domain/Auction
 import { Amount, Bidder } from "../src/domain/Values.ts"
 import { Counter, CounterPorts } from "./bench/counter.ts"
 import { LIST_ROWS, List, ListPorts } from "./bench/list.ts"
-import { kib, ms, summarize, table } from "./stats.ts"
+import { kib, mib, ms, summarize, table } from "./stats.ts"
 
 /**
  * In-process microbenchmarks of the SAM loop (`@mufw/core`, `AutoActions` false), for three
@@ -43,7 +44,9 @@ import { kib, ms, summarize, table } from "./stats.ts"
  *   until the step's record has been seen by a subscriber of `HistoryPort.records`;
  * - case 5: K fibers presenting at once; case 6: S subscribers to the representations while
  *   presenting; case 7: schema decode/encode of the values an RPC hop carries; case 8: heap held by
- *   the retained history; case 9: what an Effect costs on its own.
+ *   the retained history, for the Counter and the List at `HistoryLimit` and for the Auction after
+ *   5000 and 20000 bids with the default `HistoryRetainedSize` and with `Infinity` (count only);
+ *   case 9: what an Effect costs on its own.
  *
  * Not measured: transports, rendering, `nap`-driven automatic actions, a real action's I/O, a
  * second process, cold start, any memory but the heap read in case 8.
@@ -67,6 +70,11 @@ import { kib, ms, summarize, table } from "./stats.ts"
  *   not suspend, not under suspending steps.
  * - Case 4 includes one subscriber to `HistoryPort.records`, which is how it knows the step has
  *   been applied (`dispatch` returns once the intent is queued).
+ * - Case 8 reads the heap after two forced collections, so garbage is excluded and what remains is
+ *   what the history keeps alive plus the loop's own state. `HistoryRetainedSize` bounds an
+ *   estimate of the retained size (`Footprint.ts`), not the heap: the heap it leaves measures how
+ *   close the estimate is. The `Infinity` rows keep `HistoryLimit` records of a model that grows
+ *   with every bid.
  */
 
 const UNCAPPED = Number.MAX_SAFE_INTEGER
@@ -628,6 +636,42 @@ const retentionRow = (name: string, retention: Retention) => {
   ]
 }
 
+const AUCTION_RETENTION_BIDS = [5000, 20_000] as const
+
+/** The auction's loop with the history's size bound set to `bound`. */
+const auctionRetentionSubject = (bound: number): Subject<typeof Auction> => ({
+  ...auctionSubject,
+  layer: auctionSubject.layer.pipe(Layer.provide(Layer.succeed(HistoryRetainedSize, bound)))
+})
+
+const presentBids = (loop: Loop<typeof Auction>, bids: number) =>
+  Effect.forEach(
+    Array.from({ length: bids }, (_, index) => index),
+    (index) => loop.model.present(bidNumber(index)),
+    { discard: true }
+  )
+
+/** One fresh auction loop given the opening and `bids` bids; the opening is in `before`, as the initial record is. */
+const auctionRetentionRow = (bids: number, bound: number) =>
+  inFreshLoop(auctionRetentionSubject(bound), (loop) =>
+    Effect.gen(function*() {
+      const before = yield* heapUsed
+      yield* presentBids(loop, bids)
+      // The stream replays the retained records and ends at the newest.
+      const newestSeq = auctionSubject.prelude.length + bids
+      const kept = yield* Stream.runCount(loop.history.records.pipe(Stream.takeUntil((record) => record.seq >= newestSeq)))
+      const grown = (yield* heapUsed) - before
+      return [
+        String(bids),
+        Number.isFinite(bound) ? `${mib(bound)} MiB` : String(bound),
+        String(kept),
+        mib(before),
+        mib(before + grown),
+        mib(grown),
+        kib(grown / kept)
+      ]
+    }))
+
 /** The heap of one model copied row by row: what a record would cost if rows were not shared. */
 const unsharedListCopy = Effect.gen(function*() {
   const before = yield* heapUsed
@@ -840,6 +884,20 @@ const retentionGroup = Effect.gen(function*() {
   )
   yield* Console.log(
     `Reference: copying the List's ${copy.rows} rows one by one costs ${kib(copy.bytes)} KiB (${Math.round(copy.bytes / copy.rows)} bytes per row). A record whose rows were not shared would cost about that much; the bytes/record above are what the loop keeps, rows shared between records.`
+  )
+  const retainedSize = yield* HistoryRetainedSize
+  const auctionRows: Array<Array<string>> = []
+  for (const bids of AUCTION_RETENTION_BIDS) {
+    for (const bound of [retainedSize, Number.POSITIVE_INFINITY]) {
+      auctionRows.push(yield* auctionRetentionRow(bids, bound))
+    }
+  }
+  yield* report(
+    `### Case 8, history memory of a growing model: the Auction after the opening and N bids, heap after garbage collection, MiB (HistoryLimit ${limit}; HistoryRetainedSize ${mib(retainedSize)} MiB; "Infinity" keeps by count only)`,
+    [
+      ["bids", "HistoryRetainedSize", "records kept", "heap before MiB", "heap after MiB", "grown MiB", "KiB/record"],
+      ...auctionRows
+    ]
   )
 })
 

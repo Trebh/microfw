@@ -1,6 +1,6 @@
 import { BrowserRuntime } from "@effect/platform-browser"
 import { type IntentOf, layerLoopLocal, type RepresentationOf } from "@mufw/core"
-import { layerMount, type View } from "@mufw/view-uhtml"
+import { layerInputScheduler, layerMount, type View } from "@mufw/view-uhtml"
 import { Effect, Layer } from "effect"
 import { html } from "uhtml"
 import { List, ListPorts } from "../list.ts"
@@ -20,6 +20,6 @@ const page = layerMount(ListPorts, {
   root: document.getElementById("app")!,
   view,
   onRefused: () => Effect.void
-}).pipe(Layer.provide(layerLoopLocal(List, ListPorts)))
+}).pipe(Layer.provide(layerLoopLocal(List, ListPorts)), Layer.provide(layerInputScheduler))
 
 BrowserRuntime.runMain(Layer.launch(page))

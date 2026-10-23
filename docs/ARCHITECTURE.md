@@ -15,7 +15,7 @@ Living document: change it in the same commit that changes what it describes. De
 ```mermaid
 flowchart LR
   subgraph Driving adapters
-    View["@mufw/view-uhtml<br/>layerMount · layerMountReadOnly"]
+    View["@mufw/view-uhtml<br/>layerMount · layerMountReadOnly · layerInputScheduler"]
     Drivers["@mufw/test<br/>presentDriver / intentDriver / domDriver"]
     Handlers["@mufw/rpc<br/>layerHandlers (server side)"]
   end
@@ -66,13 +66,16 @@ flowchart BT
 ```
 
 - `@mufw/core` depends on `effect` alone and contains no platform, DOM or transport code.
+  Its synchronisation code (`layerLoopSynced`, the lease, the event-log storage, `layerLoopSyncedPersisted`)
+  is a second entry, `@mufw/core/sync`: it needs `effect/eventlog` and `effect/encoding`, which a bundler
+  cannot drop from the main entry, so a page that only runs the local loop imports none of it.
 - `@mufw/rpc` defines the wire contract and remote adapters but no transport; the application
   picks the protocol (websocket, HTTP, worker) and the serialization.
 - Adapter packages never depend on each other.
 - Platform packages (`@effect/platform-node`, `@effect/platform-browser`) appear only in the example.
 
-Packages are consumed as TypeScript sources (`exports: { ".": "./src/index.ts" }`); vite, vitest and
-tsx compile them on the fly. There is no build step.
+Packages are consumed as TypeScript sources (`exports: { ".": "./src/index.ts" }`, plus `"./sync"` for
+`@mufw/core`); vite, vitest and tsx compile them on the fly. There is no build step.
 
 ## Where effects are run
 
@@ -80,14 +83,14 @@ Code stays inside `Effect`/`Stream`/`Layer` across every package. Effects are ru
 
 | Boundary | Where | How |
 |---|---|---|
-| Browser page | `examples/auction/src/client/app.ts` (`runPage`, called by each page's entry point) | `BrowserRuntime.runMain(Layer.launch(page))` |
-| Browser island | `examples/auction/src/client/ticker.ts` (`runTicker`, called by the demo page's entry point) | `BrowserRuntime.runMain(Layer.launch(ticker))` |
-| Devtools page | `examples/auction/src/client/devtools.ts` | `BrowserRuntime.runMain(Layer.launch(page))` |
+| Browser page | `examples/auction/src/client/app.ts` (`runPage`, called by each page's entry point) | `BrowserRuntime.runMain(Layer.launch(page))`, with the page's layers wrapped last in `layerInputScheduler` |
+| Browser island | `examples/auction/src/client/ticker.ts` (`runTicker`, called by the demo page's entry point) | `BrowserRuntime.runMain(Layer.launch(ticker))`, on `layerInputScheduler` |
+| Devtools page | `examples/auction/src/client/devtools.ts` | `BrowserRuntime.runMain(Layer.launch(page))`, on `layerInputScheduler` |
 | Stream frame | `examples/auction/src/client/streamEmbed.ts` (`runStreamFrame`, called by the demo page's entry point) | `BrowserRuntime.runMain(show)` |
 | Node server | `examples/auction/src/server.ts` | `Layer.launch(...).pipe(Effect.raceFirst(Deferred.await(syncStopped)), NodeRuntime.runMain)`: a synced instance whose log was replaced stops the process |
 | Web worker | `examples/auction/src/client/auctionWorker.ts`, the worker's composition root | `BrowserRuntime.runMain(Layer.launch(workerHost.pipe(Layer.provide(BrowserWorkerRunner.layer))))` |
 | Live tests and scripts | `examples/auction/test/live.ts`, `test/walletLive.ts`, `test/syncLive.ts`, `test/syncRestartLive.ts`, `test/syncFailoverLive.ts`, `scripts/*.ts` | `NodeRuntime.runMain(program)` |
-| DOM events | `layerMount` dispatch, `layerPanel` and `layerHistoryList` row click and export click | `FiberSet.makeRuntime` captured in the layer: the fiber inherits the layer's services and references and is interrupted with its scope |
+| DOM events | `layerMount` dispatch, `layerPanel` and `layerHistoryList` row click and export click | `FiberSet.makeRuntime` captured in the layer: the fiber inherits the layer's services and references (the `Scheduler` among them) and is interrupted with its scope |
 | Tests | every `*.test.ts` | `@effect/vitest` `it.effect` |
 
 ## Data at the edges
@@ -212,6 +215,16 @@ Each entry states the choice and the constraint behind it.
 - **A refused dispatch reaches the page as data, apart from the representation.** `layerMount`
   hands a `DispatchRefused` to its `onRefused` effect; the example reports it into a `Refusals`
   service that a notice layer renders, so the domain and the SAM representation stay unaware.
+- **A browser page runs its loop on `layerInputScheduler`, not Effect's default scheduler.** A click
+  reaches the render through two fiber hops (the intent queue's wake of the actions-drain fiber and
+  the fork of the present). The default `MixedScheduler` posts each hop as a macrotask, and Chromium
+  holds one posted from an input event until the next frame. The input scheduler runs the hops as
+  microtasks, in the task of the click, until fibers have worked for `inputBudgetMillis` (5 ms);
+  past it each hop is a macrotask until one runs, so a busy fiber cannot starve input or paint. A
+  pure microtask scheduler (`MixedScheduler("sync")`) was rejected for that starvation. The layer
+  must wrap the whole composition (`Layer.provide` last): a queue keeps the dispatcher of the
+  fiber that created it, so only layers built beneath the scheduler reach it, including the loop
+  of a placement. The web worker and the server have no input and keep the default.
 - **The session token is a request header, not a connection property.** A browser websocket cannot
   set headers, but an RPC request can, so the client middleware adds the token to each request and
   one connection could serve several identities.
@@ -225,8 +238,11 @@ Each entry states the choice and the constraint behind it.
   Tagging proposals with a seq would change the `Present` payload, and a remote model could not
   tell a stale proposal from a concurrent one; `nap` always runs next to the bus, so the model
   can cancel the fibers itself under its permit.
-- **History is bounded by count (`HistoryLimit`, default 1000) and always keeps seq 0.** Seqs are
-  never reused, and an evicted seq is a `NoSuchStep` like an unknown one.
+- **History is bounded by count (`HistoryLimit`, default 1000) and by estimated size
+  (`HistoryRetainedSize`, default 64 MiB), and always keeps seq 0.** A record holds its own model,
+  so a model that grows makes a count bound grow with it; the size is what each record adds beyond
+  its predecessor, measured at commit. Seqs are never reused, and an evicted seq is a `NoSuchStep`
+  like an unknown one.
 - **A stalled reader costs the server a bound, and the history's retention is what backs it.**
   `records` subscribers share a sliding window (`HistoryBacklog`) and read what they missed from the
   retained records, because no record may be skipped; served `Representations` slide to the newest
