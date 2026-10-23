@@ -1,0 +1,294 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>µFW — one-page design</title>
+<style>
+  @page { size: 594mm 420mm; margin: 0; }
+
+  :root {
+    --ink: #1b1f2a;
+    --muted: #5b6372;
+    --faint: #9aa1ad;
+    --paper: #f6f3ec;
+    --card: #ffffff;
+    --rule: #e4ded2;
+    --pure: #2563eb;
+    --effect: #e8590c;
+    --data: #7c3aed;
+    --seam: #d6336c;
+    --adapter: #64748b;
+    --ok: #2f9e44;
+    --g1: linear-gradient(135deg, #2563eb, #7c3aed);
+    --g2: linear-gradient(135deg, #d6336c, #e8590c);
+    --g3: linear-gradient(135deg, #2f9e44, #0ca678);
+    --shadow: 0 .3mm .8mm rgba(27,31,42,.06), 0 2.4mm 7mm rgba(27,31,42,.07);
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+    --sans: -apple-system, "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: #d9d4c9; }
+  body { font-family: var(--sans); color: var(--ink); -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+  .sheet {
+    width: 594mm; height: 420mm; margin: 0 auto; padding: 11mm 12mm 7mm;
+    background:
+      radial-gradient(circle at 8% 6%, rgba(37,99,235,.10), transparent 32%),
+      radial-gradient(circle at 46% 0%, rgba(124,58,237,.07), transparent 28%),
+      radial-gradient(circle at 96% 96%, rgba(232,89,12,.08), transparent 30%),
+      radial-gradient(circle at 70% 48%, rgba(214,51,108,.05), transparent 30%),
+      radial-gradient(rgba(27,31,42,.075) .22mm, transparent .3mm) 0 0 / 4.5mm 4.5mm,
+      var(--paper);
+    display: grid; grid-template-rows: 47mm 1fr 76mm 3mm; gap: 6mm;
+    font-size: 3.4mm; line-height: 1.34;
+  }
+  @media screen { .sheet { margin: 10mm auto; box-shadow: 0 2mm 8mm rgba(0,0,0,.18); } }
+
+  code, .mono { font-family: var(--mono); font-size: .9em; }
+  h1, h2, h3 { margin: 0; font-family: var(--serif); font-weight: 700; letter-spacing: -.01em; }
+  p { margin: 0; }
+  ul { margin: 0; padding: 0; list-style: none; }
+
+  .eyebrow { font-family: var(--sans); font-size: 2.8mm; font-weight: 800; letter-spacing: .16em;
+             text-transform: uppercase; color: var(--muted); margin-bottom: 2mm; }
+
+  /* Header */
+  header { display: grid; grid-template-columns: 118mm 1fr 236mm; gap: 11mm; align-items: center; }
+  .brand h1 { display: inline-block; padding-right: 1mm; font-size: 31mm; line-height: .86; letter-spacing: -.03em;
+              background: linear-gradient(100deg, #2563eb 0%, #7c3aed 38%, #d6336c 70%, #e8590c 100%);
+              -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .brand p { font-size: 4.4mm; margin-top: 3mm; color: var(--muted); }
+  .brand p b { color: var(--ink); }
+  .problem p { font-family: var(--serif); font-size: 5.5mm; line-height: 1.3; }
+  .problem p em { font-style: normal; background: linear-gradient(transparent 60%, rgba(214,51,108,.22) 60%); }
+  .bets { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3.5mm; }
+  .bet { background: var(--card); border-radius: 3.2mm; box-shadow: var(--shadow); padding: 3.6mm 4mm 3.8mm;
+         position: relative; overflow: hidden; }
+  .bet::before { content: ""; position: absolute; inset: 0 0 auto 0; height: 1.1mm; background: var(--g); }
+  .bet b { display: block; font-family: var(--serif); font-size: 4.5mm; line-height: 1.15; margin: 2mm 0 1.2mm; }
+  .bet span.sub { display: block; color: var(--muted); font-size: 3mm; line-height: 1.3; }
+  .num { width: 8mm; height: 8mm; border-radius: 50%; background: var(--g); color: #fff;
+         display: grid; place-items: center; font-family: var(--serif); font-weight: 700; font-size: 4.6mm;
+         box-shadow: 0 .6mm 1.6mm rgba(27,31,42,.18); }
+  .p1 { --g: var(--g1); } .p2 { --g: var(--g2); } .p3 { --g: var(--g3); }
+
+  /* Cards */
+  .card { background: var(--card); border-radius: 4mm; box-shadow: var(--shadow); position: relative; overflow: hidden;
+          padding: 5.5mm 6.5mm 5mm; display: flex; flex-direction: column; min-height: 0; }
+  .card::before { content: ""; position: absolute; inset: 0 0 auto 0; height: 1.3mm; background: var(--g); }
+  .panel-head { display: grid; grid-template-columns: 9mm 1fr; gap: 3.2mm; align-items: start; margin-bottom: 2mm; }
+  .panel-head .num { width: 9mm; height: 9mm; font-size: 5.2mm; }
+  .panel-head h2 { font-size: 7.2mm; line-height: 1.05; }
+  .panel-head p { color: var(--muted); font-size: 3.4mm; margin-top: 1.2mm; }
+  .hero .panel-head { grid-template-columns: 11mm 1fr; }
+  .hero .panel-head .num { width: 11mm; height: 11mm; font-size: 6.4mm; }
+  .hero .panel-head h2 { font-size: 9.6mm; }
+  .hero .panel-head p { font-size: 3.9mm; max-width: 270mm; }
+
+  main { display: grid; grid-template-columns: 322mm 1fr; gap: 9mm; min-height: 0; }
+  .right { display: grid; grid-template-rows: 1fr 1fr; gap: 6mm; min-height: 0; }
+  .card svg.fig { flex: 1; width: 100%; min-height: 0; }
+  .card svg.natural { width: 100%; height: auto; }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 1.5mm 6.5mm; font-size: 3mm; color: var(--muted); margin: 0 0 0 14.2mm; }
+  .legend span { display: inline-flex; align-items: center; gap: 1.6mm; }
+  .legend svg { width: 7mm; height: 5mm; }
+
+  .rules { display: grid; gap: 1.3mm; font-size: 3.15mm; margin-top: 2.2mm; }
+  .rules li { padding-left: 4.6mm; position: relative; }
+  .rules li::before { content: ""; position: absolute; left: 0; top: 1.05mm; width: 2.2mm; height: 2.2mm; border-radius: .6mm; background: var(--g2); }
+  .rules li.ok::before { background: var(--g3); }
+  .bang { display: inline-grid; place-items: center; width: 3.2mm; height: 3.2mm; border-radius: 50%; background: var(--seam);
+          color: #fff; font-weight: 900; font-size: 2.3mm; vertical-align: .1mm; }
+
+  /* Strip */
+  .strip { display: grid; grid-template-columns: 150mm 92mm 104mm 100mm 1fr; gap: 6mm; min-height: 0; }
+  .strip .card { padding: 4.6mm 5mm 4mm; font-size: 3mm; border-radius: 3.4mm; }
+  .strip .card::before { height: 1mm; }
+  .strip h3 { font-size: 4.6mm; margin-bottom: 2mm; }
+  .strip h3 small { font-family: var(--sans); font-size: 2.7mm; font-weight: 400; color: var(--muted); margin-left: 1.5mm; }
+  .strip ul { display: grid; gap: 1.1mm; }
+  .strip li { padding-left: 3.4mm; position: relative; }
+  .strip li::before { content: "–"; position: absolute; left: 0; color: var(--faint); }
+  .strip svg { width: 100%; }
+  .s-data { --g: linear-gradient(90deg, #7c3aed, #a78bfa); }
+  .s-core { --g: linear-gradient(90deg, #2563eb, #60a5fa); }
+  .s-vision { --g: linear-gradient(90deg, #1b1f2a, #5b6372); }
+  .editor { margin: 0; border-radius: 2.4mm; overflow: hidden; background: linear-gradient(160deg, #1f2436, #272d44);
+            box-shadow: inset 0 0 0 .25mm rgba(255,255,255,.06); }
+  .editor .bar { display: flex; align-items: center; gap: 1.3mm; padding: 1.8mm 3mm; background: rgba(255,255,255,.04);
+                 font-family: var(--mono); font-size: 2.5mm; color: #8b93a7; }
+  .editor .bar i { width: 2mm; height: 2mm; border-radius: 50%; background: #ff5f57; }
+  .editor .bar i:nth-child(2) { background: #febc2e; } .editor .bar i:nth-child(3) { background: #28c840; margin-right: 2mm; }
+  pre { margin: 0; padding: 2.4mm 3.4mm 2.6mm; color: #e6e8ee; font-family: var(--mono); font-size: 2.5mm; line-height: 1.4;
+        white-space: pre; overflow: hidden; }
+  pre .c { color: #8b93a7; } pre .k { color: #ffb37a; } pre .s { color: #a6e3a1; } pre .p { color: #8fb8ff; } pre .t { color: #d4b8ff; }
+  .split { display: grid; grid-template-columns: 1fr; gap: 1.5mm; }
+  .nongoals li { color: var(--muted); }
+  .nongoals li::before { content: "✕"; color: var(--seam); font-size: 2.6mm; }
+  .criteria li::before { content: "✓"; color: var(--ok); font-weight: 900; }
+  .strip .note { margin-top: 1.2mm; color: var(--muted); }
+  .sub-h { font-weight: 800; font-size: 2.6mm; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); margin: 2.4mm 0 1.2mm; }
+
+  footer { display: flex; justify-content: space-between; font-size: 2.6mm; color: var(--faint); align-items: end; }
+</style>
+</head>
+<body>
+<div class="sheet">
+
+  <header>
+    <div class="brand">
+      <h1>µFW</h1>
+      <p><b>The SAM pattern on Effect&nbsp;4.</b><br>Write the loop once; place it anywhere.</p>
+    </div>
+    <div class="problem">
+      <div class="eyebrow">The problem</div>
+      <p>Front-end state machines and server workflows are written twice, with a hand-written protocol
+        in between. Moving a rule across&nbsp;— a credit check, a countdown&nbsp;— means rewriting it,
+        and <em>the two halves drift</em>.</p>
+    </div>
+    <div>
+      <div class="eyebrow">The bet: three pillars</div>
+      <div class="bets">
+        <div class="bet p1"><span class="num">1</span><b>SAM is the programming model.</b><span class="sub">Data plus pure functions; only actions touch the world.</span></div>
+        <div class="bet p2"><span class="num">2</span><b>Placement is a deployment decision.</b><span class="sub">Browser or server is a choice of <code>Layer</code>, never of domain code.</span></div>
+        <div class="bet p3"><span class="num">3</span><b>The definition is the test oracle.</b><span class="sub">The pure step yields the graph; every path is replayed on the real system.</span></div>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section class="card hero p1">
+      <div class="panel-head">
+        <span class="num">1</span>
+        <div>
+          <h2>One loop, one effectful box</h2>
+          <p>An intent becomes a proposal through an action; acceptors decide what the model becomes; <code>state</code> derives
+            the representation; <code>nap</code> proposes what happens next. Each port on the loop stands up as a pane into
+            the wire layer above: an RPC can cut the loop at any of the four, and the domain below never changes.</p>
+        </div>
+      </div>
+      <div class="legend">
+        <span><svg viewBox="0 0 14 10"><path d="M2.6,4 v3 a4.4,2 0 0 0 8.8,0 v-3" fill="#bcd0fa" stroke="#2563eb" stroke-width=".6"/><ellipse cx="7" cy="4" rx="4.4" ry="2" fill="#f2f6ff" stroke="#2563eb" stroke-width=".6"/></svg>pure function</span>
+        <span><svg viewBox="0 0 14 10"><path d="M2.6,4 v3 a4.4,2 0 0 0 8.8,0 v-3" fill="#ffb27e" stroke="#e8590c" stroke-width=".7"/><ellipse cx="7" cy="4" rx="4.4" ry="2" fill="#fff3ea" stroke="#e8590c" stroke-width=".7"/></svg>effectful action</span>
+        <span><svg viewBox="0 0 14 10"><path d="M2,5 h8 v3.4 h-8 z" fill="#e6dafd" stroke="#7c3aed" stroke-width=".6"/><path d="M2,5 l2,-2.4 h8 l-2,2.4 z" fill="#fff" stroke="#7c3aed" stroke-width=".6"/><path d="M10,5 l2,-2.4 v3.4 l-2,2.4 z" fill="#d9c8fb" stroke="#7c3aed" stroke-width=".6"/></svg>data with a <code>Schema</code></span>
+        <span><svg viewBox="0 0 14 10"><ellipse cx="7" cy="6" rx="6" ry="2.8" fill="none" stroke="#64748b" stroke-width=".6" stroke-dasharray="1.2 .8"/></svg>adapter</span>
+        <span><svg viewBox="0 0 14 10"><path d="M5,1 l4,1.4 v7 l-4,-1.4 z" fill="#d6336c" fill-opacity=".2" stroke="#d6336c" stroke-width=".6"/></svg>seam: a port an RPC can carry</span>
+        <span><svg viewBox="0 0 14 10"><path d="M1,8 Q7,0 13,5" fill="none" stroke="#2563eb" stroke-width=".8" stroke-dasharray="1.6 1"/></svg>automatic intent</span>
+      </div>
+      {{HERO}}
+    </section>
+
+    <div class="right">
+      <section class="card p2">
+        <div class="panel-head">
+          <span class="num">2</span>
+          <div>
+            <h2>One definition, five placements</h2>
+            <p>Model and actions each run in the browser or on the server, or both in a web worker. Each page picks its layers at its own composition root.</p>
+          </div>
+        </div>
+        {{PLACEMENTS}}
+        <ul class="rules">
+          <li class="ok"><b>Zero domain changes.</b> Moving a rule across the wire is a layer swap at the composition root plus its test.</li>
+          <li><b>Trust follows the RPC.</b> <code>Present</code> applies any proposal, so only trusted clients get it. Actions in a browser or a worker <span class="bang">!</span> bring a permissive credit check. Strangers get <code>Submit</code>, and the bidder comes from the session, never the intent.</li>
+        </ul>
+      </section>
+
+      <section class="card p3">
+        <div class="panel-head">
+          <span class="num">3</span>
+          <div>
+            <h2>Every path, replayed on the real system</h2>
+            <p>The step is pure, so the control-state graph is explored offline. Each generated path runs against the system, asserting the representation at every node.</p>
+          </div>
+        </div>
+        {{ORACLE}}
+      </section>
+    </div>
+  </main>
+
+  <div class="strip">
+    <section class="card s-data">
+      <h3>A definition <small>schemas first, then behaviour</small></h3>
+      <div class="editor">
+        <div class="bar"><i></i><i></i><i></i>examples/auction/src/domain/Auction.ts</div>
+<pre><span class="k">export const</span> Auction = <span class="p">define</span>({
+  name: <span class="s">"auction"</span>, model: <span class="t">Model</span>, proposal: <span class="t">Proposal</span>,
+  intent: <span class="t">Intent</span>, representation: <span class="t">Representation</span>   <span class="c">// the cut points</span>
+})({
+  controlStates: [<span class="s">"opening"</span>, <span class="s">"open"</span>, <span class="s">"closing"</span>, <span class="s">"sold"</span>],
+  initial,
+  acceptors: [acceptOpened, acceptBid, acceptRejection, acceptTick, acceptClose],
+  reactors: [], state, nap,                         <span class="c">// pure</span>
+  actions: { Open: …, PlaceBid: …, Tick: …, Close: … } <span class="c">// effectful</span>
+})
+<span class="k">const</span> Ports = <span class="p">makePorts</span>(Auction)
+<span class="k">const</span> Loop  = <span class="p">layerLoopLocal</span>(Auction, Ports)   <span class="c">// or the @mufw/rpc remote layers</span></pre>
+      </div>
+      <p class="note"><code>define(schemas)(behaviour)</code> is curried so the schemas type the behaviour's literals.</p>
+    </section>
+
+    <section class="card s-core">
+      <h3>Dependencies point inward</h3>
+      {{RINGS}}
+      <ul>
+        <li><code>@mufw/core</code> depends on <code>effect</code> alone: no DOM, transport or platform.</li>
+        <li>Adapter packages never import each other.</li>
+      </ul>
+    </section>
+
+    <section class="card s-data">
+      <h3>Every step is recorded</h3>
+      {{HISTORY}}
+      <ul>
+        <li><b>Time travel:</b> <code>travelTo(seq)</code> restores any retained record and appends a <code>travel</code> record; <code>nap</code> does not run. A history exports to JSON and replays its proposals.</li>
+        <li><b>Diagrams are derived:</b> the Stately inspector draws state and sequence diagrams from the definition.</li>
+        <li><b>Beyond one process:</b> the model persists through a <code>KeyValueStore</code> port; instances agree by applying one ordered log of proposals.</li>
+      </ul>
+    </section>
+
+    <section class="card s-vision">
+      <h3>Principles</h3>
+      <ul>
+        <li><b>Hexagonal:</b> ports are services, adapters are layers.</li>
+        <li><b>Parse, don't validate:</b> decode once, at the boundary.</li>
+        <li><b>Effects all the way down;</b> run only at the edges.</li>
+        <li><b>Boring and small:</b> a pure function over a service, a service over a feature.</li>
+        <li><b>Observable by default.</b></li>
+      </ul>
+      <div class="sub-h">Not doing</div>
+      <ul class="nongoals">
+        <li>A general-purpose UI framework</li>
+        <li>Hiding Effect from its users</li>
+        <li>Statecharts as the source of truth</li>
+      </ul>
+      <p class="note">Then: XState's ground — modelling, visualisation, model-based testing — with the domain kept as data and pure functions.</p>
+    </section>
+
+    <section class="card p3">
+      <h3>How we will know it works</h3>
+      <ul class="criteria">
+        <li>Every placement runs from one definition, with zero domain changes.</li>
+        <li>The same path test passes locally, over in-process RPC and against a live server.</li>
+        <li>Moving a rule between client and server is a one-line layer change plus its test.</li>
+      </ul>
+      <div class="sub-h">Next</div>
+      <ul>
+        <li>Transports that bound a stalled client and show a held call</li>
+        <li>Sync that survives a host restart and hands over automatic actions</li>
+        <li>Server-owned pages that learn their identity</li>
+        <li>Several definitions per server; installable packages</li>
+      </ul>
+    </section>
+  </div>
+
+  <footer>
+    <span>µFW · one-page design · drawn from VISION.md, docs/ARCHITECTURE.md and docs/TODO.md</span>
+    <span>A2 landscape · print at 100 %</span>
+  </footer>
+</div>
+</body>
+</html>

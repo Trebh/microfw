@@ -278,7 +278,8 @@ through `to.IntentPort`. Each definition keeps its own loop, root and placement.
 These are living documents: they are updated in the same change that makes them false.
 
 - [VISION.md](VISION.md) — why µFW exists and where it is going
-- [docs/one-page.html](docs/one-page.html) — the design on one A2 sheet (print at 100 %, landscape)
+- [docs/one-page.html](docs/one-page.html) — the design on one A2 sheet (print at 100 %, landscape),
+  built from [docs/one-page/](docs/one-page/) with `python3 docs/one-page/build.py`
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — how it is built, with the detailed pages under
   [docs/architecture/](docs/architecture/)
 - [docs/TODO.md](docs/TODO.md) — known gaps
