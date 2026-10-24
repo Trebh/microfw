@@ -9,8 +9,8 @@ const hints: ReadonlyArray<readonly [keys: ReadonlyArray<string>, does: string]>
   [["→", "Space"], "next cue"],
   [["←"], "back one cue"],
   [["1", "…", "9"], "jump to an act"],
-  [["A"], "autoplay: the prompter reads the show"],
-  [["B"], "the prompter's book"],
+  [["A"], "play the show on its own"],
+  [["B"], "open the prompter's book"],
   [["Home"], "back to the overture"]
 ]
 
@@ -33,7 +33,7 @@ const playbill = () =>
     <header class="overture__masthead">
       <p class="overture__kicker marquee">Tonight · a play in seven acts</p>
       <h1 class="overture__title" data-spot="title">µFW</h1>
-      <p class="overture__subtitle" data-spot="subtitle">a play for one model and any number of stages</p>
+      <p class="overture__subtitle" data-spot="subtitle">one model, on any stage</p>
     </header>
     <section class="overture__cast" aria-labelledby="overture-cast">
       <h2 class="overture__heading marquee" id="overture-cast">The cast <span class="past-35">in order of appearance</span></h2>

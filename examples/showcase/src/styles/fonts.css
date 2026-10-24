@@ -1,10 +1,9 @@
-/* Redaction is the voice; its degraded cuts are the past. Each cut is its own family. */
+/* Redaction is the voice; its degraded cuts 10 and 35 are the past. Each cut is its own family. 100 only draws the overture title's ghost, never text to read. */
 @import "@fontsource/redaction/400.css";
 @import "@fontsource/redaction/400-italic.css";
 @import "@fontsource/redaction/700.css";
 @import "@fontsource/redaction-10/400.css";
 @import "@fontsource/redaction-35/400.css";
-@import "@fontsource/redaction-70/400.css";
 @import "@fontsource/redaction-100/400.css";
 
 /* Marquee capitals: act numerals, curtain titles, counters. The package maps `./*` to `./*.css`, so no extension. */

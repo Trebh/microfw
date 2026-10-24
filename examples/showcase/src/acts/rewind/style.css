@@ -29,12 +29,11 @@
 }
 
 #act-rewind .rewind__title {
-  font-size: var(--text-l);
+  font-size: var(--text-m);
   font-style: italic;
   font-weight: 400;
   line-height: 1;
-  color: var(--limelight);
-  text-shadow: 0 0 0.4em color-mix(in oklab, var(--limelight) 28%, transparent);
+  color: var(--chalk);
 }
 
 #act-rewind .rewind__counters {
@@ -49,12 +48,12 @@
 }
 
 #act-rewind .counter dt {
-  color: var(--chalk);
+  color: var(--chalk-dim);
 }
 
 #act-rewind .counter dd {
-  font-size: var(--text-l);
-  color: var(--paper);
+  font-size: var(--text-m);
+  color: var(--chalk);
 }
 
 /* The seats, small on a frame and large on the stage */
@@ -82,8 +81,11 @@
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: var(--space-3);
   min-height: 0;
+  padding: var(--space-4);
+  border: 1px solid var(--chalk-faint);
+  background: color-mix(in oklab, var(--wing-grey) 55%, transparent);
 }
 
 #act-rewind .stage__head {
@@ -94,7 +96,7 @@
 }
 
 #act-rewind .stage__title {
-  font-size: var(--text-m);
+  font-size: var(--text-l);
   color: var(--paper);
 }
 
@@ -105,13 +107,13 @@
   font-weight: 400;
   letter-spacing: 0;
   text-transform: none;
-  color: var(--chalk);
+  color: var(--chalk-dim);
 }
 
 #act-rewind .stage__counts {
   display: flex;
   gap: var(--space-4);
-  font-size: var(--text-s);
+  font-size: var(--text-m);
   color: var(--chalk);
 }
 
@@ -167,12 +169,12 @@
 }
 
 #act-rewind .seat__id {
-  font-size: var(--text-xs);
+  font-size: var(--text-m);
 }
 
 #act-rewind .seat__by {
   min-height: 1.2em;
-  font-size: 0.62rem;
+  font-size: var(--text-xs);
   opacity: 0.8;
 }
 
@@ -197,7 +199,6 @@
 
 #act-rewind .stage__cut {
   color: var(--alarm);
-  text-shadow: 0 0 0.6em color-mix(in oklab, var(--alarm) 35%, transparent);
 }
 
 #act-rewind .stage__note {
@@ -268,27 +269,33 @@
   grid-area: side;
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
+  gap: var(--space-5);
   min-height: 0;
 }
 
 #act-rewind .never {
-  font-size: var(--text-m);
+  padding-inline-start: var(--space-3);
+  border-inline-start: 2px solid var(--chalk-faint);
+  font-size: var(--text-s);
   font-style: italic;
-  line-height: 1.15;
+  line-height: 1.25;
+  transition: border-color var(--dur-slow) ease;
+}
+
+#act-rewind .never[data-lit="true"] {
+  border-inline-start-color: var(--limelight-deep);
 }
 
 #act-rewind .never__line {
   display: block;
   color: var(--chalk-dim);
-  font-family: "Redaction 100", var(--face-body);
+  font-family: "Redaction 35", var(--face-body);
   transition: color var(--dur-slow) ease;
 }
 
 #act-rewind .never[data-lit="true"] .never__line {
-  color: var(--limelight);
+  color: var(--paper);
   font-family: var(--face-body);
-  text-shadow: 0 0 0.5em color-mix(in oklab, var(--limelight) 28%, transparent);
 }
 
 #act-rewind .never[data-lit="true"][data-bleed="a"] .never__line { animation: rewind-never-a 1.4s var(--ease-line); }
@@ -305,7 +312,7 @@
 }
 
 #act-rewind .verdict {
-  flex: 1;
+  flex: 0 1 auto;
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
@@ -325,7 +332,7 @@
 }
 
 #act-rewind .verdict__head h2 {
-  font-size: var(--text-m);
+  font-size: var(--text-s);
   color: var(--velvet);
 }
 
@@ -343,7 +350,7 @@
   flex: none;
   padding: 0.1em 0.4em;
   border: 0.14em double var(--velvet);
-  font-size: var(--text-l);
+  font-size: var(--text-m);
   color: var(--velvet);
   rotate: -5deg;
   animation: rewind-stamp var(--dur-slow) var(--ease-ticket) backwards;
@@ -413,14 +420,14 @@
 }
 
 #act-rewind .transport__label {
-  font-size: var(--text-m);
-  color: var(--chalk);
+  font-size: var(--text-s);
+  color: var(--chalk-dim);
 }
 
 #act-rewind .transport__where {
   min-width: 14ch;
   font-size: var(--text-xs);
-  color: var(--limelight);
+  color: var(--chalk);
 }
 
 #act-rewind .transport__range {
@@ -456,7 +463,7 @@
   border: 0;
   border-radius: 0.15rem;
   background: var(--limelight);
-  box-shadow: 0 0 0.9rem color-mix(in oklab, var(--limelight) 55%, transparent);
+  box-shadow: none;
   appearance: none;
 }
 
@@ -466,7 +473,7 @@
   border: 0;
   border-radius: 0.15rem;
   background: var(--limelight);
-  box-shadow: 0 0 0.9rem color-mix(in oklab, var(--limelight) 55%, transparent);
+  box-shadow: none;
 }
 
 #act-rewind .transport .stage-button {
@@ -491,15 +498,15 @@
 
 #act-rewind .film__title {
   padding-bottom: var(--space-1);
-  font-size: var(--text-s);
-  color: var(--chalk);
+  font-size: var(--text-xs);
+  color: var(--chalk-dim);
 }
 
 #act-rewind .film__strip {
   position: relative;
   display: flex;
   gap: 0.4rem;
-  padding: 0.5rem 0.5rem 0.6rem;
+  padding: 0.4rem 0.5rem 0.5rem;
   overflow-x: auto;
   overflow-y: hidden;
   background: var(--film);
@@ -509,9 +516,9 @@
 }
 
 #act-rewind .frame {
-  flex: 0 0 8.4rem;
-  height: 9.6rem;
-  opacity: calc(1 - min(var(--age, 0), 11) * 0.04);
+  flex: 0 0 7.2rem;
+  height: 7.8rem;
+  opacity: calc(1 - min(var(--age, 0), 8) * 0.07);
   filter: sepia(calc(min(var(--age, 0), 10) * 0.07));
   transition: opacity var(--dur-base) ease, filter var(--dur-base) ease;
   animation: rewind-exposed var(--dur-slow) var(--ease-line) backwards;
@@ -523,7 +530,7 @@
   filter: none;
 }
 
-#act-rewind .frame--travel { flex-basis: 7.4rem; }
+#act-rewind .frame--travel { flex-basis: 6.4rem; }
 #act-rewind .frame--blank { flex-basis: 22rem; display: grid; place-items: center; padding: var(--space-4); text-align: center; font-style: italic; }
 
 #act-rewind .frame__body {
@@ -532,7 +539,7 @@
   gap: 0.25rem;
   width: 100%;
   height: 100%;
-  padding: 1.15rem 0.6rem 0.9rem;
+  padding: 1rem 0.5rem 0.7rem;
   border: 1px solid var(--chalk-faint);
   text-align: start;
   color: var(--paper);
@@ -562,8 +569,8 @@
 }
 
 #act-rewind .frame__seq {
-  font-size: var(--text-m);
-  color: var(--limelight-deep);
+  font-size: var(--text-s);
+  color: var(--chalk-dim);
 }
 
 #act-rewind .frame--init .frame__seq { color: var(--chalk); }
@@ -572,7 +579,7 @@
 #act-rewind .frame__title {
   display: -webkit-box;
   overflow: hidden;
-  font-size: var(--text-s);
+  font-size: var(--text-xs);
   line-height: 1.05;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
@@ -604,11 +611,10 @@
 
 #act-rewind .frame__lamp {
   position: absolute;
-  inset: 0.65rem 0.6rem auto auto;
+  inset: 0.55rem 0.5rem auto auto;
   font-size: 0.7rem;
   letter-spacing: 0.12em;
   color: var(--cue-green);
-  text-shadow: 0 0 0.6em color-mix(in oklab, var(--cue-green) 55%, transparent);
 }
 
 #act-rewind .frame__body { position: relative; }

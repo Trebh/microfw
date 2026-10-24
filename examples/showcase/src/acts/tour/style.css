@@ -5,10 +5,10 @@
   --tour-text-l: 1.9rem;
   display: grid;
   align-content: start;
-  gap: var(--space-3);
+  gap: var(--space-4);
 }
 
-/* The banner and the two import lines that every composition root shares. */
+/* The banner, and the two import lines that every stage shares. */
 
 #act-tour .tour__head {
   display: grid;
@@ -20,7 +20,7 @@
 #act-tour .tour__kicker {
   font-size: var(--tour-text-s);
   letter-spacing: 0.2em;
-  color: var(--limelight);
+  color: var(--chalk-dim);
 }
 
 #act-tour .tour__statement {
@@ -35,28 +35,23 @@
 #act-tour .tour__only {
   font-style: normal;
   color: var(--limelight);
-  text-shadow: 0 0 0.9em color-mix(in oklab, var(--limelight) 38%, transparent);
 }
 
-#act-tour .tour__imports {
-  --tilt: 0.5deg;
-  padding: var(--space-2) var(--space-4) var(--space-2);
+#act-tour .tour__imports,
+#act-tour .tour__root {
+  padding: var(--space-2) var(--space-3);
+  background: color-mix(in oklab, var(--stage-black) 70%, var(--wing-grey));
+  border: 1px solid var(--chalk-faint);
 }
 
 #act-tour .tour__caption {
-  font-size: 0.66rem;
+  margin-bottom: var(--space-1);
+  font-size: 0.62rem;
   letter-spacing: 0.14em;
-  color: var(--velvet);
+  color: var(--chalk-dim);
 }
 
-#act-tour .tour__imports-same {
-  margin-top: var(--space-1);
-  font-size: 0.66rem;
-  letter-spacing: 0.14em;
-  color: color-mix(in oklab, var(--ink) 62%, transparent);
-}
-
-/* Code on paper: the literal lines of the composition root; the marked ones are only this stage's. */
+/* Code on a dark panel: the literal lines of the setup; the marked ones are only this stage's. */
 
 #act-tour .tour__code {
   margin: 0;
@@ -75,13 +70,13 @@
   display: block;
   margin-inline: calc(-1 * var(--space-1));
   padding-inline: var(--space-1);
-  color: color-mix(in oklab, var(--ink) 74%, transparent);
+  color: var(--chalk-dim);
 }
 
 #act-tour .tour__line[data-kind="marked"] {
-  color: var(--ink);
-  background: color-mix(in oklab, var(--limelight) 46%, transparent);
-  box-shadow: inset 2px 0 0 var(--velvet);
+  color: var(--chalk);
+  background: color-mix(in oklab, var(--limelight) 10%, transparent);
+  box-shadow: inset 2px 0 0 var(--limelight-deep);
 }
 
 #act-tour .tour__line[data-kind="elision"] {
@@ -89,19 +84,19 @@
 }
 
 #act-tour .tour__tok--keyword {
-  color: var(--velvet);
+  color: var(--velvet-lit);
 }
 
 #act-tour .tour__tok--string {
-  color: var(--velvet-deep);
+  color: var(--limelight-deep);
 }
 
 #act-tour .tour__tok--type {
-  font-weight: 600;
+  color: var(--chalk);
 }
 
 #act-tour .tour__tok--call {
-  color: color-mix(in oklab, var(--standby-blue) 46%, var(--ink));
+  color: var(--paper);
 }
 
 #act-tour .tour__tok--number {
@@ -112,7 +107,7 @@
   color: var(--chalk-dim);
 }
 
-/* Three stages, side by side. */
+/* Three stages, side by side, built alike: only the lamp and the lit stage tell them apart. */
 
 #act-tour .tour__stages,
 #act-tour .tour__board-cells {
@@ -126,20 +121,11 @@
   display: grid;
   grid-row: span 4;
   grid-template-rows: subgrid;
-  row-gap: var(--space-2);
+  row-gap: var(--space-3);
   min-width: 0;
-  padding: var(--space-2) var(--space-4) var(--space-3);
+  padding: var(--space-3) var(--space-4);
   background: linear-gradient(var(--wing-grey), color-mix(in oklab, var(--wing-grey) 62%, var(--stage-black)));
   border: 1px solid var(--chalk-faint);
-  border-top: 3px solid var(--limelight);
-}
-
-#act-tour .tour__stage[data-stage="wings"] {
-  border-top-color: var(--standby-blue);
-}
-
-#act-tour .tour__stage[data-stage="town"] {
-  border-top: 3px dashed var(--standby-blue);
 }
 
 #act-tour .tour__stage-head {
@@ -151,7 +137,7 @@
 
 #act-tour .tour__ordinal {
   font-size: var(--tour-text-l);
-  color: var(--limelight);
+  color: var(--chalk-dim);
 }
 
 #act-tour .tour__title {
@@ -162,7 +148,7 @@
 }
 
 #act-tour .tour__where {
-  font-size: 0.66rem;
+  font-size: 0.68rem;
   color: var(--chalk);
 }
 
@@ -183,29 +169,15 @@
 }
 
 #act-tour .tour__lamp[data-state="connecting"] {
-  color: var(--standby-blue);
-  text-shadow: 0 0 0.6em color-mix(in oklab, var(--standby-blue) 38%, transparent);
+  color: var(--chalk-dim);
 }
 
 #act-tour .tour__lamp[data-state="connected"] {
-  --glow: 0.5;
   color: var(--cue-green);
-  text-shadow:
-    0 0 calc(0.25em + var(--glow) * 0.7em) color-mix(in oklab, var(--cue-green) calc(30% + var(--glow) * 50%), transparent);
-  animation: cue-light 2.6s var(--ease-cue-light) infinite;
 }
 
 #act-tour .tour__lamp[data-state="disconnected"] {
   color: var(--alarm);
-}
-
-#act-tour .tour__root {
-  --tilt: -0.25deg;
-  padding: var(--space-2) var(--space-3) var(--space-2);
-}
-
-#act-tour .tour__stage[data-stage="wings"] .tour__root {
-  --tilt: 0.2deg;
 }
 
 /* Seats: the one view, painted from whatever representation the stage's ports deliver. */
@@ -216,7 +188,7 @@
 
 #act-tour .tour__seats:empty::before,
 #act-tour .tour__meter-mount:empty::before {
-  content: "the company has not come on yet";
+  content: "waiting for the stage to start";
   font-size: var(--tour-text-xs);
   color: var(--chalk-dim);
 }
@@ -299,16 +271,11 @@
   gap: var(--space-3);
   margin-top: var(--space-2);
   font-size: 0.66rem;
-  color: var(--chalk);
+  color: var(--chalk-dim);
 }
 
 #act-tour .tour__doors {
-  color: var(--limelight);
-}
-
-#act-tour .tour__seatmap[data-state="selling"] .tour__doors,
-#act-tour .tour__seatmap[data-state="full"] .tour__doors {
-  color: var(--cue-green);
+  color: var(--chalk);
 }
 
 #act-tour .tour__note {
@@ -318,19 +285,19 @@
   color: var(--alarm);
 }
 
-/* The board: one stopwatch per stage, on the same scale. */
+/* The board: one stopwatch per stage, on the same scale; quieter than the stages above it. */
 
 #act-tour .tour__board {
   display: grid;
   gap: var(--space-2);
-  padding-top: var(--space-2);
+  padding-top: var(--space-3);
   border-top: 1px solid var(--chalk-faint);
 }
 
 #act-tour .tour__board-label {
-  font-size: 0.7rem;
+  font-size: 0.68rem;
   letter-spacing: 0.16em;
-  color: var(--chalk);
+  color: var(--chalk-dim);
 }
 
 #act-tour .tour__meter-mount {
@@ -357,7 +324,7 @@
 }
 
 #act-tour .tour__meter-figure {
-  font-size: var(--tour-text-l);
+  font-size: var(--tour-text-m);
   line-height: 0.85;
   font-variant-numeric: tabular-nums;
   color: var(--paper);
@@ -365,7 +332,7 @@
 
 #act-tour .tour__meter-unit {
   font-size: 0.66rem;
-  color: var(--chalk);
+  color: var(--chalk-dim);
 }
 
 #act-tour .tour__meter[data-state="timing"] .tour__meter-figure {
@@ -391,26 +358,18 @@
   flex: 0 0 0.55rem;
   height: calc(var(--h, 0) * 100%);
   min-height: 2px;
-  background: var(--limelight);
+  background: var(--chalk-dim);
   transition: height var(--dur-base) var(--ease-spot);
 }
 
-#act-tour .tour__meter-bar:nth-last-child(n + 4) {
-  opacity: 0.72;
-}
-
-#act-tour .tour__meter-bar:nth-last-child(n + 8) {
-  opacity: 0.45;
-}
-
 #act-tour .tour__meter-bar:last-child {
-  background: var(--cue-green);
+  background: var(--limelight);
 }
 
 #act-tour .tour__meter-note {
   grid-area: note;
   font-size: 0.62rem;
-  color: var(--chalk);
+  color: var(--chalk-dim);
 }
 
 #act-tour .tour__board-caption {
@@ -424,8 +383,7 @@
     transform: scaleX(1);
   }
 
-  #act-tour .tour__meter[data-state="timing"] .tour__meter-figure,
-  #act-tour .tour__lamp[data-state="connected"] {
+  #act-tour .tour__meter[data-state="timing"] .tour__meter-figure {
     animation: none;
   }
 }

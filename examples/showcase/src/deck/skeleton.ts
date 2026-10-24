@@ -46,7 +46,7 @@ export const buildSkeleton = <R>(host: HTMLElement, acts: ReadonlyArray<Act<R>>)
       <aside class="book" id="prompter-book" data-open="false" aria-label="The prompter's book" inert>
         <header class="book__head">
           <h2 class="marquee">The prompter's book</h2>
-          <p>Every step the deck took tonight, newest first. Click a line and the show itself goes back to it.</p>
+          <p>Every move the show has made so far, newest first. Click a line and the show goes back to that point.</p>
         </header>
         <div class="book__panel"></div>
       </aside>

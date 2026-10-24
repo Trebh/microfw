@@ -94,7 +94,7 @@ const surtitles = (scripts: ReadonlyArray<ActScript>, representation: Representa
     Option.getOrElse(() => "")
   )
   return html`<section class="surtitles" aria-label="Surtitles">
-    <p class="surtitle surtitle--past past-70" data-flip=${String(flip)} aria-hidden="true">${renderSegments(past)}</p>
+    <p class="surtitle surtitle--past past-10" data-flip=${String(flip)} aria-hidden="true">${renderSegments(past)}</p>
     <p class="surtitle surtitle--now" data-flip=${String(flip)} data-size=${surtitleSize(current)} aria-live="polite">${renderSegments(current)}</p>
     <p class="surtitles__where marquee">${script?.numeral ?? ""} ${script?.title ?? ""}</p>
   </section>`

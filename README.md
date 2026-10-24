@@ -28,7 +28,7 @@ Status: **proof of concept**. APIs move freely; there is no build step and nothi
 the same pages written in plain uhtml ([performance.md](docs/architecture/performance.md), where
 every figure, its baseline and its command are):
 
-- **Bundle.** The smallest µFW page ships about twenty times the JavaScript of the plain page, tens
+- **Bundle.** The smallest µFW page ships about thirteen times the JavaScript of the plain page, tens
   of KiB gzipped, most of it the Effect runtime and `Schema`.
 - **Startup.** First content takes two to three times as long, script time three to seven times.
 - **Interaction.** Pages run on `layerInputScheduler`, which runs the fiber hops of a click as

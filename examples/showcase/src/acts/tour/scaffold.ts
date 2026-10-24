@@ -18,21 +18,21 @@ export const cards: ReadonlyArray<Card> = [
     stage: house,
     ordinal: "1",
     title: "In the house",
-    where: "this page, this thread",
+    where: "runs in this page",
     root: houseRoot
   },
   {
     stage: wings,
     ordinal: "2",
     title: "In the wings",
-    where: "a dedicated Worker: company.worker.ts",
+    where: "runs in a web worker, a background thread (company.worker.ts)",
     root: wingsRoot
   },
   {
     stage: town,
     ordinal: "3",
     title: "Across town",
-    where: `RPC to a server in this page, over a simulated ${NETWORK_MILLIS} ms network`,
+    where: `acts like a server, but runs in this page, with a ${NETWORK_MILLIS} ms wait added`,
     root: townRoot
   }
 ]
@@ -55,8 +55,8 @@ const stageCard = (card: Card, mounts: Mounts) =>
       ${mounts.lamp}
     </header>
     <p class="tour__where mono">${card.where}</p>
-    <figure class="tour__root paper-card">
-      <figcaption class="tour__caption marquee">composition root</figcaption>
+    <figure class="tour__root">
+      <figcaption class="tour__caption marquee">setup code · marked lines differ</figcaption>
       <pre class="tour__code mono"><code>${card.root.map(codeLine)}</code></pre>
     </figure>
     ${mounts.seats}
@@ -69,10 +69,9 @@ const boardCell = (card: Card, mounts: Mounts) =>
   </div>`
 
 const imports = () =>
-  html`<figure class="tour__imports paper-card" data-spot="imports">
-    <figcaption class="tour__caption marquee">all three import the definition and the view like this</figcaption>
+  html`<figure class="tour__imports" data-spot="imports">
+    <figcaption class="tour__caption marquee">every stage has these two imports</figcaption>
     <pre class="tour__code mono"><code>${sharedImports.map((line) => codeLine({ text: line, marked: false }))}</code></pre>
-    <p class="tour__imports-same marquee">identical, line for line, on every stage</p>
   </figure>`
 
 /**
@@ -85,17 +84,17 @@ export const tour = (mounts: Readonly<Record<Stage["id"], Mounts>>) =>
       <div class="tour__banner" data-spot="banner">
         <p class="tour__kicker marquee">Act V · On tour</p>
         <h1 class="tour__statement">
-          The definition did not change.
-          <em class="tour__only">Only the layers did.</em>
+          The program stays the same.
+          <em class="tour__only">Only the setup changes.</em>
         </h1>
       </div>
       ${imports()}
     </header>
     <div class="tour__stages" data-spot="stages">${cards.map((card) => stageCard(card, mounts[card.stage.id]))}</div>
-    <section class="tour__board" data-spot="meters" aria-label="Round trips">
+    <section class="tour__board" data-spot="meters" aria-label="Time from click to result">
       <div class="tour__board-cells">${cards.map((card) => boardCell(card, mounts[card.stage.id]))}</div>
       <p class="tour__board-caption mono">
-        round trip: a seat pressed to the representation that shows it · measured with Clock inside the act · log scale, 0.1 ms to 1 s
+        time from your click until the seat changes on screen · each bar is one click, newest on the right · log scale, 0.1 ms at the bottom to 1 s at the top
       </p>
     </section>
   </div>`

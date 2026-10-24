@@ -3,7 +3,7 @@
 
 #act-loop .loop {
   display: grid;
-  grid-template-columns: minmax(22rem, 0.74fr) minmax(0, 1.6fr);
+  grid-template-columns: minmax(22rem, 0.88fr) minmax(0, 1.6fr);
   gap: var(--space-6);
   align-items: start;
   min-height: 100%;
@@ -23,6 +23,14 @@
   font-size: var(--text-m);
   letter-spacing: 0.2em;
   color: var(--chalk);
+}
+
+#act-loop .loop__house .loop__kicker {
+  color: var(--paper);
+}
+
+#act-loop .loop__play .loop__kicker {
+  color: var(--chalk-dim);
 }
 
 #act-loop .loop__state {
@@ -45,16 +53,15 @@
   place-items: center;
   height: 2.6rem;
   margin-inline: var(--space-3);
-  border-bottom: 2px solid color-mix(in oklab, var(--limelight) 55%, transparent);
+  border-bottom: 2px solid color-mix(in oklab, var(--limelight) 30%, transparent);
   border-radius: 0 0 50% 50% / 0 0 100% 100%;
-  background: linear-gradient(var(--wing-grey), color-mix(in oklab, var(--limelight) 14%, var(--wing-grey)));
-  box-shadow: 0 0.7rem 1.4rem -0.5rem color-mix(in oklab, var(--limelight) 40%, transparent);
+  background: linear-gradient(var(--wing-grey), color-mix(in oklab, var(--limelight) 8%, var(--wing-grey)));
 }
 
 #act-loop .loop__apron span {
   font-size: var(--text-xs);
   letter-spacing: 0.4em;
-  color: var(--limelight-deep);
+  color: var(--chalk-dim);
 }
 
 #act-loop .loop__seats {
@@ -150,9 +157,7 @@
 #act-loop .seat[data-status="sold"] .seat__chair {
   border-color: var(--paper);
   background-color: var(--paper);
-  box-shadow:
-    0 0 1.1rem color-mix(in oklab, var(--paper) 55%, transparent),
-    inset 0 -0.45rem 0 -0.2rem color-mix(in oklab, var(--limelight-deep) 55%, var(--paper));
+  box-shadow: inset 0 -0.45rem 0 -0.2rem color-mix(in oklab, var(--limelight-deep) 55%, var(--paper));
 }
 
 #act-loop .seat[data-status="sold"] .seat__id {
@@ -234,7 +239,6 @@
 
 #act-loop .loop__count[data-tone="sold"] dd {
   color: var(--paper);
-  text-shadow: 0 0 0.5em color-mix(in oklab, var(--paper) 45%, transparent);
 }
 
 #act-loop .loop__notes {
@@ -324,8 +328,8 @@
   color: var(--chalk-dim);
   overflow-wrap: anywhere;
   box-shadow:
-    0 0 calc(var(--loop-flash) * 1.8rem) calc(var(--loop-flash) * 0.15rem)
-      color-mix(in oklab, var(--limelight) calc(var(--loop-flash) * 60%), transparent);
+    0 0 calc(var(--loop-flash) * 1rem)
+      color-mix(in oklab, var(--limelight) calc(var(--loop-flash) * 35%), transparent);
   transition:
     border-color var(--dur-base) ease,
     color var(--dur-base) ease;
@@ -352,8 +356,8 @@
 }
 
 #act-loop .station__name {
-  font-size: var(--text-m);
-  letter-spacing: 0.08em;
+  font-size: var(--text-s);
+  letter-spacing: 0.04em;
 }
 
 #act-loop .station[data-fired="true"] .station__name {
@@ -374,17 +378,16 @@
 /* The Action is the one that may go offstage: standby blue always, awake while a payment is away. */
 #act-loop .station[data-station="action"] {
   border-style: dashed;
-  border-color: color-mix(in oklab, var(--standby-blue) 45%, transparent);
-  border-top: 3px solid var(--standby-blue);
+  border-color: var(--chalk-faint);
+  border-top: 3px dashed color-mix(in oklab, var(--standby-blue) 45%, transparent);
 }
 
-#act-loop .station[data-station="action"] .station__name {
+#act-loop .station[data-station="action"][data-offstage="true"] .station__name {
   color: var(--standby-blue);
 }
 
 #act-loop .station[data-station="action"][data-offstage="true"] {
   background-color: color-mix(in oklab, var(--standby-blue) 14%, var(--wing-grey));
-  animation: loop-standby 1.2s var(--ease-cue-light) infinite;
 }
 
 #act-loop .station[data-station="action"][data-offstage="true"] .station__note {
@@ -403,7 +406,7 @@
   gap: var(--space-1) var(--space-3);
   min-height: 1.4rem;
   font-size: var(--text-s);
-  color: var(--chalk);
+  color: var(--chalk-dim);
 }
 
 #act-loop .loop__recent::before {
@@ -459,10 +462,11 @@
   margin: 0;
   font-size: var(--text-s);
   line-height: 1.2;
+  color: var(--chalk);
 }
 
 #act-loop .ledger__item--proposal dd {
-  color: var(--limelight);
+  color: var(--paper);
   overflow-wrap: anywhere;
 }
 
@@ -501,7 +505,7 @@
 
 #act-loop .chip__field {
   font-weight: 400;
-  color: var(--limelight);
+  color: var(--chalk);
 }
 
 #act-loop .chip__change {
@@ -509,11 +513,10 @@
   color: var(--paper);
 }
 
-/* The prompter speaks softly, in the past tense of the book: Redaction, italic, in the limelight. */
 #act-loop .prompter {
   font-size: var(--text-m);
   font-style: italic;
-  color: var(--limelight);
+  color: var(--paper);
 }
 
 #act-loop .prompter::before { content: "“"; }
@@ -523,6 +526,7 @@
 
 #act-loop .loop__code {
   --tilt: -0.3deg;
+  opacity: 0.82;
   margin: 0;
   padding: 0.6rem var(--space-4) 0.7rem;
   max-height: 11rem;
@@ -602,7 +606,6 @@
 
 @media (prefers-reduced-motion: reduce) {
   #act-loop .seat[data-charging="true"] .seat__chair,
-  #act-loop .station[data-station="action"][data-offstage="true"],
   #act-loop .loop__note {
     animation: none;
   }

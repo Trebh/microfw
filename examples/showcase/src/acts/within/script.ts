@@ -4,39 +4,39 @@ export const script: ActScript = {
   id: "within",
   numeral: "VI",
   title: "A Play Within a Play",
-  subtitle: "two ways to compose definitions: nest, and layerForward",
+  subtitle: "two ways to combine programs: nest and layerForward",
   feature: "nest · layerForward · proposalLabel",
   cues: [
     {
-      line: "[Elsinore. Hamlet has the players stage a play inside the play, to catch a king.] On the left, The Mousetrap: a box office, staged inside the house that owns the lights.",
+      line: "[Elsinore. Hamlet has the players stage a play inside the play.] On the left, The Mousetrap is a box office that sits inside a house with its own lights.",
       spot: "proscenium"
     },
     {
-      line: "nest(House, Mousetrap) is one definition: one model { parent, child }, one intent queue, one loop, one view. Its control state reads both halves.",
+      line: "nest(House, Mousetrap) joins the house lights and the play into one program. Its model has two parts, and the label below reads both: lights/play.",
       spot: "model"
     },
     {
-      line: "Forwarding happens inside the step. [The stage manager dims the house.] The doors of the inner play open in that same record. Now raise its curtain: the house goes darker in the same one.",
+      line: "[The stage manager dims the house.] Dimming opens the play's doors in that same step. Now press Raise curtain: the house dims again in that step too.",
       spot: "controls"
     },
     {
-      line: "One history for both. Child/SeatHeld and LightsDimmed are rows of one list, one seq apiece, and one travelTo would rewind the house and the play together.",
+      line: "Look at the list beside the play. House steps like LightsDimmed and play steps like Child/SeatHeld share one history, so travelTo could rewind both together.",
       spot: "history-nest"
     },
     {
-      line: "[The other way to stage it.] On the right, two islands: FrontOfHouse is a box office, the Marquee is a sign. Two definitions, two models, two loops, joined by one layer.",
+      line: "[The other way to stage it.] On the right are two separate programs: FrontOfHouse, a box office, and the Marquee, a sign. layerForward connects them.",
       spot: "islands"
     },
     {
-      line: "layerForward is a function: the previous and the current representation in, an intent out. It answers none when nothing the sign cares about has changed.",
+      line: "layerForward runs this function on every change in FrontOfHouse. It returns a repaint request for the sign, or nothing if the sign would read the same.",
       spot: "forward-code"
     },
     {
-      line: "Two islands, two histories. The box office counts its steps, the marquee its repaints, and a repaint is a step of its own, after the one that caused it. [Hold every seat.]",
+      line: "[Press Hold every seat.] Each program numbers its own steps. The box office logs the holds, and a moment later the sign logs its repaints in its own list.",
       spot: "histories"
     },
     {
-      line: "The choice: nest what must change together, in one step. Forward between what only watches, and may stand somewhere else.",
+      line: "Use nest for parts that must change together. Use layerForward when one program only watches another, or when they run in different places.",
       spot: "compare"
     }
   ]

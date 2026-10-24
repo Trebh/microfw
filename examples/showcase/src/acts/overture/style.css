@@ -22,7 +22,7 @@
 
 #act-overture .overture__kicker {
   font-size: var(--text-m);
-  color: var(--chalk);
+  color: var(--chalk-dim);
   letter-spacing: 0.22em;
 }
 
@@ -73,9 +73,13 @@
 
 #act-overture .overture__heading {
   margin-bottom: var(--space-3);
-  font-size: var(--text-m);
+  font-size: var(--text-s);
   letter-spacing: 0.2em;
-  color: var(--chalk);
+  color: var(--chalk-dim);
+}
+
+#act-overture .overture__cast .overture__heading {
+  padding-inline: var(--space-3);
 }
 
 #act-overture .overture__heading span {
@@ -98,23 +102,23 @@
     "num role role";
   column-gap: var(--space-3);
   align-items: baseline;
-  padding: 0.4rem var(--space-3);
-  border-top: 1px dotted var(--chalk-faint);
+  padding: 0.45rem var(--space-3);
+  border-top: 1px solid var(--chalk-faint);
   animation: overture-rise 0.9s var(--ease-line) calc(0.15s + var(--i) * 70ms) both;
 }
 
 #act-overture .overture__member:last-child {
-  border-bottom: 1px dotted var(--chalk-faint);
+  border-bottom: 1px solid var(--chalk-faint);
 }
 
 #act-overture .overture__number {
   grid-area: num;
-  color: var(--velvet-lit);
+  color: var(--chalk-dim);
 }
 
 #act-overture .overture__name {
   grid-area: name;
-  font-size: 1.7rem;
+  font-size: 1.6rem;
   line-height: 1.05;
   color: var(--paper);
 }
@@ -122,12 +126,12 @@
 #act-overture .overture__role {
   grid-area: role;
   font-size: var(--text-s);
-  color: var(--chalk);
+  color: var(--chalk-dim);
 }
 
 #act-overture .overture__code {
   grid-area: code;
-  color: var(--standby-blue);
+  color: var(--chalk-dim);
 }
 
 #act-overture .overture__how {
@@ -154,17 +158,17 @@
 
 #act-overture .overture__hint dd {
   font-size: var(--text-s);
-  color: var(--chalk);
+  color: var(--chalk-dim);
 }
 
 #act-overture kbd {
   padding: 0.1em 0.5em;
   border: 1px solid var(--chalk-faint);
-  border-bottom-width: 3px;
+  border-bottom-width: 2px;
   border-radius: 0.2em;
   font-size: var(--text-xs);
-  color: var(--paper);
-  background: var(--wing-grey);
+  color: var(--chalk);
+  background: transparent;
 }
 
 @keyframes overture-title {

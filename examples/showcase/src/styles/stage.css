@@ -69,8 +69,10 @@ body > noscript .noscript {
   position: fixed;
   inset: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
+  --controls-gap: var(--space-5);
+  grid-template-columns: minmax(0, 1fr) auto;
   grid-template-rows: auto auto minmax(0, 1fr) auto;
+  column-gap: var(--controls-gap);
   background:
     radial-gradient(ellipse 85% 60% at 50% 0%, color-mix(in oklab, var(--limelight) 8%, transparent), transparent 72%),
     var(--stage-black);
@@ -105,6 +107,7 @@ body > noscript .noscript {
 
 #chrome .playbill {
   grid-row: 1;
+  grid-column: 1 / -1;
   position: relative;
   z-index: var(--z-chrome);
   display: flex;
@@ -159,6 +162,7 @@ body > noscript .noscript {
   text-shadow: 0 0 0.9em color-mix(in oklab, var(--limelight) 55%, transparent);
 }
 
+/* Every entry keeps a numeral line, so the key, numeral and title of the overture and the finale share one baseline with the acts. */
 #chrome .playbill__key {
   font-size: var(--text-xs);
   opacity: 0.6;
@@ -167,6 +171,10 @@ body > noscript .noscript {
 #chrome .playbill__numeral {
   min-width: 1.2ch;
   font-size: var(--text-l);
+}
+
+#chrome .playbill__numeral:empty::before {
+  content: "\00a0";
 }
 
 #chrome .playbill__title {
@@ -189,18 +197,22 @@ body > noscript .noscript {
   --surtitle-size: 1.5rem;
   --surtitle-leading: 1.18;
   --surtitle-lines: 3;
+  /* The row is computed in rem and rounded below the lines' own height; without this slack, a line that fills every row is clamped one line early. */
+  --surtitle-slack: 1px;
   --surtitle-past-row: 1.5rem;
+  --surtitle-past-opacity: 0.6;
   --surtitle-pad: var(--space-3);
   grid-row: 2;
+  grid-column: 1 / -1;
   position: relative;
   z-index: var(--z-chrome);
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  grid-template-rows: var(--surtitle-past-row) calc(var(--surtitle-lines) * var(--surtitle-size) * var(--surtitle-leading));
+  grid-template-rows: var(--surtitle-past-row) calc(var(--surtitle-lines) * var(--surtitle-size) * var(--surtitle-leading) + var(--surtitle-slack));
   column-gap: var(--space-5);
   align-content: center;
   block-size: calc(
-    var(--surtitle-past-row) + var(--surtitle-lines) * var(--surtitle-size) * var(--surtitle-leading) + 2 * var(--surtitle-pad)
+    var(--surtitle-past-row) + var(--surtitle-lines) * var(--surtitle-size) * var(--surtitle-leading) + var(--surtitle-slack) + 2 * var(--surtitle-pad)
   );
   padding: var(--surtitle-pad) var(--space-6);
   overflow: hidden;
@@ -220,7 +232,7 @@ body > noscript .noscript {
   font-size: var(--text-s);
   line-height: 1.5;
   color: var(--chalk);
-  opacity: 0.42;
+  opacity: var(--surtitle-past-opacity);
   animation: line-past-a var(--dur-line) var(--ease-line) both;
 }
 
@@ -271,18 +283,19 @@ body > noscript .noscript {
 
 @keyframes line-past-a {
   from { opacity: 1; translate: 0 1.6em; color: var(--limelight); }
-  to { opacity: 0.42; translate: 0 0; color: var(--chalk); }
+  to { opacity: var(--surtitle-past-opacity); translate: 0 0; color: var(--chalk); }
 }
 
 @keyframes line-past-b {
   from { opacity: 1; translate: 0 1.6em; color: var(--limelight); }
-  to { opacity: 0.42; translate: 0 0; color: var(--chalk); }
+  to { opacity: var(--surtitle-past-opacity); translate: 0 0; color: var(--chalk); }
 }
 
 /* Proscenium and stage */
 
 #theatre > .stage-frame {
   grid-row: 3;
+  grid-column: 1 / -1;
   position: relative;
   isolation: isolate;
   overflow: hidden;
@@ -337,30 +350,54 @@ body > noscript .noscript {
 }
 
 /*
- * Spotlight: the stage dims to about half its light, except a soft ellipse around the lit element.
- * The dark field stays legible: the act is never darker than half of what the ellipse lights.
+ * Spotlight: with a spot set the stage falls to near dark (86% stage-black) except a pool of light shaped
+ * like the cued element. `--spot-rx` and `--spot-ry` are the pool's half-width and half-height, margin
+ * included, so the element is lit to its edges; the light then falls off over `--spot-soft`. The field
+ * is the full rectangle minus the pool (mask `exclude`), so with no spot (`--spot-dim: 0`) nothing is dimmed.
  */
 
 .stage-frame > .spotlight {
+  --spot-soft: 1.75rem;
+  --pool-across: linear-gradient(
+    90deg,
+    transparent calc(var(--spot-x) - var(--spot-rx) - var(--spot-soft)),
+    #000 calc(var(--spot-x) - var(--spot-rx)),
+    #000 calc(var(--spot-x) + var(--spot-rx)),
+    transparent calc(var(--spot-x) + var(--spot-rx) + var(--spot-soft))
+  );
+  --pool-down: linear-gradient(
+    transparent calc(var(--spot-y) - var(--spot-ry) - var(--spot-soft)),
+    #000 calc(var(--spot-y) - var(--spot-ry)),
+    #000 calc(var(--spot-y) + var(--spot-ry)),
+    transparent calc(var(--spot-y) + var(--spot-ry) + var(--spot-soft))
+  );
+  --pool-warmth: radial-gradient(
+    ellipse calc(var(--spot-rx) * 1.5) calc(var(--spot-ry) * 1.5) at var(--spot-x) var(--spot-y),
+    color-mix(in oklab, var(--limelight) calc(var(--spot-dim) * 9%), transparent),
+    transparent
+  );
   position: absolute;
   inset: 0;
   z-index: var(--z-spot);
   pointer-events: none;
-  background:
-    radial-gradient(
-      ellipse var(--spot-rx) var(--spot-ry) at var(--spot-x) var(--spot-y),
-      color-mix(in oklab, var(--limelight) calc(var(--spot-dim) * 8%), transparent) 0,
-      transparent 40%,
-      color-mix(in oklab, var(--stage-black) calc(var(--spot-dim) * 14%), transparent) 62%,
-      color-mix(in oklab, var(--stage-black) calc(var(--spot-dim) * 38%), transparent) 84%,
-      color-mix(in oklab, var(--stage-black) calc(var(--spot-dim) * 48%), transparent) 100%
-    );
+  background: color-mix(in oklab, var(--stage-black) calc(var(--spot-dim) * 86%), transparent);
+  mask-image: linear-gradient(#000 0 0), var(--pool-down), var(--pool-across);
+  mask-composite: exclude, intersect, add;
   transition:
     --spot-dim var(--dur-spot) var(--ease-spot),
     --spot-x 80ms linear,
     --spot-y 80ms linear,
     --spot-rx 80ms linear,
     --spot-ry 80ms linear;
+}
+
+.stage-frame > .spotlight::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--pool-warmth);
+  mask-image: var(--pool-down), var(--pool-across);
+  mask-composite: intersect;
 }
 
 .stage-frame > .spotlight[data-moving="true"] {
@@ -453,10 +490,8 @@ body > noscript .noscript {
   display: grid;
   grid-template-columns: auto minmax(6rem, 1fr) auto;
   align-items: center;
-  gap: var(--space-5);
-  padding: var(--space-4) var(--space-6);
-  /* leaves room for the prompter's book tab, which sits over the right end of this row */
-  padding-inline-end: 16rem;
+  gap: var(--controls-gap);
+  padding: var(--space-4) 0 var(--space-4) var(--space-6);
 }
 
 #chrome .controls__buttons {
@@ -550,7 +585,7 @@ body > noscript .noscript {
   align-self: flex-start;
 }
 
-/* Newest on top. Rows older than the latest are set in ever more degraded cuts of Redaction. */
+/* Newest on top. The latest row is lit; older rows are set in Redaction 10, then 35, and fade into the background. */
 #prompter-book .mufw-history {
   display: flex;
   flex: 1 1 auto;
@@ -590,12 +625,12 @@ body > noscript .noscript {
 }
 
 #prompter-book .mufw-history li:nth-last-child(n + 8) {
-  font-family: "Redaction 70", var(--face-body);
+  font-family: "Redaction 35", var(--face-body);
   color: var(--chalk);
 }
 
 #prompter-book .mufw-history li:nth-last-child(n + 14) {
-  font-family: "Redaction 100", var(--face-body);
+  font-family: "Redaction 35", var(--face-body);
   color: var(--chalk-dim);
 }
 
@@ -612,11 +647,15 @@ body > noscript .noscript {
   color: var(--chalk);
 }
 
+/* A grid item beside the controls, in the same row: it centres on the buttons and keeps the row's gap from the count. */
 #theatre > .book-tab {
-  position: fixed;
-  right: var(--space-6);
-  bottom: var(--space-3);
+  grid-row: 4;
+  grid-column: 2;
+  position: relative;
   z-index: var(--z-book-tab);
+  display: flex;
+  align-self: center;
+  margin-inline-end: var(--space-6);
   transition: translate var(--dur-slow) var(--ease-curtain);
 }
 
@@ -630,6 +669,10 @@ body > noscript .noscript {
  * is again one fixed height, so the stage still never moves between cues.
  */
 @media (max-height: 800px) {
+  #theatre {
+    --controls-gap: var(--space-4);
+  }
+
   #chrome .playbill {
     gap: var(--space-4);
   }
@@ -664,15 +707,10 @@ body > noscript .noscript {
 
   #chrome .controls {
     padding-block: var(--space-2);
-    gap: var(--space-4);
   }
 
   #chrome .controls .stage-button,
   #theatre > .book-tab .stage-button {
     padding-block: 0.4em;
-  }
-
-  #theatre > .book-tab {
-    bottom: var(--space-2);
   }
 }

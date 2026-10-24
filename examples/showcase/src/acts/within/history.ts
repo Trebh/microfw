@@ -50,8 +50,8 @@ const recordRow = (row: Row, older: Row | undefined) =>
 
 const historyList = (title: string, rows: ReadonlyArray<Row>) =>
   html`<header class="within__hist-head">
-      <h3 class="within__hist-title mono">${title}</h3>
-      <span class="within__hist-count mono">${rows.length === 0 ? "…" : `#${rows[0]?.seq ?? 0}`}</span>
+      <h3 class="within__hist-title mono">${title} <span class="within__hist-kind">history</span></h3>
+      <span class="within__hist-count mono">${rows.length === 0 ? "…" : `step #${rows[0]?.seq ?? 0}`}</span>
     </header>
     <ol class="within__records">${rows.map((row, index) => recordRow(row, rows[index + 1]))}</ol>`
 

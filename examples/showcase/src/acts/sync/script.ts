@@ -6,50 +6,50 @@ export const RACE_CUE = 2
 /** The cue on which the same race runs again over the slow line to window B. */
 export const SLOW_RACE_CUE = 5
 
-/** The cue on which window A is closed and the chair changes hands. */
+/** The cue on which window A is closed and the lease changes hands. */
 export const CLOSE_CUE = 7
 
 export const script: ActScript = {
   id: "sync",
   numeral: "VII",
   title: "Two Box Offices",
-  subtitle: "two windows, one house, one ordered log",
+  subtitle: "two windows, one house, one shared log",
   feature: "@mufw/core/sync · layerLoopSynced · SyncLog · the lease",
   cues: [
     {
-      line: "Two ticket windows face each other across one house. Same definition, two loops, and not one shared variable.",
+      line: "Two ticket windows, one house. Each window runs the same box office on its own, and they share no variable.",
       spot: "windows"
     },
     {
-      line: "Between them runs the log: ordered, append-only. Every entry has a sequence, and both windows read it from the top.",
+      line: "Between them is the log, one shared list of numbered entries. Both windows write their proposals to its end, and both apply it from the top.",
       spot: "log"
     },
     {
-      line: "[Both windows reach for the same seat in the same instant.] Two intents, two actions, two proposals, each sent to the log.",
+      line: "[Both windows reach for the same seat at the same moment.] Each one turns its click into a proposal and sends it to the log.",
       spot: "windows"
     },
     {
-      line: "The log picks an order. The first proposal takes the seat; the second meets the same acceptor, and is refused, on both windows alike.",
+      line: "The log puts the two proposals in a line. The first gets the seat, the second is refused, and both windows show the same result.",
       spot: "log"
     },
     {
-      line: "The badge is not a hope. It compares the two models at the same sequence, and says agreed only when they are equal.",
+      line: "The badge compares the two windows. It says agreed only when both have applied the same entries and hold the same seats.",
       spot: "agreed"
     },
     {
-      line: "[The line to window B goes slow. B asks first.] Its proposal is still on the wire: A's lands first and wins, and B converges when its own arrives.",
+      line: "[The line to window B goes slow, and B asks first.] B's proposal is still on its way, so A's reaches the log first and wins. B catches up when its own arrives.",
       spot: "slow-line"
     },
     {
-      line: "One part needs a single owner: the prompter's chair. Automatic actions, like the wait that frees a hold, run only in the window that holds the lease.",
+      line: "Some work must run in one window only. Automatic actions, like the timer that frees an unpaid hold, run only in the window that holds the lease.",
       spot: "lease"
     },
     {
-      line: "[Window A closes.] Its renewals stop. After the timeout of silence, B claims the next epoch, and the chair is B's.",
+      line: "[Window A closes.] It stops renewing the lease. After a few seconds of silence, window B takes the lease over and runs the automatic actions.",
       spot: "lease"
     },
     {
-      line: "Only proposals travel. Each action ran where its intent arrived, A's hold at A, B's hold at B; the log never saw an intent.",
+      line: "Only proposals go into the log. A's click was handled in window A and B's in window B; the log never sees a click.",
       spot: "log"
     }
   ]

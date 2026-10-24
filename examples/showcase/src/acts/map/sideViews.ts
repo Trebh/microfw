@@ -12,12 +12,12 @@ const classes = (...parts: ReadonlyArray<string | false>): string => parts.filte
 /** The marquee numbers and the one-line answer to "is anything unreachable?". */
 export const headView = (chart: Chart): Hole => {
   const answer = chart.unreachable.length === 0
-    ? "no place on stage is unreachable"
-    : `unreachable: ${chart.unreachable.join(", ")}`
+    ? "every place can be reached"
+    : `cannot be reached: ${chart.unreachable.join(", ")}`
   return html`<header class="map__head">
-    <p class="map__kicker marquee">The blocking diagram</p>
+    <p class="map__kicker marquee">The map of the Box Office</p>
     <p class="map__figures" data-spot="count">
-      <span class="map__figure"><b class="marquee">${chart.states}</b> states,</span>
+      <span class="map__figure"><b class="marquee">${chart.states}</b> states found,</span>
       <span class="map__figure"><b class="marquee">${chart.places}</b> places to stand</span>
     </p>
     <p class="map__unreachable" data-spot="unreachable">
@@ -65,15 +65,15 @@ const wayView = (way: Way, index: number, representation: Representation): Hole 
 const statusLine = (representation: Representation): string => {
   const routes = representation.ways.length
   if (representation.controlState === "walking") return `route ${representation.way + 1} of ${routes}`
-  if (representation.controlState === "done") return `[${routes} routes walked, one to every place]`
-  return "[the light waits in the wings]"
+  if (representation.controlState === "done") return `[${routes} routes walked, one to each place]`
+  return "[the light is waiting offstage]"
 }
 
 /** Every shortest path, written as stage directions, with the light's progress through them. */
 export const walkView = (representation: Representation, dispatch: Dispatch): Hole =>
   html`<section class="map__walk" data-spot="walk" aria-labelledby="map-walk">
     <header class="map__section-head">
-      <h2 class="marquee" id="map-walk">Walk every path</h2>
+      <h2 class="marquee" id="map-walk">Walk directions</h2>
       <button
         type="button"
         class="stage-button"
@@ -100,10 +100,10 @@ const crossingRow = (crossing: Crossing, latest: string): Hole => {
 /** What the visitor's own history crossed on the map, from `mergeHistory`. */
 export const mineView = (representation: Representation): Hole => {
   const rows = representation.crossings.length === 0
-    ? html`<p class="mine__empty">[Nobody has crossed the stage yet. Open the doors, hold a seat: Act I.]</p>`
+    ? html`<p class="mine__empty">[You haven't crossed the stage yet. Open the doors and hold a seat in Act I.]</p>`
     : html`<ul class="mine__rows">${representation.crossings.map((crossing) => crossingRow(crossing, representation.latest))}</ul>`
   return html`<section class="map__mine" data-spot="mine" aria-labelledby="map-mine">
-    <h2 class="marquee" id="map-mine">The paths you walked tonight</h2>
+    <h2 class="marquee" id="map-mine">The paths you took</h2>
     ${rows}
   </section>`
 }
@@ -115,7 +115,7 @@ const codeLine = (line: string): Hole =>
 export const cardView = (chart: Chart): Hole =>
   html`<aside class="map__card paper-card paper-card--torn" data-spot="xstate" style="--tilt: 0.7deg" aria-labelledby="map-xstate">
     <header class="card__head">
-      <h2 class="marquee" id="map-xstate">The same map, as Stately reads it</h2>
+      <h2 class="marquee" id="map-xstate">The same map as an XState machine</h2>
       <p class="mono">toXStateDefinition(BoxOffice, graph)</p>
     </header>
     <div class="code mono" role="img" aria-label="The XState machine config of the Box Office">${chart.xstate.map(codeLine)}</div>

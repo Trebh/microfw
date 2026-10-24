@@ -101,7 +101,7 @@ export const floorView = (chart: Chart, representation: Representation): Hole =>
     representation.crossings.map((crossing): readonly [string, Crossing] => [groupKey(crossing), crossing])
   )
   const crossingKey = Option.match(crossingNow(representation), { onNone: () => "", onSome: groupKey })
-  return svg`<svg class="floor" viewBox="0 0 720 430" role="img" aria-label="Blocking diagram of the Box Office: four spike marks joined by chalk arcs">
+  return svg`<svg class="floor" viewBox="0 0 720 430" role="img" aria-label="Map of the Box Office: four places to stand joined by chalk arcs">
     <defs>
       <radialGradient id="map-pool" cx="50%" cy="50%" r="50%">
         <stop class="floor__lit" offset="0" />

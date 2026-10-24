@@ -36,11 +36,11 @@ export const shell = () =>
     <header class="rehearsal__head">
       <p class="rehearsal__kicker marquee">Act IV</p>
       <h1 class="rehearsal__title">Rehearsal</h1>
-      <p class="rehearsal__feature mono">@mufw/test · a test is a path through the graph</p>
+      <p class="rehearsal__feature mono">@mufw/test · model-based testing</p>
     </header>
 
     <section class="rehearsal__graph" data-spot="graph" aria-labelledby="rehearsal-graph">
-      <h2 class="rehearsal__heading marquee" id="rehearsal-graph">The graph <span class="past-35">explored, never drawn</span></h2>
+      <h2 class="rehearsal__heading marquee" id="rehearsal-graph">The graph <span class="past-35">every state the test library found</span></h2>
       <ul class="rehearsal__nodes">${graphNodes.map(graphNode)}</ul>
       <ul class="rehearsal__edges">${graphEdges.map(graphEdge)}</ul>
     </section>
@@ -48,7 +48,7 @@ export const shell = () =>
     <section class="rehearsal__sheet" data-spot="sheet" aria-labelledby="rehearsal-sheet"></section>
 
     <section class="rehearsal__bench" data-spot="bench" aria-labelledby="rehearsal-bench">
-      <h2 class="rehearsal__heading marquee" id="rehearsal-bench">The understudy <span class="past-35">a second Box Office</span></h2>
+      <h2 class="rehearsal__heading marquee" id="rehearsal-bench">The understudy <span class="past-35">a second Box Office for the test</span></h2>
       <div class="rehearsal__panes">
         <figure class="rehearsal__pane" data-understudy="honest">
           <div class="rehearsal__house" data-house="honest"></div>
@@ -56,7 +56,7 @@ export const shell = () =>
         </figure>
         <figure class="rehearsal__pane" data-understudy="sabotaged">
           <div class="rehearsal__house" data-house="sabotaged"></div>
-          <figcaption class="mono">Understudy, sabotaged</figcaption>
+          <figcaption class="mono">Sabotaged understudy</figcaption>
         </figure>
       </div>
     </section>
@@ -98,8 +98,8 @@ const stageManagersNote = (entry: CallSheetLine, failure: Failure) =>
 
 const STATUS_WORDS: Record<Line["status"], string> = {
   pending: "waiting",
-  running: "on stage",
-  passed: "clean",
+  running: "running",
+  passed: "passed",
   failed: "failed"
 }
 
@@ -127,7 +127,7 @@ const pathLines = (representation: Representation): ReadonlyArray<Hole> =>
   )
 
 const totalReading = (representation: Representation): string => {
-  const base = `${representation.total} paths, ${representation.passed} clean`
+  const base = `${representation.passed} of ${representation.total} passed`
   return representation.failed > 0 ? `${base}, ${representation.failed} failed` : base
 }
 
@@ -140,7 +140,7 @@ const rehearseLabel = (representation: Representation): string => {
 export const sheetView: View<Representation, Intent> = (representation, dispatch) => {
   const sabotaged = representation.understudy === "sabotaged"
   return html`<header class="rehearsal__sheet-head">
-      <h2 class="rehearsal__heading marquee" id="rehearsal-sheet">Call sheet <span class="past-35">every shortest path</span></h2>
+      <h2 class="rehearsal__heading marquee" id="rehearsal-sheet">Call sheet <span class="past-35">the shortest way to each state</span></h2>
     </header>
     <ol
       class="rehearsal__paths"

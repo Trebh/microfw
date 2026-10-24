@@ -16,11 +16,11 @@ const element = (tag: "div" | "span", className: string): HTMLElement => {
   return created
 }
 
-/** The lamp reads `waking` until its stage says otherwise, so a worker that is slow to start is seen to be. */
+/** The lamp reads `starting` until its stage says otherwise, so a worker that is slow to start is seen to be. */
 const mountsOfOneStage = (): Mounts => {
   const lamp = element("span", "tour__lamp mono")
   lamp.dataset.state = "connecting"
-  lamp.textContent = "waking"
+  lamp.textContent = "starting"
   return { seats: element("div", "tour__seats"), meter: element("div", "tour__meter-mount"), lamp }
 }
 

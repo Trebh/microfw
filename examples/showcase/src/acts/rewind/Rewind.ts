@@ -103,7 +103,7 @@ export const acceptTravelRefused = (model: Model, proposal: Proposal): Model =>
       ...model,
       selected: Option.none(),
       pendingStart: false,
-      note: Option.some(`Frame ${proposal.seq} has left the reel: the stage no longer keeps it.`)
+      note: Option.some(`The stage no longer has frame ${proposal.seq}, so it can't go back there.`)
     }
     : model
 
@@ -111,7 +111,7 @@ export const acceptTravelRefused = (model: Model, proposal: Proposal): Model =>
 export const acceptReturnRequested = (model: Model, proposal: Proposal): Model => {
   if (proposal._tag !== "ReturnRequested") return model
   if (Option.isSome(doorsOf(model.records))) return { ...model, pendingStart: true }
-  return { ...model, note: Option.some("Nothing has happened on the stage yet: open the doors, hold a seat, then go back.") }
+  return { ...model, note: Option.some("Nothing has happened on the stage yet. Open the doors and hold a seat, then go back.") }
 }
 
 export const acceptExportRequested = (model: Model, proposal: Proposal): Model =>

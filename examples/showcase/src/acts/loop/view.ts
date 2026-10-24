@@ -25,7 +25,7 @@ const seatIntent = (seat: SeatView, open: boolean, charging: boolean): Option.Op
 }
 
 const seatHint = (seat: SeatView, charging: boolean): string => {
-  if (charging) return `${seat.id}: paying, the gateway is thinking`
+  if (charging) return `${seat.id}: paying, waiting for the payment gateway`
   if (seat.status === "free") return `${seat.id}: free. Click to hold it`
   if (seat.status === "held") return `${seat.id}: held. Click to pay`
   return `${seat.id}: sold`
@@ -156,9 +156,9 @@ const seatsText = (seats: ReadonlyArray<string>) => seats.join(", ")
 
 const actionNote = (representation: Representation, scene: Option.Option<Scene>): string => {
   if (representation.charging.length > 0) {
-    return `offstage: charging… ${seatsText(representation.charging.map((charge) => charge.seat))}`
+    return `offstage: paying ${seatsText(representation.charging.map((charge) => charge.seat))}…`
   }
-  return Option.isSome(scene) ? "came back with a proposal" : "waiting in the wings"
+  return Option.isSome(scene) ? "came back with a Proposal" : "waiting in the wings"
 }
 
 const fieldsText = (scene: Scene): string => {
@@ -170,7 +170,7 @@ const stationNote = (id: StationId, representation: Representation): string => {
   const scene = representation.scene
   if (id === "action") return actionNote(representation, scene)
   return Option.match(scene, {
-    onNone: () => (id === "intent" ? "ask for a seat" : "—"),
+    onNone: () => (id === "intent" ? "click a seat" : "—"),
     onSome: (current) => {
       const notes: Readonly<Record<Exclude<StationId, "action">, string>> = {
         intent: current.automatic ? `${current.intent} · by NAP` : current.intent,
@@ -203,15 +203,15 @@ const station = (id: StationId, index: number, representation: Representation) =
   </li>`
 }
 
-/** Redaction degrades with age: the newest earlier scene is nearly fresh, the oldest long gone. */
-const pastCuts = ["past-10", "past-35", "past-70", "past-100"]
+/** Redaction degrades with age: the newest earlier scene is nearly fresh, the older ones fade out. */
+const pastCuts = ["past-10", "past-35", "past-faded"]
 
 const earlierScenes = (representation: Representation) => {
   const earlier = representation.recent.slice(0, -1).slice(-pastCuts.length)
   return html`<ol class="loop__recent" aria-label="Earlier scenes">
     ${earlier.map((scene, index) => {
       const age = earlier.length - 1 - index
-      return html`<li class=${pastCuts[age] ?? "past-100"}>${scene.tag}</li>`
+      return html`<li class=${pastCuts[age] ?? "past-faded"}>${scene.tag}</li>`
     })}
   </ol>`
 }
@@ -233,7 +233,7 @@ const acceptorsItem = (scene: Option.Option<Scene>) =>
       onNone: () => html`<p class="ledger__quiet">no scene yet</p>`,
       onSome: (current) =>
         current.changes.length === 0
-          ? html`<p class="ledger__quiet">the model kept every field</p>`
+          ? html`<p class="ledger__quiet">the Model didn't change</p>`
           : html`<ul class="chips">${current.changes.map((change) => chip(change.field, change.change))}</ul>
             <p class="ledger__by mono">by ${current.movers.join(", ")}</p>`
     })
@@ -246,7 +246,7 @@ const reactorsItem = (scene: Option.Option<Scene>) => {
     <dt class="marquee">Reactors</dt>
     <dd>${
     freed.length > 0
-      ? html`<p class="ledger__freed">freed <b class="mono">${seatsText(freed)}</b>: its hold had run out</p>`
+      ? html`<p class="ledger__freed">freed <b class="mono">${seatsText(freed)}</b>, its hold ran out</p>`
       : html`<p class="ledger__quiet">${Option.isSome(scene) ? "the stage was already tidy" : "no scene yet"}</p>`
   }</dd>
   </div>`
@@ -270,8 +270,8 @@ const whisperLine = (scene: Scene): string =>
     onNone: () => (scene.controlState === "curtain" ? "The curtain is up. Nothing more to say." : "Nothing to wait for. I keep quiet."),
     onSome: (intent) =>
       intent._tag === "RaiseCurtain"
-        ? "Every seat is sold: raise the curtain."
-        : "Wait for the earliest hold to run out, then tick."
+        ? "Every seat is sold. Raise the curtain."
+        : "Wait for the earliest hold to run out, then look at the clock."
   })
 
 const napItem = (scene: Option.Option<Scene>) =>
@@ -314,7 +314,7 @@ const play = (representation: Representation) => {
   return html`<section class="loop__play" data-state=${representation.controlState} aria-label="One step of the loop">
     <header class="loop__heading">
       <p class="loop__kicker marquee">One step</p>
-      <p class="loop__state mono">${Option.match(scene, { onNone: () => "no scene yet", onSome: (current) => `scene · record ${current.seq}` })}</p>
+      <p class="loop__state mono">${Option.match(scene, { onNone: () => "no scene yet", onSome: (current) => `scene ${current.seq}` })}</p>
     </header>
     <div class="loop__track">
       <ol class="loop__stations">${STATIONS.map((id, index) => station(id, index, representation))}</ol>

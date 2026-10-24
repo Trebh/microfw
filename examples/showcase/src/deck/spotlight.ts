@@ -8,7 +8,7 @@ export interface SpotlightRoots {
   readonly frame: HTMLElement
   /** Holds the acts. */
   readonly stage: HTMLElement
-  /** Covers the stage; the stylesheet draws a dimmed field with a soft ellipse of light from its `--spot-*` properties. */
+  /** Covers the stage; the stylesheet draws a dark field with a pool of light, sized from its `--spot-*` properties. */
   readonly overlay: HTMLElement
 }
 
@@ -23,10 +23,9 @@ const findSpot = (stage: HTMLElement, actId: string, spot: string): HTMLElement 
 /** An element in a hidden act has no box: it cannot be lit yet. */
 const isDisplayed = (element: HTMLElement) => element.getClientRects().length > 0
 
-/** The ellipse is wider than the element it lights: a bright core past its edges, then the fall-off. */
-const CORE_FACTOR = 2.2
-const MARGIN_X = 140
-const MARGIN_Y = 110
+/** The pool of light reaches this far past the element's edges, in screen pixels, so the element is lit to its border and shadow. */
+const MARGIN_X = 28
+const MARGIN_Y = 22
 /** An act's island may render after its first cue is up, and a hidden act is shown by the curtain. */
 const SEARCH_ATTEMPTS = 30
 const SEARCH_EVERY_MILLIS = 50
@@ -37,8 +36,8 @@ const aim = (overlay: HTMLElement, target: HTMLElement) => {
   const field = overlay.getBoundingClientRect()
   overlay.style.setProperty("--spot-x", `${spot.left + spot.width / 2 - field.left}px`)
   overlay.style.setProperty("--spot-y", `${spot.top + spot.height / 2 - field.top}px`)
-  overlay.style.setProperty("--spot-rx", `${(spot.width / 2) * CORE_FACTOR + MARGIN_X}px`)
-  overlay.style.setProperty("--spot-ry", `${(spot.height / 2) * CORE_FACTOR + MARGIN_Y}px`)
+  overlay.style.setProperty("--spot-rx", `${spot.width / 2 + MARGIN_X}px`)
+  overlay.style.setProperty("--spot-ry", `${spot.height / 2 + MARGIN_Y}px`)
 }
 
 const setDim = (overlay: HTMLElement, dim: 0 | 1) => overlay.style.setProperty("--spot-dim", String(dim))
@@ -47,9 +46,9 @@ const prefersReducedMotion = () => window.matchMedia("(prefers-reduced-motion: r
 
 /**
  * Lights the element the current cue's `spot` names, or the whole stage when the cue has none.
- * The ellipse travels over the spot's own duration, is measured again when it arrives, and then
+ * The pool travels over the spot's own duration, is measured again when it arrives, and then
  * follows the target and the stage: a resize of either, a new `--stage-scale` (the canvas is scaled
- * to the frame, and the ellipse lives in the frame's own coordinates), scrolling, and the curtain
+ * to the frame, and the pool lives in the frame's own coordinates), scrolling, and the curtain
  * opening on the act.
  * A spot the act's markup does not carry is logged and the stage stays fully lit.
  */

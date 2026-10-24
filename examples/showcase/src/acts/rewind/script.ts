@@ -7,39 +7,39 @@ export const script: ActScript = {
   id: "rewind",
   numeral: "II",
   title: "Rewind",
-  subtitle: "everything that happened is on the reel",
+  subtitle: "every step is kept on the reel",
   feature: "HistoryPort · travelTo · replayFrom · encodeHistoryJson",
   cues: [
     {
-      line: "[A projector warms. The house you filled in Act I has been filmed, record by record.]",
+      line: "[A projector warms. The house you filled in Act I was filmed, one frame for every step.]",
       spot: "film"
     },
     {
-      line: "Every step is a frame: the proposal that caused it, and the house as it stood after. The older the frame, the more its print has faded.",
+      line: "Each frame shows the proposal behind a step and the house as it stood afterwards. The older the frame, the more faded it looks.",
       spot: "frame-latest"
     },
     {
-      line: "This is the newest frame, enlarged: the stage as it is. Touch it and a frame is exposed. Nothing here is a copy.",
+      line: "The big panel is the newest frame, enlarged. It's the live stage: click a seat and a new frame appears on the strip.",
       spot: "stage"
     },
     {
-      line: "Now go back. travelTo(seq) restores the model recorded under a seq. [The stage rewinds to the doors opening; the seats you held are free again.]",
+      line: "Now go back. travelTo jumps to any earlier step and restores the model as it was then. [The stage returns to the doors opening; your seats are free again.]",
       spot: "scrubber"
     },
     {
-      line: "And the journey is itself a frame, a splice in the film. A travel is a new record: history never forgets it went back.",
+      line: "Going back is recorded too. The jump adds a new frame to the reel, so the history still shows that you went back.",
       spot: "never-forgets"
     },
     {
-      line: "A travel also stops what was running offstage. A hold waits for its expiry in an automatic action; travel away and that wait is interrupted, until the next proposal wakes the prompter.",
+      line: "Going back also cancels work running offstage. A held seat waits for its time to run out, and that wait stops until the next proposal arrives.",
       spot: "hold-wait"
     },
     {
-      line: "Same proposals, same play. replayFrom re-applies every proposal after a frame, as a pure function, and each model comes out equal to the one on the reel.",
+      line: "Replaying means applying the same proposals again and getting the same models. replayFrom does it from any frame, and each result should match the reel.",
       spot: "replay"
     },
     {
-      line: "Take the recording home. encodeHistoryJson turns the whole reel into a file that decodeHistoryJson accepts. [A file lands in your downloads.]",
+      line: "You can keep the recording. encodeHistoryJson turns the whole reel into a JSON file, and decodeHistoryJson reads it back. [A file lands in your downloads.]",
       spot: "export"
     }
   ]

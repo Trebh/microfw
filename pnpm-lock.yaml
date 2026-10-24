@@ -102,9 +102,6 @@ importers:
       '@fontsource/redaction-35':
         specifier: ^5.3.0
         version: 5.3.0
-      '@fontsource/redaction-70':
-        specifier: ^5.3.0
-        version: 5.3.0
       '@mufw/core':
         specifier: workspace:*
         version: link:../../packages/core
@@ -388,9 +385,6 @@ packages:
 
   '@fontsource/redaction-35@5.3.0':
     resolution: {integrity: sha512-c4n4fgTbYoiyODKvasBWjj1EzV9G+X2oYDgr1PPShIO3rzM50CYvlJ+VCpgBmNyw9l8D/6T1PUmn8ZGgzOlV3g==}
-
-  '@fontsource/redaction-70@5.3.0':
-    resolution: {integrity: sha512-K8jG7NWaOIF+d4kySQBkq+FeMxIoOxwotmK3adBDd6/MTrbPcGijxI46Y5zjjDWmfY/8Rcs2YJlz6XhYjyJylQ==}
 
   '@fontsource/redaction@5.3.0':
     resolution: {integrity: sha512-mlVA74kHfyjLPjX2j+93w/0leZAQ4aouFbx6LR8fbfqpaDRFidQnpFbpb+0wVY/MS/k3IbTjQgPjdVI8ymllzw==}
@@ -1131,8 +1125,6 @@ snapshots:
   '@fontsource/redaction-10@5.3.0': {}
 
   '@fontsource/redaction-35@5.3.0': {}
-
-  '@fontsource/redaction-70@5.3.0': {}
 
   '@fontsource/redaction@5.3.0': {}
 

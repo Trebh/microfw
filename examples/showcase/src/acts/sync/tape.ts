@@ -1,5 +1,5 @@
 import { applyProposal } from "@mufw/core"
-import { applyLease, Lease, type LeaseState, leaseOutcome, noLease } from "@mufw/core/sync"
+import { applyLease, Lease, type LeaseOutcome, type LeaseState, leaseOutcome, noLease } from "@mufw/core/sync"
 import { Cause, Effect, Option, Schema } from "effect"
 import { Event, EventJournal } from "effect/eventlog"
 import { type Model as BoxModel, Proposal } from "../../domain/BoxOffice.ts"
@@ -90,6 +90,12 @@ const ROW_LIMIT = 30
 
 const SHORT_HOLDER = 6
 
+const LEASE_WORDS: Record<LeaseOutcome, string> = {
+  claimed: "took the lease",
+  renewed: "renewed",
+  ignored: "ignored"
+}
+
 const bareRow = (logged: Logged, event: string, label: string): Row => ({
   seq: logged.seq,
   at: logged.at,
@@ -152,8 +158,8 @@ const withLease = (tape: Tape, logged: Logged, lease: Lease): Tape => {
     return { ...tape, rows: [merged, ...tape.rows.slice(1)], lease: state, leaseAt, lastSeq: Option.some(logged.seq) }
   }
   const row: Row = {
-    ...bareRow(logged, "Lease", `epoch ${lease.epoch} · ${lease.holder.slice(0, SHORT_HOLDER)}`),
-    detail: outcome,
+    ...bareRow(logged, "Lease", `term ${lease.epoch} · ${lease.holder.slice(0, SHORT_HOLDER)}`),
+    detail: LEASE_WORDS[outcome],
     leaseKey: key
   }
   return pushed(tape, logged, row, { lease: state, leaseAt })

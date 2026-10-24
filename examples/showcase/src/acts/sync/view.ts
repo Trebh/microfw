@@ -51,26 +51,26 @@ const seatRow = (side: Side, window: WindowScene, open: boolean, hands: Hands, s
 
 const verdictLine = (scene: Scene, window: WindowScene) =>
   Option.match(verdictFor(scene.tape, window.patron), {
-    onNone: () => html`<span class="win__quiet">nothing asked of the log yet</span>`,
+    onNone: () => html`<span class="win__quiet">no proposal from this window yet</span>`,
     onSome: (verdict) =>
-      html`<span class="win__verdict-seq mono">seq ${verdict.seq}</span>
+      html`<span class="win__verdict-seq mono">entry ${verdict.seq}</span>
         <span class="win__verdict-label mono">${verdict.label}</span>
         <strong class="win__verdict-word" data-refused=${String(verdict.refused)}>${verdict.refused ? verdict.detail : "accepted"}</strong>`
   })
 
 const counts = (window: WindowScene) =>
   Option.match(window.seats, {
-    onNone: () => "the doors are not open to this window yet",
-    onSome: (seats) => `free ${seats.free} · held ${seats.held} · sold ${seats.sold}`
+    onNone: () => "not open yet",
+    onSome: (seats) => `${seats.free} free · ${seats.held} held · ${seats.sold} sold`
   })
 
 const appliedText = (window: WindowScene) =>
-  Option.match(window.applied, { onNone: () => "no entry applied", onSome: (applied) => `applied up to seq ${applied.sequence}` })
+  Option.match(window.applied, { onNone: () => "no entries applied yet", onSome: (applied) => `applied up to entry ${applied.sequence}` })
 
 const slowLineNote = (scene: Scene) =>
   scene.onTheWire === 0
-    ? html`<p class="win__wire win__wire--quiet mono">the line is ${scene.stage.slowLine ? "slow, nothing on it" : "clear"}</p>`
-    : html`<p class="win__wire offstage mono">${scene.onTheWire} proposal${scene.onTheWire === 1 ? "" : "s"} on the slow line</p>`
+    ? html`<p class="win__wire win__wire--quiet mono">line to the log: ${scene.stage.slowLine ? "slow, nothing on it" : "normal"}</p>`
+    : html`<p class="win__wire offstage mono">${scene.onTheWire} proposal${scene.onTheWire === 1 ? "" : "s"} on the way to the log</p>`
 
 const ticketWindow = (side: Side, scene: Scene, hands: Hands) => {
   const window = side === "A" ? scene.a : scene.b
@@ -86,7 +86,7 @@ const ticketWindow = (side: Side, scene: Scene, hands: Hands) => {
       <h2 class="win__name marquee">Window ${side}</h2>
       <p class="win__patron">acting for <em>${window.patron}</em></p>
       <p class="win__chair marquee" data-lit=${String(window.holdsChair)}>
-        <span class="win__lamp"></span>${window.holdsChair ? "holds the prompter's chair" : "not in the chair"}
+        <span class="win__lamp"></span>${window.holdsChair ? "holds the lease" : "doesn't hold the lease"}
       </p>
     </header>
     <div class="win__house" role="group" aria-label=${`The house, seen from window ${side}`}>
@@ -94,15 +94,16 @@ const ticketWindow = (side: Side, scene: Scene, hands: Hands) => {
     </div>
     <p class="win__counts mono">${counts(window)}</p>
     <p class="win__applied mono">${appliedText(window)}</p>
-    <p class="win__verdict"><span class="win__verdict-title marquee">The log's last word</span> ${verdictLine(scene, window)}</p>
-    ${side === "B" ? slowLineNote(scene) : html`<p class="win__wire win__wire--quiet mono">a direct line to the log's own storage</p>`}
+    <p class="win__verdict"><span class="win__verdict-title marquee">The log's answer to this window</span> ${verdictLine(scene, window)}</p>
+    ${side === "B" ? slowLineNote(scene) : html`<p class="win__wire win__wire--quiet mono">line to the log: direct</p>`}
     <p class="win__shutter marquee" ?hidden=${open}>window closed</p>
   </section>`
 }
 
 const detailOf = (row: Row): string => {
   if (row.renewals === 0) return row.detail
-  return row.detail === "renewed" ? `renewed ×${row.renewals + 1}` : `${row.detail} · renewed ×${row.renewals}`
+  const times = row.renewals + 1
+  return row.detail === "renewed" ? `renewed ${times} times` : `${row.detail}, renewed ${row.renewals === 1 ? "once" : `${row.renewals} times`}`
 }
 
 const tapeRow = (row: Row) =>
@@ -121,11 +122,11 @@ const tapeRow = (row: Row) =>
 const agreementBadge = (state: Agreement) => {
   switch (state._tag) {
     case "agreed":
-      return html`<span class="badge__lamp"></span><span class="badge__text">agreed at seq ${state.sequence}</span>`
+      return html`<span class="badge__lamp"></span><span class="badge__text">both agree at entry ${state.sequence}</span>`
     case "catching-up":
-      return html`<span class="badge__lamp"></span><span class="badge__text">window ${state.behind} is catching up to seq ${state.sequence}</span>`
+      return html`<span class="badge__lamp"></span><span class="badge__text">window ${state.behind} is catching up to entry ${state.sequence}</span>`
     case "diverged":
-      return html`<span class="badge__lamp"></span><span class="badge__text">the models differ at seq ${state.sequence}</span>`
+      return html`<span class="badge__lamp"></span><span class="badge__text">the windows differ at entry ${state.sequence}</span>`
     case "alone":
       return html`<span class="badge__lamp"></span><span class="badge__text">window A is closed, B sells alone</span>`
     case "joining":
@@ -135,30 +136,31 @@ const agreementBadge = (state: Agreement) => {
 
 const holderText = (scene: Scene): string =>
   Option.match(chairHolder(scene), {
-    onNone: () => (scene.tape.lease.epoch === 0 ? "nobody yet" : "vacant: waiting out the timeout"),
+    onNone: () => (scene.tape.lease.epoch === 0 ? "nobody yet" : "nobody, waiting for the timeout"),
     onSome: (side) => `window ${side}`
   })
 
 const silenceText = (scene: Scene): string =>
   Option.match(silenceMillis(scene), {
-    onNone: () => "no lease entry yet",
-    onSome: (millis) => `${(millis / 1000).toFixed(1)} s without a lease entry · another window claims at ${LEASE_TIMEOUT_MILLIS / 1000} s`
+    onNone: () => "no lease entry in the log yet",
+    onSome: (millis) => `${(millis / 1000).toFixed(1)} s of silence. Another window takes over at ${LEASE_TIMEOUT_MILLIS / 1000} s`
   })
 
 const lease = (scene: Scene) =>
   html`<div class="lease" data-spot="lease" data-vacant=${String(Option.isNone(chairHolder(scene)))}>
     <p class="lease__line">
-      <span class="lease__title marquee">The prompter's chair</span>
-      <span class="lease__epoch mono">epoch ${scene.tape.lease.epoch}</span>
+      <span class="lease__title marquee">The lease</span>
+      <span class="lease__epoch mono">term ${scene.tape.lease.epoch}</span>
     </p>
     <p class="lease__holder">${holderText(scene)}</p>
     <div class="lease__meter" style=${`--progress: ${silenceShare(scene).toFixed(3)}`}><span class="lease__bar"></span></div>
     <p class="lease__note mono">${silenceText(scene)}</p>
+    <p class="lease__rule">Only the holder runs the automatic actions.</p>
   </div>`
 
 const raceLabel = (scene: Scene): string =>
   Option.match(Option.flatMap(scene.b.seats, raceableSeat), {
-    onNone: () => "no seat to race for",
+    onNone: () => "no free seat to reach for",
     onSome: (seat) => `both reach for ${seat}`
   })
 
@@ -183,7 +185,7 @@ const controls = (scene: Scene, hands: Hands) => {
       aria-pressed=${String(slow)}
       onclick=${() => hands.stage({ _tag: "SetSlowLine", slow: !slow })}
     >
-      <span class="lamp"></span>slow line to window B
+      <span class="lamp"></span>slow down the line to window B
     </button>
     <button
       class="stage-button"
@@ -199,7 +201,7 @@ const controls = (scene: Scene, hands: Hands) => {
 export const view = (scene: Scene, hands: Hands) => {
   const state = agreement(scene)
   return html`<div class="sync">
-    <p class="sync__kicker marquee">Two windows <span class="past-35">one house, one log</span></p>
+    <p class="sync__kicker marquee">Two windows <span class="past-35">one house, one shared log</span></p>
     <div class="badge" data-spot="agreed" data-state=${state._tag} role="status">${agreementBadge(state)}</div>
     <div class="sync__stage" data-spot="windows">
       ${ticketWindow("A", scene, hands)}

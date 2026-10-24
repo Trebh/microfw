@@ -43,9 +43,9 @@ const observed: Forward<typeof BoxOffice, typeof Meter> = (_previous, current) =
   )
 
 const LAMP_TEXT: Readonly<Record<ConnectionState, string>> = {
-  connecting: "waking",
-  connected: "live",
-  disconnected: "lost"
+  connecting: "starting",
+  connected: "running",
+  disconnected: "stopped"
 }
 
 const layerLamp = (lamp: HTMLElement) =>

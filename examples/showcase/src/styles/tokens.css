@@ -3,9 +3,10 @@
  *
  *   .marquee      Big Shoulders capitals: act numerals, titles, counters, labels on the bill.
  *   .mono         Martian Mono: code, tags, proposals, sequence numbers, keys.
- *   .past-10 .past-35 .past-70 .past-100
- *                 Redaction's degraded cuts. The older a record, step or line, the more degraded
- *                 the cut: 10 is last minute, 100 is long gone. Never use one for something current.
+ *   .past-10 .past-35 .past-faded
+ *                 The past, in Redaction's degraded cuts: 10 is recent, 35 is older, `.past-faded` is long
+ *                 gone (the 35 cut, faded out). The heavier cuts (70, 100) break letters apart at the
+ *                 sizes the stage sets, so readable text never uses them. Never use one for something current.
  *   .live         Cue-light green with a breathing glow: something is running now.
  *   .offstage     Standby blue: something is in flight, away from the stage (an action, a worker, a wire).
  *   .paper-card   A sheet of paper on the dark stage (playbills, receipts, notes). `.paper-card--torn`
@@ -162,8 +163,7 @@
 
 .past-10 { font-family: "Redaction 10", var(--face-body); }
 .past-35 { font-family: "Redaction 35", var(--face-body); }
-.past-70 { font-family: "Redaction 70", var(--face-body); }
-.past-100 { font-family: "Redaction 100", var(--face-body); }
+.past-faded { font-family: "Redaction 35", var(--face-body); opacity: 0.55; }
 
 /* Light and wiring */
 

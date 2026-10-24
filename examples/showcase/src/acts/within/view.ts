@@ -91,7 +91,7 @@ export const playView: View<RepresentationOf<typeof Playhouse>, IntentOf<typeof 
     </div>
     <div class="within__model mono" data-spot="model">
       <p>{ parent: <b>${house.controlState}</b>, child: <b>${play.controlState}</b> }</p>
-      <p>controlState <b>${representation.controlState}</b></p>
+      <p>label <b>${representation.controlState}</b></p>
     </div>
     <div class="within__controls" data-spot="controls">
       ${ticket("Open doors", play.controlState === "dark", () => send({ _tag: "OpenDoors" }))}
@@ -175,17 +175,17 @@ const codeLine = (line: string) => html`<span class="within__code-line">${tokens
 const compare = () =>
   html`<aside class="within__compare paper-card" data-spot="compare" aria-label="When to nest, when to forward">
     <section>
-      <h3 class="within__verdict"><code class="mono">nest</code> <span class="marquee">when the parts are one decision</span></h3>
+      <h3 class="within__verdict"><code class="mono">nest</code> <span class="marquee">when the parts must change together</span></h3>
       <ul>
-        <li>They change together or not at all: a half-updated pair is never on screen.</li>
-        <li>One model, one history, one graph: a rewind or an explored path covers both.</li>
+        <li>Both parts change in the same step, so you never see one half updated and the other not.</li>
+        <li>There is one history, so going back in time rewinds both parts.</li>
       </ul>
     </section>
     <section>
-      <h3 class="within__verdict"><code class="mono">layerForward</code> <span class="marquee">when one part listens</span></h3>
+      <h3 class="within__verdict"><code class="mono">layerForward</code> <span class="marquee">when one program watches another</span></h3>
       <ul>
-        <li>One part only watches the other, or lives elsewhere: another page, a worker, a server.</li>
-        <li>Each keeps its own model, history and pace; the forwarded intent is a step of its own, after.</li>
+        <li>The watcher can live somewhere else: another page, a worker or a server.</li>
+        <li>Each keeps its own history and logs the request later, as a step of its own.</li>
       </ul>
     </section>
   </aside>`
@@ -196,14 +196,14 @@ export const shell = (slots: Slots) =>
     <section class="within__column" aria-labelledby="within-nest">
       <header class="within__head">
         <h2 class="within__heading" id="within-nest"><code class="within__fn">nest</code></h2>
-        <p class="within__tagline marquee">one loop, one history</p>
+        <p class="within__tagline marquee">one program, two parts that change together</p>
       </header>
       <div class="within__body within__body--nest">${slots.play}${slots.playHistory}</div>
     </section>
     <section class="within__column" aria-labelledby="within-forward">
       <header class="within__head">
         <h2 class="within__heading" id="within-forward"><code class="within__fn">layerForward</code></h2>
-        <p class="within__tagline marquee">two islands, two histories</p>
+        <p class="within__tagline marquee">two programs, one watching the other</p>
       </header>
       <div class="within__body within__body--forward">
         <div class="within__islands" data-spot="islands">${slots.front}${slots.sign}</div>

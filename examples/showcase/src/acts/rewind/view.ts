@@ -9,23 +9,22 @@ type Dispatch = (intent: Intent) => void
 
 const pad = (seq: number): string => String(seq).padStart(2, "0")
 
-/** Redaction's cut by age: the newest frame is crisp, the oldest long gone. */
+/** Redaction's cut by age: the newest frame is crisp, older ones degrade, the oldest fade. */
 const cuts: ReadonlyArray<readonly [maxAge: number, cut: string]> = [
   [0, ""],
   [2, "past-10"],
-  [5, "past-35"],
-  [9, "past-70"]
+  [5, "past-35"]
 ]
 
-const cutOf = (age: number): string => cuts.find(([maxAge]) => age <= maxAge)?.[1] ?? "past-100"
+const cutOf = (age: number): string => cuts.find(([maxAge]) => age <= maxAge)?.[1] ?? "past-faded"
 
 const spaced = (label: string): string => label.replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase()
 
 const titles: Record<Frame["kind"], (frame: Frame) => string> = {
-  init: () => "the empty house",
+  init: () => "empty house",
   step: (frame) => spaced(frame.label),
   travel: (frame) =>
-    Option.match(frame.travelledTo, { onNone: () => "splice", onSome: (seq) => `back to ${pad(seq)}` })
+    Option.match(frame.travelledTo, { onNone: () => "jump back", onSome: (seq) => `back to ${pad(seq)}` })
 }
 
 /** A travel restarts the animations of its island: they alternate between two names, which CSS reads from this. */
@@ -55,7 +54,7 @@ const frameView = (rep: Representation, dispatch: Dispatch) => (frame: Frame) =>
     <button
       type="button"
       class="frame__body"
-      aria-label=${`Travel to frame ${frame.seq}: ${title}, ${frame.held} held, ${frame.sold} sold`}
+      aria-label=${`Jump to frame ${frame.seq}: ${title}, ${frame.held} held, ${frame.sold} sold`}
       aria-current=${isSelected ? "true" : null}
       onclick=${() => dispatch({ _tag: "TravelTo", seq: frame.seq })}
     >
@@ -70,7 +69,7 @@ const frameView = (rep: Representation, dispatch: Dispatch) => (frame: Frame) =>
 
 const blankFrame = () =>
   html`<li class="frame frame--blank" data-spot="frame-latest">
-    <span class="frame__title past-100">No frame yet. The projector waits for the first record.</span>
+    <span class="frame__title past-35">No frames yet. The first one appears as soon as the stage reports.</span>
   </li>`
 
 const film = (rep: Representation, dispatch: Dispatch) =>
@@ -82,11 +81,11 @@ const film = (rep: Representation, dispatch: Dispatch) =>
   </section>`
 
 const waitNotes: Record<Representation["holdWait"], () => Hole> = {
-  none: () => html`No seat is held: nothing is waiting offstage.`,
+  none: () => html`No seat is held, so nothing is waiting offstage.`,
   inflight: () =>
-    html`<span class="offstage mono">AwaitExpiry</span> is waiting offstage for the earliest hold, an automatic action in flight.`,
+    html`<span class="offstage mono">AwaitExpiry</span> is waiting offstage for the earliest hold to run out.`,
   interrupted: () =>
-    html`<span class="stage__cut mono">travelTo</span> interrupted the wait for this hold. Nothing runs by itself until the next proposal.`
+    html`Going back (<span class="stage__cut mono">travelTo</span>) cancelled the wait for this hold to run out. Nothing runs on its own until the next proposal.`
 }
 
 const seatButton = (canHold: boolean, dispatch: Dispatch) => (seat: SeatView) =>
@@ -129,7 +128,7 @@ const stagePanel = (rep: Representation, dispatch: Dispatch) =>
     </header>
     <div class="stage__floor">
       ${Option.match(rep.stage, {
-        onNone: () => html`<p class="stage__empty past-70">The stage has not reported yet.</p>`,
+        onNone: () => html`<p class="stage__empty past-35">The stage hasn't reported yet.</p>`,
         onSome: (stage) => house(stage, rep, dispatch)
       })}
     </div>
@@ -138,17 +137,17 @@ const stagePanel = (rep: Representation, dispatch: Dispatch) =>
     <p class="stage__note" aria-live="polite">${Option.getOrElse(rep.note, () => "")}</p>
   </section>`
 
-const splicesIn = (rep: Representation): number => rep.frames.filter((frame) => frame.kind === "travel").length
+const jumpsIn = (rep: Representation): number => rep.frames.filter((frame) => frame.kind === "travel").length
 
 const neverForgets = (rep: Representation) =>
-  html`<p class="never" data-spot="never-forgets" data-lit=${splicesIn(rep) > 0} data-bleed=${bleedOf(rep.travels)}>
-    <span class="never__line">A travel is a new record: history never forgets it went back.</span>
+  html`<p class="never" data-spot="never-forgets" data-lit=${jumpsIn(rep) > 0} data-bleed=${bleedOf(rep.travels)}>
+    <span class="never__line">Going back adds a new frame, so the history still shows that you went back.</span>
   </p>`
 
 const untilText = (verdict: Verdict): string =>
   Option.match(verdict.until, {
-    onNone: () => "to the newest record",
-    onSome: (seq) => `up to the splice at ${pad(seq)}`
+    onNone: () => "to the newest frame",
+    onSome: (seq) => `to the jump back at ${pad(seq)}`
   })
 
 const replayedRow = (row: Verdict["replayed"][number]) =>
@@ -159,13 +158,13 @@ const replayedRow = (row: Verdict["replayed"][number]) =>
 const verdictBody = (verdict: Verdict) =>
   verdict.replayed.length === 0
     ? html`<p class="verdict__none">
-      Nothing was proposed after frame ${pad(verdict.from)} ${untilText(verdict)}. Choose an older frame and the replay has work to do.
+      Nothing was proposed after frame ${pad(verdict.from)}, so there is nothing to replay. Pick an earlier frame.
     </p>`
     : html`<p class="verdict__result" data-agrees=${verdict.agrees}>
-        <span class="verdict__seal marquee">${verdict.agrees ? "Equal" : "Differs"}</span>
+        <span class="verdict__seal marquee">${verdict.agrees ? "Match" : "Differs"}</span>
         <span class="verdict__sum">
           ${verdict.equalCount} of ${verdict.replayed.length} replayed
-          ${verdict.replayed.length === 1 ? "model equals" : "models equal"} the recorded one,
+          ${verdict.replayed.length === 1 ? "model matches the recorded one" : "models match the recorded ones"},
           from frame ${pad(verdict.from)} ${untilText(verdict)}.
         </span>
       </p>
@@ -174,11 +173,11 @@ const verdictBody = (verdict: Verdict) =>
 const replayCard = (rep: Representation) =>
   html`<section class="verdict paper-card" data-spot="replay" style="--tilt: 0.5deg" aria-labelledby="rewind-replay">
     <header class="verdict__head">
-      <h2 class="marquee" id="rewind-replay">Same proposals, same play</h2>
-      <p class="mono">replayFrom(BoxOffice, records, seq)</p>
+      <h2 class="marquee" id="rewind-replay">Replay from this frame</h2>
+      <p class="mono">replayFrom</p>
     </header>
     ${Option.match(rep.verdict, {
-      onNone: () => html`<p class="verdict__none">Choose a frame to replay from.</p>`,
+      onNone: () => html`<p class="verdict__none">Pick a frame to replay from.</p>`,
       onSome: verdictBody
     })}
   </section>`
@@ -206,7 +205,7 @@ const selectedLine = (rep: Representation): string =>
 const transport = (rep: Representation, dispatch: Dispatch) =>
   html`<section class="transport" aria-label="Transport">
     <div class="transport__scrub" data-spot="scrubber">
-      <label class="transport__label marquee" for="rewind-scrub">Scrub</label>
+      <label class="transport__label marquee" for="rewind-scrub">Jump to</label>
       <input
         id="rewind-scrub"
         class="transport__range"
@@ -246,7 +245,7 @@ export const view: View<Representation, Intent> = (rep, dispatch) =>
       <h1 class="rewind__title">The reel of tonight</h1>
       <dl class="rewind__counters">
         ${counter("frames", rep.frames.length)}
-        ${counter("splices", splicesIn(rep))}
+        ${counter("jumps back", jumpsIn(rep))}
       </dl>
     </header>
     ${stagePanel(rep, dispatch)}

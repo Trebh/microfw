@@ -10,7 +10,7 @@
 
 #act-sync .sync__kicker {
   grid-column: 1;
-  font-size: var(--text-m);
+  font-size: var(--text-s);
   letter-spacing: 0.22em;
   color: var(--chalk);
 }
@@ -51,20 +51,9 @@
   border-color: color-mix(in oklab, var(--cue-green) 55%, transparent);
 }
 
-/* --glow does not inherit, so the text and the lamp each carry the cue-light animation. */
-#act-sync .badge[data-state="agreed"] .badge__text,
-#act-sync .badge[data-state="agreed"] .badge__lamp {
-  --glow: 0.5;
-  animation: cue-light 2.6s var(--ease-cue-light) infinite;
-}
-
-#act-sync .badge[data-state="agreed"] .badge__text {
-  text-shadow: 0 0 calc(0.25em + var(--glow) * 0.7em) color-mix(in oklab, var(--cue-green) calc(30% + var(--glow) * 50%), transparent);
-}
-
 #act-sync .badge[data-state="agreed"] .badge__lamp {
   opacity: 1;
-  box-shadow: 0 0 calc(0.4em + var(--glow) * 0.6em) color-mix(in oklab, var(--cue-green) 70%, transparent);
+  box-shadow: 0 0 0.7em color-mix(in oklab, var(--cue-green) 60%, transparent);
 }
 
 #act-sync .badge[data-state="catching-up"] {
@@ -167,34 +156,28 @@
 
 #act-sync .win__chair[data-lit="true"] .win__lamp {
   background: var(--cue-green);
-  box-shadow: 0 0 0.9em 0.15em color-mix(in oklab, var(--cue-green) 65%, transparent);
-  animation: sync-lamp 2.6s var(--ease-cue-light) infinite;
-}
-
-@keyframes sync-lamp {
-  0%, 100% { opacity: 0.65; }
-  50% { opacity: 1; }
+  box-shadow: 0 0 0.6em color-mix(in oklab, var(--cue-green) 55%, transparent);
 }
 
 #act-sync .win__house {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.4rem;
-  padding-block: var(--space-2);
+  gap: 0.5rem;
+  padding-block: var(--space-3);
 }
 
 #act-sync .win__row {
   display: flex;
-  gap: 0.4rem;
+  gap: 0.5rem;
 }
 
 #act-sync .seat {
   position: relative;
   display: grid;
   place-items: center;
-  inline-size: 2.7rem;
-  block-size: 2.7rem;
+  inline-size: 3.3rem;
+  block-size: 3.3rem;
   padding: 0;
   border: 1px solid var(--chalk-faint);
   border-radius: 0.55rem 0.55rem 0.15rem 0.15rem;
@@ -223,7 +206,7 @@
 #act-sync .seat__by {
   font-family: var(--face-marquee);
   font-weight: 800;
-  font-size: 1.15rem;
+  font-size: 1.4rem;
   line-height: 1;
   padding-top: 0.35rem;
 }
@@ -342,11 +325,9 @@
   color: var(--ink);
   background:
     var(--tooth),
-    linear-gradient(172deg, color-mix(in oklab, var(--paper) 94%, white), var(--paper) 45%, color-mix(in oklab, var(--paper) 88%, var(--limelight-deep)));
+    linear-gradient(172deg, color-mix(in oklab, var(--paper) 70%, var(--wing-grey)), color-mix(in oklab, var(--paper) 64%, var(--wing-grey)) 55%, color-mix(in oklab, var(--paper) 58%, var(--wing-grey)));
   background-blend-mode: multiply, normal;
-  box-shadow:
-    0 0.15rem 0.3rem color-mix(in oklab, black 50%, transparent),
-    0 1.4rem 3rem -0.6rem color-mix(in oklab, black 80%, transparent);
+  box-shadow: 0 1.4rem 3rem -0.6rem color-mix(in oklab, black 80%, transparent);
 }
 
 #act-sync .tape::before,
@@ -377,7 +358,7 @@
 }
 
 #act-sync .tape__title {
-  font-size: var(--text-l);
+  font-size: var(--text-m);
 }
 
 #act-sync .tape__count {
@@ -467,14 +448,12 @@
   font-family: "Redaction 35", var(--face-body);
 }
 
-#act-sync .tape__row:nth-child(n + 6) .tape__event,
-#act-sync .tape__row:nth-child(n + 6) .tape__detail {
-  font-family: "Redaction 70", var(--face-body);
+#act-sync .tape__row:nth-child(n + 6) {
+  opacity: 0.78;
 }
 
-#act-sync .tape__row:nth-child(n + 8) .tape__event,
-#act-sync .tape__row:nth-child(n + 8) .tape__detail {
-  font-family: "Redaction 100", var(--face-body);
+#act-sync .tape__row:nth-child(n + 8) {
+  opacity: 0.55;
 }
 
 #act-sync .lease {
@@ -497,12 +476,18 @@
 }
 
 #act-sync .lease__epoch,
-#act-sync .lease__note {
+#act-sync .lease__note,
+#act-sync .lease__rule {
   font-size: var(--text-xs);
 }
 
+#act-sync .lease__rule {
+  color: color-mix(in oklab, var(--ink) 72%, transparent);
+}
+
 #act-sync .lease__holder {
-  font-size: var(--text-m);
+  font-size: var(--text-s);
+  font-weight: 700;
   line-height: 1.05;
 }
 
@@ -544,16 +529,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  #act-sync .badge[data-state="agreed"] .badge__text,
-  #act-sync .badge[data-state="agreed"] .badge__lamp,
-  #act-sync .win__chair[data-lit="true"] .win__lamp,
   #act-sync .win__shutter {
     animation: none;
-  }
-
-  #act-sync .badge[data-state="agreed"] .badge__text,
-  #act-sync .badge[data-state="agreed"] .badge__lamp {
-    --glow: 0.7;
   }
 
   #act-sync .seat[data-status="free"]:hover:not(:disabled),
