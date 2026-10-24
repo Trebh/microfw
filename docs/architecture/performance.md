@@ -41,6 +41,7 @@ own unit: bundlejs and the Effect posts use kB (1000 bytes), and the tables that
 | Counter, script time at 1× / 4× / 10× | 6.2 / 25.9 / 71.3 ms | 0.9 / 3.5 / 9.3 ms | 6.61× / 7.37× / 7.67× |
 | Counter, click to DOM at 1× | 0.5 ms | 0.3 ms | 1.67× |
 | Counter, click to next frame at 1× | 15.2 ms | 15.3 ms | 0.99× |
+| [js-framework-benchmark](../spikes/benchmark-positioning.md), keyed table, CPU weighted geometric mean against vanilla JavaScript, three passes | 1.43 / 1.32 / 1.33 (derived) | 1.36 / 1.27 / 1.27, the `uhtml4` control | 1.048× / 1.040× / 1.051× (derived) |
 | Node: `ModelPort.present`, counter, median per step | 2.875 µs | 0.007 µs, a plain reducer | 399× |
 | Node: `IntentPort.dispatch` until its record, counter, median | 34.00 µs | 0.007 µs | 3951× |
 | Server: `Present` over a websocket, one connection | 5926 steps/s, p50 0.14 ms, p99 0.64 ms | none measured | |
@@ -305,9 +306,14 @@ from 0.9 to 6.2 ms (+5.3) and `list-uhtml` from 0.8 to 5.2 ms (+4.4). The gap be
 0.2, 0.3 and 0.6 ms at 1×, 4× and 10× for the counter and 0.1, 0.4 and 1.0 ms for the list (derived): the
 step, which slows down under throttling like the render. The render itself is uhtml's work. On
 [js-framework-benchmark](https://krausest.github.io/js-framework-benchmark/2026/chrome154.html)
-(Apple M4, Chrome 154, a 1000-row table) uhtml 5.0.3, a newer major version than the 4.x µFW uses, has
-a geometric mean of 1.180 against vanilla JavaScript, 64th of 196 keyed implementations (derived from the
-published results, not the site's own ranking).
+(Apple M4, Chrome 154, a 1000-row table) uhtml 5.0.3, a newer major version than the 4.x µFW uses,
+scores 1.26 on the site's headline, 71st of 196 keyed implementations; vanilla JavaScript scores 1.05, 7th.
+The headline is the weighted geometric mean of the nine CPU factors, each a median against the fastest
+implementation in that benchmark. The unweighted geometric mean against vanilla JavaScript alone is 1.180,
+64th (derived from the published results; the site shows neither). The published uhtml entry carries note
+[#772](https://github.com/krausest/js-framework-benchmark/issues/772), manual DOM manipulation, so it is not
+an idiomatic-uhtml measurement. µFW's own entry, run locally next to a plain uhtml 4 control, is in the
+[benchmark positioning spike](../spikes/benchmark-positioning.md).
 
 ## The loop in Node
 

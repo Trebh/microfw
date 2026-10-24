@@ -1,0 +1,1 @@
+{"framework":"hyperapp-v2.0.22-keyed","keyed":true,"benchmark":"25_run-clear-memory","type":"memory","values":{"DEFAULT":{"min":0.6552791595458984,"max":0.6552791595458984,"median":0.6552791595458984,"mean":0.6552791595458984,"stddev":null,"values":[0.6552791595458984]}}}

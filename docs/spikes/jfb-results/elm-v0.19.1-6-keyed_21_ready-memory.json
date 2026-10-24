@@ -1,0 +1,1 @@
+{"framework":"elm-v0.19.1-6-keyed","keyed":true,"benchmark":"21_ready-memory","type":"memory","values":{"DEFAULT":{"min":0.6778945922851562,"max":0.6778945922851562,"median":0.6778945922851562,"mean":0.6778945922851562,"stddev":null,"values":[0.6778945922851562]}}}

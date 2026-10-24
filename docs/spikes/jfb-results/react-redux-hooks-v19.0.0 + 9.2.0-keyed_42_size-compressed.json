@@ -1,0 +1,1 @@
+{"framework":"react-redux-hooks-v19.0.0 + 9.2.0-keyed","keyed":true,"benchmark":"42_size-compressed","type":"size","values":{"DEFAULT":{"min":50.6,"max":50.6,"median":50.6,"mean":50.6,"stddev":null,"values":[50.6]}}}

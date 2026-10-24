@@ -45,6 +45,8 @@ docs/                ARCHITECTURE.md, architecture/*.md, TODO.md
 | `pnpm --filter @mufw/example-auction bench:loop` | in Node: the cost of a step, an intent, concurrent presenters, subscribers, schema boundaries and history records, against a plain reducer |
 | `pnpm --filter @mufw/example-auction bench:browser` | cold load and click latency of the bench pages and `browser-only` in headless Chromium at each `BENCH_CPU_RATES` throttling rate (default `1,4`), with µFW/uhtml ratios; ports 4600–4699 |
 | `pnpm --filter @mufw/example-auction bench:server` | starts servers of its own on ports 4800–4999: `Present`/`Submit` throughput and latency, `Representations` fan-out, RSS as history fills, synced host and joiner latency |
+| `pnpm --filter @mufw/example-jfb build` | builds the two js-framework-benchmark entries (`mufw`, and `uhtml4` as the plain-uhtml control) into `examples/jfb/out/keyed/<name>`, shaped like built `frameworks/keyed/<name>` directories, and prints each `dist/main.js` size |
+| `pnpm --filter @mufw/example-jfb jfb:install <jfb-checkout>` | copies both built directories into `<jfb-checkout>/frameworks/keyed/`, replacing them; fails if the checkout or the build is missing |
 
 A change is done when `pnpm typecheck` and `pnpm test` pass and the changed behaviour has been
 exercised: a UI change in the browser, a server change against a running server.

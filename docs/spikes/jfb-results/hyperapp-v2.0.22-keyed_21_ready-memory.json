@@ -1,0 +1,1 @@
+{"framework":"hyperapp-v2.0.22-keyed","keyed":true,"benchmark":"21_ready-memory","type":"memory","values":{"DEFAULT":{"min":0.5807743072509766,"max":0.5807743072509766,"median":0.5807743072509766,"mean":0.5807743072509766,"stddev":null,"values":[0.5807743072509766]}}}

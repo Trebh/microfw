@@ -1,0 +1,1 @@
+{"framework":"mufw-v0.0.0-keyed","keyed":true,"benchmark":"25_run-clear-memory","type":"memory","values":{"DEFAULT":{"min":9.454626083374023,"max":9.454626083374023,"median":9.454626083374023,"mean":9.454626083374023,"stddev":null,"values":[9.454626083374023]}}}

@@ -2,3 +2,4 @@ node_modules
 dist
 .vitest
 .certs
+examples/jfb/out

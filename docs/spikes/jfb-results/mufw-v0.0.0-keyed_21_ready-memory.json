@@ -1,0 +1,1 @@
+{"framework":"mufw-v0.0.0-keyed","keyed":true,"benchmark":"21_ready-memory","type":"memory","values":{"DEFAULT":{"min":1.3142366409301758,"max":1.3142366409301758,"median":1.3142366409301758,"mean":1.3142366409301758,"stddev":null,"values":[1.3142366409301758]}}}

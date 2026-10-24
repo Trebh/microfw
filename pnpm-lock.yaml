@@ -79,6 +79,33 @@ importers:
         specifier: ^5.33.3
         version: 5.33.3
 
+  examples/jfb:
+    dependencies:
+      '@effect/platform-browser':
+        specifier: ^4.0.5
+        version: 4.0.5(effect@4.0.5)
+      '@effect/platform-node':
+        specifier: ^4.0.5
+        version: 4.0.5(effect@4.0.5)(redis@6.3.0)
+      '@mufw/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@mufw/view-uhtml':
+        specifier: workspace:*
+        version: link:../../packages/view-uhtml
+      effect:
+        specifier: ^4.0.5
+        version: 4.0.5
+      tsx:
+        specifier: ^4.20.0
+        version: 4.23.15
+      uhtml:
+        specifier: ^4.7.1
+        version: 4.7.1
+      vite:
+        specifier: ^8.3.0
+        version: 8.3.4(@types/node@24.19.2)(esbuild@0.28.2)(tsx@4.23.15)
+
   examples/showcase:
     dependencies:
       '@effect/platform-browser':

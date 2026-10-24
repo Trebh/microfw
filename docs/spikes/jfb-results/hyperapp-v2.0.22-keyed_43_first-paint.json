@@ -1,0 +1,1 @@
+{"framework":"hyperapp-v2.0.22-keyed","keyed":true,"benchmark":"43_first-paint","type":"size","values":{"DEFAULT":{"min":76.3,"max":76.3,"median":76.3,"mean":76.3,"stddev":null,"values":[76.3]}}}

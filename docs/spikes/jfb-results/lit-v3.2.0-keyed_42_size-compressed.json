@@ -1,0 +1,1 @@
+{"framework":"lit-v3.2.0-keyed","keyed":true,"benchmark":"42_size-compressed","type":"size","values":{"DEFAULT":{"min":7.3,"max":7.3,"median":7.3,"mean":7.3,"stddev":null,"values":[7.3]}}}

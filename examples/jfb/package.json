@@ -1,0 +1,21 @@
+{
+  "name": "@mufw/example-jfb",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "tsx scripts/build.ts",
+    "jfb:install": "tsx scripts/install.ts"
+  },
+  "dependencies": {
+    "effect": "^4.0.5",
+    "@mufw/core": "workspace:*",
+    "@mufw/view-uhtml": "workspace:*",
+    "@effect/platform-node": "^4.0.5",
+    "@effect/platform-browser": "^4.0.5",
+    "uhtml": "^4.7.1",
+    "vite": "^8.3.0",
+    "tsx": "^4.20.0"
+  }
+}

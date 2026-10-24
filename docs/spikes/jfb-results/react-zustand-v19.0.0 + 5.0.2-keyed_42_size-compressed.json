@@ -1,0 +1,1 @@
+{"framework":"react-zustand-v19.0.0 + 5.0.2-keyed","keyed":true,"benchmark":"42_size-compressed","type":"size","values":{"DEFAULT":{"min":49.8,"max":49.8,"median":49.8,"mean":49.8,"stddev":null,"values":[49.8]}}}

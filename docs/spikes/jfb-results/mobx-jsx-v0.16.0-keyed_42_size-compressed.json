@@ -1,0 +1,1 @@
+{"framework":"mobx-jsx-v0.16.0-keyed","keyed":true,"benchmark":"42_size-compressed","type":"size","values":{"DEFAULT":{"min":15.6,"max":15.6,"median":15.6,"mean":15.6,"stddev":null,"values":[15.6]}}}

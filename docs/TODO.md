@@ -27,6 +27,16 @@ history lives in git). Each item names where the gap is and what done looks like
   no longer current, tested with a holder cut off from the log whose finished action reaches it after
   the successor's claim.
 
+### View
+
+- [ ] **A keyed list in a view keeps every removed row's node.** `uhtml/keyed`'s `htmlFor` memoizes a
+  node per key and uhtml 4 has no way to drop one, so the `<tr>` of a removed or replaced row stays
+  referenced for as long as the list's reference does. The js-framework-benchmark run-clear memory is
+  9.46 MiB for the µFW entry and 8.41 MiB for the plain uhtml 4 control, against 0.64 MiB for vanilla
+  JavaScript (one sample each, `docs/spikes/benchmark-positioning.md`). Done: a keyed list in a
+  `@mufw/view-uhtml` view releases the rows it removes, shown by `25_run-clear-memory` (or an
+  equivalent heap test) within a stated factor of vanilla JavaScript's.
+
 ### Tooling
 
 - [ ] **No build or publish.** Packages export TypeScript sources. Done when a consumer outside the

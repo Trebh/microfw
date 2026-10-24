@@ -1,0 +1,1 @@
+{"framework":"re-frame-v1.4.3-keyed","keyed":true,"benchmark":"22_run-memory","type":"memory","values":{"DEFAULT":{"min":7.627419471740723,"max":7.627419471740723,"median":7.627419471740723,"mean":7.627419471740723,"stddev":null,"values":[7.627419471740723]}}}
