@@ -1,3 +1,4 @@
+export * from "./Compose.ts"
 export * from "./Definition.ts"
 export * from "./Forward.ts"
 export * from "./Graph.ts"

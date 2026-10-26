@@ -61,7 +61,7 @@ describe("define", () => {
     const settled = Traced.nap({ controlState: "settled" })
     const marked = Traced.nap({ controlState: "marked" })
 
-    expect(settled).toEqual(Option.none())
-    expect(marked).toEqual(Option.some({ _tag: "Mark" }))
+    expect(settled).toEqual([])
+    expect(marked).toEqual([{ _tag: "Mark" }])
   })
 })

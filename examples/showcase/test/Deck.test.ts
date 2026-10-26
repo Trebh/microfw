@@ -1,5 +1,4 @@
 import { assert, describe, it } from "@effect/vitest"
-import { Option } from "effect"
 import {
   acceptAdvanced,
   acceptAutoplayToggled,
@@ -149,16 +148,16 @@ describe("nap", () => {
   it("whispers the reading of the current cue while autoplay is on", () => {
     assert.deepStrictEqual(
       Deck.nap(state(at(1, 1, true))),
-      Option.some({ _tag: "AwaitCue", act: "loop", cue: 1, millis: 8000 })
+      [{ _tag: "AwaitCue", act: "loop", cue: 1, millis: 8000 }]
     )
   })
 
   it("stays silent while autoplay is off", () => {
-    assert.deepStrictEqual(Deck.nap(state(at(1, 1))), Option.none())
+    assert.deepStrictEqual(Deck.nap(state(at(1, 1))), [])
   })
 
   it("stays silent at the end even with autoplay on", () => {
-    assert.deepStrictEqual(Deck.nap(state(at(2, 0, true))), Option.none())
+    assert.deepStrictEqual(Deck.nap(state(at(2, 0, true))), [])
   })
 })
 

@@ -35,7 +35,7 @@ export type Verdict = typeof Verdict.Type
 
 /** What a record is called on the reel: its proposal's label, or its kind for a record that has none. */
 export const labelOf = (record: BoxRecord): string =>
-  Option.match(record.proposal, { onNone: () => record.kind, onSome: proposalLabel })
+  Option.match(record.proposal, { onNone: () => record.kind, onSome: (proposal) => proposalLabel(BoxOffice, proposal) })
 
 export const framesOf = (records: ReadonlyArray<BoxRecord>): ReadonlyArray<Frame> => {
   const newest = records.length - 1

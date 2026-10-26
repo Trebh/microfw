@@ -32,7 +32,7 @@ export const Scene = Schema.Struct({
   free: Schema.Int,
   held: Schema.Int,
   sold: Schema.Int,
-  whisper: Schema.Option(StageIntent)
+  whispers: Schema.Array(StageIntent)
 })
 export type Scene = typeof Scene.Type
 
@@ -132,7 +132,7 @@ export const sceneOf = (record: StageRecord, before: StageModel): Option.Option<
     free: record.representation.free,
     held: record.representation.held,
     sold: record.representation.sold,
-    whisper: BoxOffice.nap(record.representation)
+    whispers: BoxOffice.nap(record.representation)
   }))
 
 /** Which stations did something in this scene; the rest only let the light pass. */
@@ -143,7 +143,7 @@ export const firedStations = (scene: Scene): ReadonlyArray<boolean> => [
   scene.changes.length > 0,
   scene.freed.length > 0,
   true,
-  Option.isSome(scene.whisper)
+  scene.whispers.length > 0
 ]
 
 /** A proposal as the stage writes it down: its tag, then its fields. */

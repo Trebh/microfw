@@ -3,6 +3,7 @@ import {
   exploreGraph,
   type Explore,
   mergeHistory,
+  nest,
   shortestPaths,
   simplePaths,
   toXStateDefinition,
@@ -85,6 +86,20 @@ describe("graph consumers", () => {
       states: {
         low: { on: { Inc: [{ target: "low" }, { target: "high" }], Reset: "low" } },
         high: { on: { Inc: "high", Reset: "low" } }
+      }
+    })
+  })
+
+  it("toXStateDefinition names an event with the definition's proposal label", () => {
+    const Plain = nest(Counter, Counter)
+    const nestedGraph = exploreGraph(Plain, () => [inc3, { _tag: "Child", proposal: inc3 } as const])
+
+    expect(toXStateDefinition(Plain, nestedGraph)).toEqual({
+      id: "counter/counter",
+      initial: "low",
+      states: {
+        low: { on: { Inc: "high", "Child/Inc": "low" } },
+        high: { on: { Inc: "high", "Child/Inc": "high" } }
       }
     })
   })

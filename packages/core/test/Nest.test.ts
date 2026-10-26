@@ -131,22 +131,22 @@ describe("nest representation", () => {
 })
 
 describe("nest nap", () => {
-  it("offers the parent's intent first", () => {
-    const intent = Plain.nap(representationAt(3, 3))
+  it("offers both sides' intents, the parent's first", () => {
+    const intents = Plain.nap(representationAt(3, 3))
 
-    assert.deepStrictEqual(intent, Option.some({ _tag: "AutoReset" }))
+    assert.deepStrictEqual(intents, [{ _tag: "AutoReset" }, { _tag: "Child", intent: { _tag: "AutoReset" } }])
   })
 
-  it("offers the child's intent wrapped when the parent has none", () => {
-    const intent = Plain.nap(representationAt(0, 3))
+  it("offers only the child's intent, wrapped, when the parent has none", () => {
+    const intents = Plain.nap(representationAt(0, 3))
 
-    assert.deepStrictEqual(intent, Option.some({ _tag: "Child", intent: { _tag: "AutoReset" } }))
+    assert.deepStrictEqual(intents, [{ _tag: "Child", intent: { _tag: "AutoReset" } }])
   })
 
   it("offers nothing when neither side has an intent", () => {
-    const intent = Plain.nap(representationAt(1, 1))
+    const intents = Plain.nap(representationAt(1, 1))
 
-    assert.deepStrictEqual(intent, Option.none())
+    assert.deepStrictEqual(intents, [])
   })
 })
 
@@ -309,30 +309,25 @@ describe("nest intent keys", () => {
 
 describe("proposalLabel", () => {
   it("is the tag of a parent proposal", () => {
-    assert.strictEqual(proposalLabel({ _tag: "Inc" }), "Inc")
+    assert.strictEqual(proposalLabel(Plain, { _tag: "Inc" }), "Inc")
   })
 
   it("prefixes a child proposal with Child/", () => {
     const child = { _tag: "Child", proposal: { _tag: "Inc" } }
 
-    assert.strictEqual(proposalLabel(child), "Child/Inc")
+    assert.strictEqual(proposalLabel(Plain, child), "Child/Inc")
   })
 
   it("follows nested children to the innermost tag", () => {
+    const Deep = nest(Counter, Plain)
     const grandchild = { _tag: "Child", proposal: { _tag: "Child", proposal: { _tag: "Reset" } } }
 
-    assert.strictEqual(proposalLabel(grandchild), "Child/Child/Reset")
+    assert.strictEqual(proposalLabel(Deep, grandchild), "Child/Child/Reset")
   })
 
-  it("is Child for a proposal named Child whose payload is null", () => {
-    const plain = { _tag: "Child", proposal: null }
+  it("is the tag for a definition with no label of its own, whatever the payload", () => {
+    const wrapped = { _tag: "Child", proposal: { _tag: "Inc" } }
 
-    assert.strictEqual(proposalLabel(plain), "Child")
-  })
-
-  it("is Child for a proposal named Child whose payload is a string", () => {
-    const plain = { _tag: "Child", proposal: "raise" }
-
-    assert.strictEqual(proposalLabel(plain), "Child")
+    assert.strictEqual(proposalLabel(Counter, wrapped), "Child")
   })
 })

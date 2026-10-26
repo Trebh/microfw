@@ -109,24 +109,24 @@ describe("state of an unopened auction", () => {
 
 describe("nap", () => {
   it("stops once sold", () => {
-    assert.deepStrictEqual(Auction.nap(representation({ controlState: "sold", remainingSeconds: 0 })), Option.none())
+    assert.deepStrictEqual(Auction.nap(representation({ controlState: "sold", remainingSeconds: 0 })), [])
   })
 
   it("opens an auction that has no start time", () => {
-    assert.deepStrictEqual(Auction.nap(representation({ controlState: "opening" })), Option.some({ _tag: "Open" }))
+    assert.deepStrictEqual(Auction.nap(representation({ controlState: "opening" })), [{ _tag: "Open" }])
   })
 
   it("closes when no time is left", () => {
     assert.deepStrictEqual(
       Auction.nap(representation({ controlState: "closing", remainingSeconds: 0 })),
-      Option.some({ _tag: "Close" })
+      [{ _tag: "Close" }]
     )
   })
 
   it("ticks while time is left", () => {
     assert.deepStrictEqual(
       Auction.nap(representation({ controlState: "closing", remainingSeconds: 1 })),
-      Option.some({ _tag: "Tick" })
+      [{ _tag: "Tick" }]
     )
   })
 })

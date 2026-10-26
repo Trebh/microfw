@@ -281,7 +281,7 @@ describe("nap", () => {
   it("awaits the earliest hold", () => {
     const holding = selling({ A1: held("A1", alice, 9_000), B2: held("B2", bob, 5_000) })
 
-    assert.deepStrictEqual(BoxOffice.nap(state(holding)), Option.some<Intent>({ _tag: "AwaitExpiry", until: 5_000 }))
+    assert.deepStrictEqual(BoxOffice.nap(state(holding)), [{ _tag: "AwaitExpiry", until: 5_000 }])
   })
 
   it("awaits the earliest hold while the house is full of holds", () => {
@@ -289,26 +289,26 @@ describe("nap", () => {
 
     assert.deepStrictEqual(
       BoxOffice.nap(state(everyoneInside)),
-      Option.some<Intent>({ _tag: "AwaitExpiry", until: 4_000 })
+      [{ _tag: "AwaitExpiry", until: 4_000 }]
     )
   })
 
   it("raises the curtain when every seat is sold", () => {
     const soldOut = selling({}, { seats: everySeat((seat) => sold(seat, alice)) })
 
-    assert.deepStrictEqual(BoxOffice.nap(state(soldOut)), Option.some<Intent>({ _tag: "RaiseCurtain" }))
+    assert.deepStrictEqual(BoxOffice.nap(state(soldOut)), [{ _tag: "RaiseCurtain" }])
   })
 
   it("has nothing to say with no hold", () => {
-    assert.deepStrictEqual(BoxOffice.nap(state(selling({ A1: sold("A1", alice) }))), Option.none())
+    assert.deepStrictEqual(BoxOffice.nap(state(selling({ A1: sold("A1", alice) }))), [])
   })
 
   it("has nothing to say before the doors open", () => {
-    assert.deepStrictEqual(BoxOffice.nap(state(initial)), Option.none())
+    assert.deepStrictEqual(BoxOffice.nap(state(initial)), [])
   })
 
   it("has nothing to say once the curtain is up", () => {
-    assert.deepStrictEqual(BoxOffice.nap(state({ ...selling(), phase: "curtain" })), Option.none())
+    assert.deepStrictEqual(BoxOffice.nap(state({ ...selling(), phase: "curtain" })), [])
   })
 })
 

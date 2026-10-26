@@ -3,6 +3,7 @@ import { Effect, FiberSet, Layer, Stream } from "effect"
 import type { Hole } from "uhtml"
 
 export { inputBudgetMillis, layerInputScheduler } from "./Scheduler.ts"
+export { type KeyedList, makeKeyedList } from "./Keyed.ts"
 
 /** A pure view: representation in, template out; user events become intents through `dispatch`. */
 export type View<Repr, Intent> = (representation: Repr, dispatch: (intent: Intent) => void) => Hole

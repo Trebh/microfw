@@ -37,12 +37,15 @@ Nothing is turned off to help the figure.
 
 ## Rendering strategy
 
-Both entries are keyed, with `htmlFor` from `uhtml/keyed` (uhtml 4.7.1): a row is
-``htmlFor(rowsKey, row.id)`<tr>…</tr>` ``, which returns the same `<tr>` element for the same id on every
-render, and the array hole of the `<tbody>` reorders those elements. `@mufw/view-uhtml`'s `View` returns
-a `Hole`, and a hole may contain DOM nodes, so the µFW entry reaches this without changing the package.
-The plain `html` tag in a `.map` is not keyed: uhtml reuses the template instance at the same position, so
-rows would be recycled.
+Both entries are keyed with uhtml 4.7.1's `htmlFor` from `uhtml/keyed`, through a keyed list whose memo holds
+the keys of the latest render only: a row is ``tag`<tr>…</tr>` ``, where `tag` is the bound tag of `row.id`, which
+renders the same `<tr>` element for the same id on every render, and the array hole of the `<tbody>` reorders those
+elements. `mufw` takes the list from `makeKeyedList` of `@mufw/view-uhtml`; `uhtml4` imports no `@mufw/*`, so
+`src/plainKeyedRows.ts` is a copy of that mechanism, the same dozen lines, and the comparison between the two stays
+like-for-like. `src/Table.view.ts` takes the list as a parameter (`makeTableView(keyedRows)`) and each entry makes one
+instance for its one `<tbody>`. `@mufw/view-uhtml`'s `View` returns a `Hole`, and a hole may contain DOM nodes, so the
+µFW entry reaches this without changing the package. The plain `html` tag in a `.map` is not keyed: uhtml reuses the
+template instance at the same position, so rows would be recycled.
 
 Checked in headless Chromium against the three checks of JFB's `isKeyed` (`webdriver-ts/src/isKeyed.ts`) on both
 entries: swap moves the same two `<tr>` nodes and creates none, `run` replaces every row, `remove` deletes the
@@ -51,13 +54,48 @@ by this package.
 
 Known costs of the strategy, shared by both entries:
 
-- `htmlFor` memoizes per `(ref, key)` in a `Map` held by the ref, and uhtml 4 has no API to drop a key. The `<tr>` of a
-  removed or replaced row stays referenced for as long as `rowsKey` does, so JFB's memory benchmarks that create rows
-  repeatedly show it (measured in headless Chromium: the JS heap after five create/clear cycles of 1,000 rows is about
-  twice the heap after one, for `mufw` and `uhtml4` alike).
+- `htmlFor(ref, key)` memoizes a bound tag, and with it the row's `<tr>`, per key in a `Map` held by the ref, and uhtml 4
+  has no API to drop a key. Rows would stay referenced for as long as the ref lives, so the keyed list takes each new
+  key's tag from a throwaway ref (`htmlFor({}, key)`) and keeps its own map, rebuilt on every render from the rows
+  it was given: a removed or replaced row's `<tr>` is unreachable after the next render. Nothing else in uhtml holds it:
+  the array hole keeps only the previous render's node list, replaced by the next, and event listeners live in a
+  `WeakMap` keyed by element. Memory figures are under [Memory](#memory).
 - uhtml leaves one comment node (`<!--[n]-->`) in the `<tbody>` to mark the array hole. JFB's selectors address
   `tbody>tr`, so they are unaffected, but the `<tbody>` is not made of `<tr>` alone.
 - Every render assigns a fresh `onclick` closure to each row's two links and to the six buttons.
+
+## Memory
+
+Measured with JFB's own runner, headless Chromium, the three memory benchmarks, `mufw`, `uhtml4` and `vanillajs` in
+the same session, five sessions (one sample each per session; JFB takes one sample per run):
+
+```sh
+cd <jfb-checkout>/webdriver-ts
+node dist/benchmarkRunner.js --headless true --framework keyed/vanillajs keyed/uhtml4 keyed/mufw --benchmark 21_ 22_ 25_
+```
+
+| MiB, median of 5 (range) | `vanillajs` | `uhtml4` | `mufw` |
+|---|---|---|---|
+| `21_ready-memory` | 0.567 (0.559–0.568) | 0.627 (0.549–0.628) | 1.328 (1.321–1.358) |
+| `22_run-memory` | 1.870 (1.794–1.872) | 2.354 (2.347–2.355) | 3.130 (3.092–3.159) |
+| `25_run-clear-memory` | 0.643 (0.592–0.650) | 0.770 (0.765–0.773) | 2.106 (2.104–2.107) |
+| `25_run-clear-memory`, ratio to `vanillajs` | 1× | 1.20× | **3.28×** |
+
+Before the keyed list released rows (`htmlFor` with a fixed ref, one sample each, a different session): `mufw`
+9.46 MiB and `uhtml4` 8.41 MiB, against 0.64 for `vanillajs`.
+
+What is left of `mufw`'s 1.34 MiB over `uhtml4` after create and clear ×5:
+
+- **Loading µFW and Effect**: 0.70 MiB of it is already there after load (`21_ready-memory`, 1.328 against 0.627).
+- **History**: about 0.42 MiB. The same entry built with `HistoryLimit` at 2 (a throwaway build, not kept; three
+  sessions) ends at 1.671–1.698 MiB against 2.101–2.107 MiB for the default 1,000 records, measured in the same
+  sessions. The five `Replaced` records each hold a model with 1,000 rows, and a cleared table does not free them while
+  they are within the limit. `@mufw/core`'s history is unchanged.
+- The remaining 0.21 MiB (derived: 1.336 − 0.701 − 0.42) is not attributed; it is the part of the Effect runtime's working state (fibers, queues,
+  closures) that a run touches and the control has none of [inference].
+
+Limits: one sample per benchmark per session, headless rather than JFB's default headed window, Google Chrome
+156.0.8078.48 on an Apple M5, JFB commit `3ab4cea`; compare within a session only.
 
 ## JFB flags
 

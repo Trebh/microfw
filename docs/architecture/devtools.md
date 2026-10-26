@@ -18,9 +18,9 @@ servers: `TravelTo` rewrites the server's model and is only served when `MUFW_RP
 default does not), whereas the list needs `History` alone. Which one a page mounts is decided at its
 composition root.
 
-A proposal's label is `proposalLabel(proposal)` of `@mufw/core`: its tag, or for a proposal of a
-`nest`ed child `Child/` and the child's label, recursively (`Child/Inc`). The panel does not know
-the wrapper's shape.
+A proposal's label is `proposalLabel(def, proposal)` of `@mufw/core`: the definition's own label
+hook when it has one (a `nest`ed definition names a child's proposal `Child/` and the child's label,
+recursively: `Child/Inc`), else the proposal's tag. The panel does not know the wrapper's shape.
 
 **Export history (JSON)** encodes the retained records with `encodeHistoryJson(def)` and hands the
 text to `options.save`, default a browser download named `<definition name>-history.json`
@@ -49,7 +49,7 @@ record the other pages produce.
 | Record | Sent to the inspector |
 |---|---|
 | `init` | `actor(actorRef, { context: model, value: controlState })` |
-| `step` | `event(name, { ...proposal, type: proposal._tag })`, then `snapshot(...)` with that event |
+| `step` | `event(name, { ...proposal, type: proposalLabel(def, proposal) })`, then `snapshot(...)` with that event |
 | `travel` | `snapshot(...)` with event `@mufw.travel` |
 
 - `definition` is usually `toXStateDefinition(def, exploreGraph(def, explore, options))`.

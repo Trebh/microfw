@@ -245,10 +245,7 @@ const makeModelPort = <D extends AnyDefinition>(
 ) => {
   const permit = Semaphore.makeUnsafe(1)
   const runNap = (representation: RepresentationOf<D>) =>
-    Option.match(def.nap(representation), {
-      onNone: () => Effect.void,
-      onSome: (intent) => bus.dispatchAuto(intent)
-    })
+    Effect.forEach(def.nap(representation), (intent) => bus.dispatchAuto(intent), { discard: true })
   const napAgain = permit.withPermits(1)(Effect.flatMap(SubscriptionRef.get(store.representation), runNap))
   const applyStep = (proposal: ProposalOf<D>) =>
     Effect.gen(function*() {

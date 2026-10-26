@@ -10,9 +10,9 @@ services; local and remote implementations are layers; the example (`examples/au
 definition in four browser/server placements and in a web worker.
 
 ```
-packages/core        @mufw/core        definition, nesting, pure step, ports, local layers, forwarding, graph, history, persistence, sync
+packages/core        @mufw/core        definition, nesting and composition, pure step, ports, local layers, forwarding, graph, history, persistence, sync
 packages/rpc         @mufw/rpc         wire contract and remote adapters (no transport)
-packages/view-uhtml  @mufw/view-uhtml  mounts a pure uhtml v4 view; `./ssr` renders one to markup in Node
+packages/view-uhtml  @mufw/view-uhtml  mounts a pure uhtml v4 view, keyed lists that release removed rows; `./ssr` renders one to markup in Node
 packages/devtools    @mufw/devtools    time-travel panel, history list, Stately adapter
 packages/test        @mufw/test        model-based path testing
 examples/auction     @mufw/example-auction
@@ -117,7 +117,7 @@ for Effect idioms; do not rely on Effect 3 knowledge.
   `Layer.effectDiscard` for background fibers), configuration with `Config` and
   `Context.Reference` for defaults (`AutoActions`).
 - Errors in the error channel with `Schema.TaggedError`, handled with `Effect.catchTag`; never
-  `throw` inside effectful code. Pure functions may throw only for authoring bugs (the graph limit, a `Child` tag clash in `nest`).
+  `throw` inside effectful code. Pure functions may throw only for authoring bugs (the graph limit, a `Child` tag clash in `nest`, a part name in `compose` that is not PascalCase or clashes with a parent tag).
 - Sequences are `Stream`s; shared state is `Ref`/`SubscriptionRef`/`PubSub` under a `Semaphore`;
   resources and fibers are scoped (`Effect.forkScoped`, `Stream.unwrap`), never left dangling.
 - Time comes from `Clock` (testable with `TestClock`), never `Date.now()` in effectful code.
@@ -147,8 +147,8 @@ transport loss is turned into a defect, in `@mufw/rpc`.
   ignores is `Tag: unchanged`. A missing or extra key does not compile.
 - The representation always carries `controlState`. One `nap` entry per control state, keyed by it,
   `noIntent` for a state with no automatic intent; `controlStates` is derived from those keys and
-  never written (only `nest` takes a `controlStates` option).
-- `nap` returns at most one intent; automatic intents with an `intentKey` (default their tag) already in flight are skipped. In a synced loop `nap` runs on every instance and only the holder of the log's lease runs its intents, so an automatic action must be safe to interrupt when the instance loses the lease.
+  never written (only `nest` and `compose` take a `controlStates` option).
+- A `nap` entry returns at most one intent; the compiled `nap` returns a list, which a combinator (`nest`, `compose`) fills with one intent per part, and the loop dispatches every one. Automatic intents with an `intentKey` (default their tag) already in flight are skipped. In a synced loop `nap` runs on every instance and only the holder of the log's lease runs its intents, so an automatic action must be safe to interrupt when the instance loses the lease.
 - Model mutation happens only in `layerModelLocal`, under its permit.
 
 ## Testing rules

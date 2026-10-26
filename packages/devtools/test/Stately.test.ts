@@ -3,6 +3,7 @@ import { exploreGraph, layerLoopLocal, toXStateDefinition } from "@mufw/core"
 import { createInspector, type StatelyInspectionEvent } from "@statelyai/inspect"
 import { Effect, Layer, Stream } from "effect"
 import { Counter, Ports } from "../../core/test/fixtures/Counter.ts"
+import { exploreNested, NestedCounter, NestedPorts } from "../../core/test/fixtures/NestedCounter.ts"
 import { layerStately, replayOnStart, type StartableInspector } from "../src/index.ts"
 
 const definition = toXStateDefinition(
@@ -42,6 +43,26 @@ describe("layerStately", () => {
         context: { count: 1 },
         value: "low"
       })
+    }).pipe(Effect.provide(layer))
+  })
+
+  it.effect("sends a nested child step with the diagram's event name", () => {
+    const sent: Array<StatelyInspectionEvent> = []
+    const inspector = createInspector({ send: (event) => void sent.push(event) })
+    const nestedDefinition = toXStateDefinition(NestedCounter, exploreGraph(NestedCounter, exploreNested))
+    const layer = layerStately(NestedCounter, NestedPorts, inspector, { definition: nestedDefinition }).pipe(
+      Layer.provideMerge(layerLoopLocal(NestedCounter, NestedPorts))
+    )
+    return Effect.gen(function*() {
+      const model = yield* NestedPorts.ModelPort
+      const history = yield* NestedPorts.HistoryPort
+
+      yield* model.present({ _tag: "Child", proposal: { _tag: "Inc", by: 1 } })
+      yield* history.records.pipe(Stream.take(2), Stream.runDrain)
+      yield* Effect.yieldNow
+
+      const event = sent.find((e) => e.type === "@xstate.event")
+      assert.strictEqual(event?.type === "@xstate.event" && event.event.type, "Child/Inc")
     }).pipe(Effect.provide(layer))
   })
 })

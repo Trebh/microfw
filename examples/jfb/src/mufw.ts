@@ -1,9 +1,10 @@
 import { BrowserRuntime } from "@effect/platform-browser"
 import { type IntentOf, layerLoopLocal, type RepresentationOf } from "@mufw/core"
-import { layerInputScheduler, layerMount, type View } from "@mufw/view-uhtml"
+import { layerInputScheduler, layerMount, makeKeyedList, type View } from "@mufw/view-uhtml"
 import { Effect, Layer } from "effect"
+import { htmlFor } from "uhtml/keyed"
 import { Table, TablePorts } from "./Table.ts"
-import { type Handlers, tableView } from "./Table.view.ts"
+import { type Handlers, makeTableView } from "./Table.view.ts"
 
 type Intent = IntentOf<typeof Table>
 type Representation = RepresentationOf<typeof Table>
@@ -20,6 +21,8 @@ const handlersOf = (dispatch: (intent: Intent) => void): Handlers => ({
   select: (id) => dispatch({ _tag: "Select", id }),
   remove: (id) => dispatch({ _tag: "Remove", id })
 })
+
+const tableView = makeTableView(makeKeyedList(htmlFor))
 
 const view: View<Representation, Intent> = (representation, dispatch) =>
   tableView(TITLE, representation.rows, representation.selected, handlersOf(dispatch))

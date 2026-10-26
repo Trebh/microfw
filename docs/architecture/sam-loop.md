@@ -1,6 +1,6 @@
 # The SAM loop
 
-Living document. Source of truth: `packages/core/src/Definition.ts`, `Step.ts`, `History.ts`, `Layers.ts`, `Persistence.ts`, `Sync.ts`, `SyncLease.ts`, `SyncStorage.ts`, `SyncPersistence.ts`, `Nest.ts`.
+Living document. Source of truth: `packages/core/src/Definition.ts`, `Step.ts`, `History.ts`, `Layers.ts`, `Persistence.ts`, `Sync.ts`, `SyncLease.ts`, `SyncStorage.ts`, `SyncPersistence.ts`, `Nest.ts`, `Compose.ts`.
 
 ## Definition
 
@@ -35,8 +35,11 @@ tagged union by tag) come from `@mufw/core`.
 `define` compiles the behaviour into the `SamDefinition` that every consumer reads: `controlStates`
 (the keys of `nap`, in order), `acceptors` as an array with one wrapper per key that applies its
 acceptor only to a proposal of its tag, and `nap` as one function that looks the representation's
-control state up. `applyProposal`, the step, `nest`, the layers and the graph work on that compiled
-form.
+control state up and returns the intents it offers as a list (`[]` for `noIntent`, one for a `Some`).
+A combinator (`nest`, `compose`) offers the intents of all its parts in one step. `proposalLabel`,
+optional and set only by a combinator, names a proposal in a history and a graph; without it the
+label is the proposal's `_tag`. `applyProposal`, the step, `nest`, `compose`, the layers and the
+graph work on that compiled form.
 
 `applyProposal(def, model, proposal)` is the whole pure step: acceptors in key order, then reactors.
 
@@ -57,7 +60,7 @@ sequenceDiagram
   A-->>D: proposal
   D->>M: present(proposal)
   Note over M: under a 1-permit semaphore:<br/>applyProposal · state · record · publish
-  M->>B: dispatchAuto(nap(representation))
+  M->>B: dispatchAuto(each intent of nap(representation), in order)
   M-->>V: representation (stream)
 ```
 
@@ -507,8 +510,9 @@ its states are the `controlStates` option and not `nap` keys; `tagsOf(ast)` (`Ta
 | `representation` | `{ controlState, parent, child }`; `controlState` is `options.controlState(parent, child)`, default the parent's |
 | `controlStates` | `options.controlStates`, which must list every value `controlState` can take (required with `options.controlState`, enforced by its type); default the parent's. The representation schema decodes only these |
 | `acceptors`, `reactors` | each side's own, routed by wrapper: a parent acceptor sees only `model.parent` and the unwrapped parent proposals, a child acceptor only `model.child` and the payload of `Child` proposals. Reactors run per side after all acceptors |
-| `nap` | the parent's intent if `Some`, else the child's wrapped in `Child` |
+| `nap` | the parent's intents, then the child's, each wrapped in `Child`: both sides offer their intent in the same step |
 | `intentKey` | a child intent is keyed `Child/` plus the child's own key, so two different automatic child intents run concurrently and a repeated one is still skipped; a parent intent keeps the parent's key |
+| `proposalLabel` | `Child/` plus the child's own label for a child proposal (`Child/Inc`, `Child/Child/Inc` for a nested child), the parent's label otherwise; the graph's XState events are named by it |
 | `actions` | the parent's, plus `Child`, which runs the child's action for the wrapped intent and wraps the proposal it returns |
 | services | `ServicesOf<parent> \| ServicesOf<child>` |
 
@@ -530,3 +534,112 @@ proposal (unwrapped); a `Some` is applied to the other side's acceptors inside t
 A nested definition can be the child of another `nest`; as a parent it already has the `Child` tag,
 so `nest` throws. Its graph is explored like any other: with a combined `controlState`
 (`"low/high"`) the nodes are the combinations of both sides' states.
+
+## Composed definitions
+
+`compose(parent, parts, options?)` (`Compose.ts`) is `nest` for sibling parts: several stateful
+children, or a keyed collection of one child definition, under one parent. The result is an
+ordinary `SamDefinition` again, so one loop, one history and one graph cover the parent and every
+part, and every placement and tool takes it unchanged. `parts` is a callback that receives a
+builder, so the hooks are typed from the parent (`keys` receives the parent's model, `toParent`
+returns a parent proposal):
+
+```ts
+compose(Roster, (part) => ({
+  Left: part.slot(Counter, { toParent: …, fromParent: … }),
+  Rows: part.collection(Counter, { keys: (roster) => roster.ids, create: (key, roster) => … })
+}), { controlState, controlStates, name })
+```
+
+A **slot** is one instance of a child definition. A **collection** is an ordered, keyed,
+runtime-sized set of instances of one child definition. Parts may share a child definition.
+Like `nest`, `compose` reads the compiled forms of its arguments and builds a compiled definition
+directly, so its states are the `controlStates` option and not `nap` keys.
+
+| Part of the result | Contract |
+|---|---|
+| `name` | `options.name`, default `${parent.name}/${part names joined by "+"}` (`tally/Left+Right`); ports are keyed by name |
+| part names | PascalCase, because a part name is a wire tag, and not a proposal or intent tag of the parent (`tagsOf`, as in `nest`). Both are authoring bugs: `compose` throws |
+| `model` | `{ parent, parts: { [Name]: slot model \| ReadonlyArray<{ key, model }> } }`; `initial` is the parent's initial, each slot's initial and each collection reconciled from the parent's initial |
+| `proposal`, `intent` | the parent's union, unwrapped, plus per slot `{ _tag: Name, proposal }` / `{ _tag: Name, intent }` and per collection `{ _tag: Name, key, proposal }` / `{ _tag: Name, key, intent }` |
+| `representation` | `{ controlState, parent, parts: { [Name]: slot representation \| ReadonlyArray<{ key, representation }> } }`; `controlState` is `options.controlState(rest)`, where `rest` is the representation without `controlState`, default the parent's |
+| `controlStates` | `options.controlStates`, which must list every value `controlState` can take (required with `options.controlState`, enforced by its type); default the parent's. The representation schema decodes only these |
+| `acceptors` | routed by wrapper: a parent acceptor sees only `model.parent` and parent proposals, a slot's acceptors only that slot's model and the payload of its wrapper, and a collection wrapper reaches only the instance with its `key`. A proposal addressed to a key the collection does not hold changes nothing and is not forwarded |
+| `reactors` | the parent's on `model.parent`, each slot's on its model, each collection's on every instance's own model; then the collection reconciliation (below) |
+| `nap` | the parent's intents, then each part's in the order the parts record declares them (a collection's instances in collection order), each wrapped |
+| `intentKey` | `Name/<child key>` for a slot, `Name[<key>]/<child key>` for an instance; a parent intent keeps the parent's key |
+| `actions` | the parent's, plus one per part name, which runs the child's action for the wrapped intent and wraps the proposal it returns (with the `key` for a collection) |
+| `proposalLabel` | `Name/<child label>`, `Name[<key>]/<child label>` (`Rows[b]/Inc`), the parent's label for a parent proposal |
+| services | `ServicesOf<parent>` and every part's child, as a union |
+
+The schemas are composed from the parts' (`Schema.Struct`, `Schema.Array`, `Schema.TaggedStruct`,
+`Schema.Union`), so the composite model, proposal and representation cross the wire and are recorded
+like any definition's.
+
+**The parent owns the lifecycle of a collection.** A collection declares
+`keys: (parentModel) => ReadonlyArray<string>` and optionally
+`create: (key, parentModel) => ChildModel` (default the child's `initial`). After the acceptors, the
+forwarding and every part's reactors, the composite reconciles each collection against
+`keys(parent model)`:
+
+- the instances keep the order of the keys;
+- a key that is new gets `create(key, parent model)`, where the parent model is the one the
+  proposal has just produced;
+- an instance whose key is no longer listed is dropped;
+- an instance still listed is kept as it is, and a repeated key counts once (its first occurrence).
+
+So only a change to the parent's model creates or removes an instance: a parent proposal (`Added`,
+`Removed`), or a part's proposal forwarded with `toParent`. A part's own acceptors cannot. An
+instance created in a step does not receive the proposals forwarded in that step, since it does not
+exist while they are applied.
+
+**Forwarding** keeps the same shape as in `nest`, one hop, inside the same `applyProposal`, so the
+history gets one record and `Present` carries one proposal:
+
+- `toParent(childProposal)` (a collection's also receives the instance's `key`) is called with every
+  proposal a part accepts, unwrapped; a `Some` is applied to the parent's acceptors. A proposal for a
+  key the collection does not hold is not accepted, so it is not offered either.
+- `fromParent(parentProposal)` (a collection's also receives the `key`) is called for the slot and
+  for every instance of a collection; a `Some` is applied to that instance's acceptors. A parent
+  proposal that came from another part's `toParent` is not offered again.
+- A forwarded proposal goes through its target's acceptors only: it is neither forwarded back nor
+  offered to another part. **Parts never forward to each other directly: a sibling that must react
+  to another sibling does so through a parent proposal that both sides handle.** That is the limit
+  that remains; a second hop does not exist.
+- The hooks see the proposal and the instance's key, not the model (as in `nest`).
+- Forwarding acceptors run after the routed ones, and the reactors after all of them.
+
+**Automatic actions.** `nap` offers every part's intent in one step and the drain dispatches them in
+order. An intent's key carries its address, so two instances' automatic actions run concurrently
+(`Rows[a]/AutoReset` and `Rows[b]/AutoReset` do not block each other), while an instance's repeated
+automatic intent is skipped as long as the first is in flight, as in a flat definition.
+
+**Graph growth.** The default node key of `exploreGraph` is the composite `controlState`: the
+parent's unless `options.controlState` combines. A combined key over slots grows as the product of
+the parts' states (two slots of 2 states each give 4 nodes); a collection's instances are as many
+as the parent lists, so a key that combines them has as many values as the instances' states and
+count allow, and the author writes what the nodes should tell apart. Exploration itself expands one
+state per distinct `serialize` (default `key`), so a definition whose control state hides most of
+its model needs a `serialize` that reads the model, and then the number of reachable models is what
+must stay bounded:
+
+- `exploreGraph` throws `mufw graph limit exceeded` past `limit` (default 1 000).
+- The author bounds N in the explore function, for instance by offering `Added` only for two ids
+  and `Inc` only while a row is low, and passes `serialize` (JSON of the model) so exploration
+  expands every model and not one per node. `key` merges nodes, `serialize` splits states.
+- Symmetry reduction across interchangeable instances is not provided: rows `[a, b]` and `[b, a]` with
+  swapped counts are different states. This is the limit that remains for large collections.
+- `simplePaths` enumerates every non-repeating path of the state graph, which grows combinatorially
+  with serialized models; `shortestPaths` returns one path per node.
+
+**Which one to use.**
+
+| Need | Use |
+|---|---|
+| one child under a parent, with the `Child` wire format | `nest` |
+| two or more sibling stateful parts, or a runtime-sized keyed set of one definition, in one history and one graph | `compose` |
+| parts with their own loop, history, placement or lifecycle, and no step that spans both | islands joined by `layerForward` |
+
+A composed definition can be the parent or a child of another `compose`, the parent or a child of a
+`nest`, when the names do not clash: as a parent its part names are tags, so a part of the same name
+throws. The label of a composed child keeps its own wrapper (`Pair/Left/Inc`).

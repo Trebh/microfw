@@ -42,9 +42,9 @@ const islands = (root: HTMLElement, slots: Slots) =>
     layerMount(PlayhousePorts, { root: slots.play, view: playView, render, onRefused: refusedToLog }),
     layerMount(FrontPorts, { root: slots.front, view: frontView, render, onRefused: refusedToLog }),
     layerMountReadOnly(MarqueePorts, { root: slots.sign, view: signView, render }),
-    layerHistoryRows(PlayhousePorts, { root: slots.playHistory, title: Playhouse.name, limit: 12 }),
-    layerHistoryRows(FrontPorts, { root: slots.frontHistory, title: FrontOfHouse.name, limit: 4 }),
-    layerHistoryRows(MarqueePorts, { root: slots.signHistory, title: Marquee.name, limit: 4 }),
+    layerHistoryRows(PlayhousePorts, { root: slots.playHistory, definition: Playhouse, limit: 12 }),
+    layerHistoryRows(FrontPorts, { root: slots.frontHistory, definition: FrontOfHouse, limit: 4 }),
+    layerHistoryRows(MarqueePorts, { root: slots.signHistory, definition: Marquee, limit: 4 }),
     layerHouseLights(root)
   )
 

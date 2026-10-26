@@ -1,5 +1,4 @@
 import { assert, describe, it } from "@effect/vitest"
-import { Option } from "effect"
 import { acceptReserved, clearReservation, initial, state, Wallet } from "../../src/wallet/Wallet.ts"
 import { held, reserved } from "./Wallet.fixtures.ts"
 
@@ -45,7 +44,7 @@ describe("nap", () => {
   it("asks for nothing, whatever the state", () => {
     assert.deepStrictEqual(
       [Wallet.nap(state(held(0))), Wallet.nap(state(held(100)))],
-      [Option.none(), Option.none()]
+      [[], []]
     )
   })
 })

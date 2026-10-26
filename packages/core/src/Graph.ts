@@ -1,5 +1,5 @@
 import { Option } from "effect"
-import type { AnyDefinition, ModelOf, ProposalOf, RepresentationOf } from "./Definition.ts"
+import { type AnyDefinition, type ModelOf, type ProposalOf, proposalLabel, type RepresentationOf } from "./Definition.ts"
 import { applyProposal, type StepRecord } from "./Step.ts"
 
 /** Sample alphabet of proposals to try from a state, written next to the definition. */
@@ -173,20 +173,21 @@ export interface XStateDefinition {
 }
 
 /**
- * XState machine config of the graph: `on[proposalTag]` is the target node, or every distinct
- * target in edge order when the same tag leads to several nodes.
+ * XState machine config of the graph: `on[label]` is the target node, or every distinct target in
+ * edge order when the same label leads to several nodes. The label is `proposalLabel(def, proposal)`.
  */
 export const toXStateDefinition = <D extends AnyDefinition>(def: D, graph: Graph<D>): XStateDefinition => {
   const targets = new Map<string, Map<string, Array<string>>>([...graph.nodes.keys()].map((node) => [node, new Map()]))
   for (const edge of graph.edges) {
-    const byTag = targets.get(edge.from)!
-    const seen = byTag.get(edge.proposal._tag) ?? []
-    if (!seen.includes(edge.to)) byTag.set(edge.proposal._tag, [...seen, edge.to])
+    const byLabel = targets.get(edge.from)!
+    const label = proposalLabel(def, edge.proposal)
+    const seen = byLabel.get(label) ?? []
+    if (!seen.includes(edge.to)) byLabel.set(label, [...seen, edge.to])
   }
   const states: Record<string, { on: Record<string, XStateTransition> }> = {}
-  for (const [node, byTag] of targets) {
+  for (const [node, byLabel] of targets) {
     const on: Record<string, XStateTransition> = {}
-    for (const [tag, list] of byTag) on[tag] = list.length === 1 ? list[0]! : list.map((target) => ({ target }))
+    for (const [label, list] of byLabel) on[label] = list.length === 1 ? list[0]! : list.map((target) => ({ target }))
     states[node] = { on }
   }
   return { id: def.name, initial: graph.initial, states }

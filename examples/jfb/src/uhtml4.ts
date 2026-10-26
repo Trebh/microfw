@@ -1,9 +1,13 @@
 import { render } from "uhtml"
+import { htmlFor } from "uhtml/keyed"
 import { makeLabels } from "./labels.ts"
+import { makePlainKeyedRows } from "./plainKeyedRows.ts"
 import { CREATE_COUNT, CREATE_LOTS_COUNT, type Row, swapRows, updateEveryTenth, withLabels } from "./rows.ts"
-import { type Handlers, tableView } from "./Table.view.ts"
+import { type Handlers, makeTableView } from "./Table.view.ts"
 
 const TITLE = "uhtml4-\"keyed\""
+
+const tableView = makeTableView(makePlainKeyedRows(htmlFor))
 
 /** The plain baseline of `mufw`: one state variable, replaced on every click, then one `render`. */
 interface State {

@@ -6,6 +6,7 @@ import {
   type IntentOf,
   type ModelOf,
   type ProposalOf,
+  proposalLabel,
   type RepresentationOf,
   type SamDefinition,
   type ServicesOf,
@@ -165,15 +166,19 @@ const nestedState = (parent: AnyDefinition, child: AnyDefinition, options: Loose
   }
 }
 
-const nestedNap = (parent: AnyDefinition, child: AnyDefinition) => (representation: Representation) => {
-  const own = parent.nap(representation.parent)
-  if (Option.isSome(own)) return own
-  return Option.map(child.nap(representation.child), (intent) => ({ _tag: CHILD_TAG, intent }))
-}
+/** Both sides' intents in one step, the parent's first. */
+const nestedNap = (parent: AnyDefinition, child: AnyDefinition) => (representation: Representation) => [
+  ...parent.nap(representation.parent),
+  ...child.nap(representation.child).map((intent) => ({ _tag: CHILD_TAG, intent }))
+]
 
 /** A child intent is keyed under `Child/` plus the child's own key, so distinct child intents never block each other. */
 const nestedIntentKey = (parent: AnyDefinition, child: AnyDefinition) => (intent: IntentOf<AnyDefinition>): string =>
   isChild(intent) ? `${CHILD_TAG}/${intentKeyOf(child, intent.intent)}` : intentKeyOf(parent, intent)
+
+/** A child proposal is labelled `Child/` plus the child's own label, recursively (`Child/Child/Inc`); any other is the parent's. */
+const nestedProposalLabel = (parent: AnyDefinition, child: AnyDefinition) => (proposal: Proposal): string =>
+  isChild(proposal) ? `${CHILD_TAG}/${proposalLabel(child, proposal.proposal)}` : proposalLabel(parent, proposal)
 
 /** The intent was decoded against the child's schema, so its tag has an action. */
 const childAction = (child: AnyDefinition) => (wrapper: ChildIntent<AnyDefinition>) =>
@@ -192,20 +197,10 @@ const nestLoosely = (parent: AnyDefinition, child: AnyDefinition, options: Loose
     state: nestedState(parent, child, options),
     nap: nestedNap(parent, child),
     intentKey: nestedIntentKey(parent, child),
+    proposalLabel: nestedProposalLabel(parent, child),
     actions: { ...parent.actions, [CHILD_TAG]: childAction(child) }
   }
 }
-
-const isTagged = (value: unknown): value is Tagged =>
-  typeof value === "object" && value !== null && "_tag" in value && typeof value._tag === "string"
-
-/** A plain definition may have its own `Child` tag with any payload, so only a wrapped tagged proposal is a child proposal. */
-const isChildProposal = (value: Tagged): value is ChildProposal<AnyDefinition> =>
-  isChild(value) && "proposal" in value && isTagged(value.proposal)
-
-/** What a proposal is called in a history: its tag, or for a child proposal `Child/` and the inner label, recursively (`Child/Inc`). */
-export const proposalLabel = (proposal: Tagged): string =>
-  isChildProposal(proposal) ? `${CHILD_TAG}/${proposalLabel(proposal.proposal)}` : proposal._tag
 
 /**
  * Composes `child` into `parent` as one definition, so one loop, one history and one graph cover
@@ -215,8 +210,8 @@ export const proposalLabel = (proposal: Tagged): string =>
  *   wrapped as `{ _tag: "Child", proposal }` and `{ _tag: "Child", intent }`
  * - representation `{ controlState, parent, child }`; `controlState` is the parent's unless
  *   `options.controlState` combines both sides, in which case `options.controlStates` lists its values
- * - each acceptor and reactor sees only its own side's model; `nap` offers the parent's intent first,
- *   then the child's; a child intent runs the child's action and wraps the proposal it returns
+ * - each acceptor and reactor sees only its own side's model; `nap` offers the parent's intents,
+ *   then the child's, in one step; a child intent runs the child's action and wraps the proposal it returns
  * - `toParent`/`toChild` forward an accepted proposal to the other side in the same step
  * - the services of the result are those of both definitions
  *

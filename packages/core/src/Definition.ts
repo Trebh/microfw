@@ -78,7 +78,11 @@ export interface SamBehaviour<
   readonly actions: Actions<I["Type"], P["Type"], R>
 }
 
-/** What `define` compiles and every consumer reads: the control states and the acceptors as lists, `nap` as one function. */
+/**
+ * What `define` compiles and every consumer reads: the control states and the acceptors as lists,
+ * `nap` as one function that returns the intents offered in this step (none, or one per definition,
+ * more for a combinator).
+ */
 export interface SamDefinition<
   M extends Codec<any>,
   P extends Codec<Tagged>,
@@ -91,8 +95,14 @@ export interface SamDefinition<
   readonly acceptors: ReadonlyArray<(model: M["Type"], proposal: P["Type"]) => M["Type"]>
   readonly reactors: ReadonlyArray<(model: M["Type"]) => M["Type"]>
   readonly state: (model: M["Type"]) => Rp["Type"]
-  readonly nap: (representation: Rp["Type"]) => Option.Option<I["Type"]>
+  readonly nap: (representation: Rp["Type"]) => ReadonlyArray<I["Type"]>
   intentKey?(intent: I["Type"]): string
+  /**
+   * What a proposal is called in a history and a graph. Set by combinators, whose proposals wrap
+   * another definition's; `define` leaves it unset and the label is the proposal's `_tag`. Read it
+   * through `proposalLabel`. Pure.
+   */
+  proposalLabel?(proposal: P["Type"]): string
   readonly actions: Actions<I["Type"], P["Type"], R>
 }
 
@@ -108,6 +118,10 @@ export type ServicesOf<D extends AnyDefinition> = D extends SamDefinition<any, a
 export const intentKeyOf = (definition: AnyDefinition, intent: Tagged): string =>
   definition.intentKey?.(intent) ?? intent._tag
 
+/** What a proposal is called in a history: the definition's own label, else its tag (`Child/Inc` for a nested child's). */
+export const proposalLabel = (definition: AnyDefinition, proposal: Tagged): string =>
+  definition.proposalLabel?.(proposal) ?? proposal._tag
+
 /**
  * One acceptor per key, in key order; each sees only the proposals of its own tag. The cast widens
  * each record entry's proposal type from its own tag to `P`, which the tag test makes sound.
@@ -119,9 +133,11 @@ const compileAcceptors = <M, P extends Tagged>(
   return entries.map(([tag, accept]) => (model, proposal) => proposal._tag === tag ? accept(model, proposal) : model)
 }
 
-/** The `nap` record as one function that looks the representation's control state up. */
-const compileNap = <Rp extends Representation, I>(nap: Nap<Rp, I>) => (representation: Rp): Option.Option<I> =>
-  nap[representation.controlState as Rp["controlState"]](representation)
+/** The `nap` record as one function that looks the representation's control state up and lists the intent it offers. */
+const compileNap = <Rp extends Representation, I>(nap: Nap<Rp, I>) => (representation: Rp): ReadonlyArray<I> => {
+  const offered = nap[representation.controlState as Rp["controlState"]](representation)
+  return Option.isSome(offered) ? [offered.value] : []
+}
 
 /**
  * `define(schemas)(behaviour)`. Two calls, because TypeScript only types the behaviour's literals

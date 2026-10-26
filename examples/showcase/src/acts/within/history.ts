@@ -12,20 +12,21 @@ export interface Row {
   readonly parts: ReadonlyArray<string>
 }
 
-export interface ListOptions {
+export interface ListOptions<D extends AnyDefinition> {
   readonly root: Element
-  readonly title: string
+  /** The definition behind the loop: it names the list and labels each record's proposal. */
+  readonly definition: D
   /** How many of the newest records the list shows. */
   readonly limit: number
 }
 
-const labelOf = (record: StepRecord<AnyDefinition>): string =>
-  Option.match(record.proposal, { onNone: () => record.kind, onSome: proposalLabel })
+const labelOf = (definition: AnyDefinition, record: StepRecord<AnyDefinition>): string =>
+  Option.match(record.proposal, { onNone: () => record.kind, onSome: (proposal) => proposalLabel(definition, proposal) })
 
-export const rowOf = (record: StepRecord<AnyDefinition>): Row => ({
+export const rowOf = (definition: AnyDefinition) => (record: StepRecord<AnyDefinition>): Row => ({
   seq: record.seq,
   kind: record.kind,
-  label: labelOf(record),
+  label: labelOf(definition, record),
   parts: record.representation.controlState.split("/")
 })
 
@@ -59,12 +60,13 @@ const historyList = (title: string, rows: ReadonlyArray<Row>) =>
  * One list over a loop's `HistoryPort`: its newest `limit` records, as the loop wrote them. The list
  * reads the port, not the model, so it shows exactly what a rewind would travel through.
  */
-export const layerHistoryRows = <D extends AnyDefinition>(ports: Ports<D>, options: ListOptions) =>
+export const layerHistoryRows = <D extends AnyDefinition>(ports: Ports<D>, options: ListOptions<D>) =>
   Layer.effectDiscard(
     Effect.gen(function*() {
       const history = yield* ports.HistoryPort
-      const paint = (rows: ReadonlyArray<Row>) => Effect.sync(() => render(options.root, historyList(options.title, rows)))
-      const rows = history.records.pipe(Stream.map(rowOf), Stream.scan(() => noRows, remember(options.limit)))
+      const paint = (rows: ReadonlyArray<Row>) =>
+        Effect.sync(() => render(options.root, historyList(options.definition.name, rows)))
+      const rows = history.records.pipe(Stream.map(rowOf(options.definition)), Stream.scan(() => noRows, remember(options.limit)))
       yield* Effect.forkScoped(Stream.runForEach(rows, paint))
     })
   )

@@ -13,6 +13,7 @@ import {
   type Path,
   type PathStep,
   type Ports,
+  proposalLabel,
   type RepresentationOf,
   shortestPaths,
   simplePaths,
@@ -181,10 +182,10 @@ export const domDriver = <D extends AnyDefinition, R, E>(
     )
 })
 
-const describePath = <D extends AnyDefinition>(path: Path<D>) => {
+const describePath = <D extends AnyDefinition>(def: D) => (path: Path<D>) => {
   if (path.steps.length === 0) return `reaches ${path.target} (initial)`
-  const tags = path.steps.map((step) => step.proposal._tag)
-  return `reaches ${path.target} via ${tags.join(" → ")}`
+  const labels = path.steps.map((step) => proposalLabel(def, step.proposal))
+  return `reaches ${path.target} via ${labels.join(" → ")}`
 }
 
 interface Checkpoint {
@@ -252,7 +253,7 @@ export const createTestModel = <D extends AnyDefinition>(
     graph,
     shortestPaths: () => shortestPaths(graph),
     simplePaths: () => simplePaths(graph),
-    describe: describePath,
+    describe: describePath(def),
     run: (path, driver) => runPath(path, driver ?? (presentDriver(ports) as Driver<D, any, any>))
   }
 }

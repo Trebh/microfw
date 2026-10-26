@@ -2,7 +2,7 @@
 
 Living document: change it in the same commit that changes what it describes. Detailed pages:
 
-- [architecture/sam-loop.md](architecture/sam-loop.md) — definition, step, automatic actions, history, travel and replay, persistence, synchronisation across instances, nested definitions
+- [architecture/sam-loop.md](architecture/sam-loop.md) — definition, step, automatic actions, history, travel and replay, persistence, synchronisation across instances, nested and composed definitions
 - [architecture/placement.md](architecture/placement.md) — ports, layers, the RPC contract, the placements (browser, server, web worker)
 - [architecture/testing.md](architecture/testing.md) — graph exploration and model-based path testing
 - [architecture/devtools.md](architecture/devtools.md) — time-travel panel, history list and export, Stately adapter
@@ -15,7 +15,7 @@ Living document: change it in the same commit that changes what it describes. De
 ```mermaid
 flowchart LR
   subgraph Driving adapters
-    View["@mufw/view-uhtml<br/>layerMount · layerMountReadOnly · layerInputScheduler"]
+    View["@mufw/view-uhtml<br/>layerMount · layerMountReadOnly · makeKeyedList · layerInputScheduler"]
     Drivers["@mufw/test<br/>presentDriver / intentDriver / domDriver"]
     Handlers["@mufw/rpc<br/>layerHandlers (server side)"]
   end
@@ -120,9 +120,10 @@ Each entry states the choice and the constraint behind it.
   without an acceptor, an acceptor for a tag the schema lacks, or a control state without a `nap`
   entry does not compile; `unchanged` and `noIntent` make ignoring a tag or having no automatic
   intent an explicit entry, and `controlStates` is derived from `nap`'s keys, not written a second
-  time. `define` compiles the record into the `SamDefinition` the step, the layers, the graph and
-  `nest` read (an acceptor array, one `nap` function, `controlStates`), so none of them knows the
-  authoring shape and `nest` builds compiled definitions directly.
+  time. `define` compiles the record into the `SamDefinition` the step, the layers, the graph,
+  `nest` and `compose` read (an acceptor array, one `nap` function returning a list of intents,
+  `controlStates`), so none of them knows the authoring shape and the combinators build compiled
+  definitions directly.
 - **Ports are function-style service keys with per-definition identifiers** (`IntentBus<D>` …),
   so their types can be named and the same framework can host several definitions.
 - **Placement is per deployment, not per request.** Each page has its own entry point that calls
@@ -134,8 +135,8 @@ Each entry states the choice and the constraint behind it.
   auction may be on the server. `layerForward(from, to, forward)` reads `from.ModelPort`
   representations and dispatches through `to.IntentPort`, so neither side knows where the other
   runs, and a refusal, or a defect in `forward` or in the dispatch, is logged, not thrown. `forward` is pure and sees the previous
-  representation, so what counts as a change is the caller's rule. (`nest` is the alternative for
-  one loop, one history.)
+  representation, so what counts as a change is the caller's rule. (`nest` and `compose` are the
+  alternative for one loop, one history.)
 - **One websocket path per served definition (`/sam/<name>`), not a definition tag in the wire
   contract.** The RPC tags stay `Submit`…`Replay`; a client builds one protocol and one socket
   per remote definition, and `MUFW_RPCS` applies to every definition the server serves. The server
@@ -289,6 +290,11 @@ Each entry states the choice and the constraint behind it.
   detached element). The `dom` + `init` pair is what the view tests already run on, and `initSsr`
   documents no `document`. The entry imports uhtml statically because it is for Node composition
   roots; `index.ts` stays lazy.
+- **A keyed list is `makeKeyedList(htmlFor)`, not `htmlFor` with one ref per list.** `htmlFor`
+  memoizes a node per `(ref, key)` and uhtml 4 cannot drop a key, so a list on one ref keeps every
+  row it ever rendered. The helper keeps the bound tags of the latest render only, each obtained
+  from `htmlFor` with a ref of its own, so a removed row's node is released at the next render. It
+  takes `htmlFor` as a parameter, as a `.view.ts` takes `html`, so the package entry stays DOM-free.
 - **The server renders the first paint from its history, and a browser-owned model starts from a
   snapshot.** `MUFW_SSR` adds `GET /` and `GET /assets/*` to the same `HttpRouter.serve` as the RPCs.
   The page renders the representation of the loop's latest `HistoryPort` record, whose model is
@@ -303,7 +309,20 @@ Each entry states the choice and the constraint behind it.
   bug, and `nest` throws.
 - **An automatic intent is deduplicated by `intentKey`, default its tag.** `nest` wraps every child
   intent in one `Child` tag, so keying by tag would let one slow child action starve every other
-  automatic child intent; `nest` keys a child intent `Child/` plus the child's own key instead.
+  automatic child intent; `nest` keys a child intent `Child/` plus the child's own key instead, and
+  `compose` keys a part's `<Part>/` or `<Part>[<key>]/` plus the child's key, so two instances run
+  concurrently and one instance's repeated intent is skipped.
+- **The compiled `nap` returns a list; an authored `nap` entry returns at most one intent.** A
+  combinator offers every part's automatic intent in the same step, so no part starves while
+  another keeps offering one; the loop dispatches each and the drain deduplicates by key.
+- **Composition of siblings and keyed collections is a second pure combinator (`compose`), next to
+  `nest`.** Parts are named slots or keyed collections; a part's proposals and intents travel under
+  its name (with the instance's `key` for a collection), so the parent's stay as authored and a
+  composed definition can itself be a parent or a part. A collection's instances follow the keys
+  the parent's model lists, so instances are created and dropped by changes to the parent's model;
+  a proposal for a key that is gone changes nothing. `nest` keeps the one-child `Child` format. A
+  history label comes from the definition (`proposalLabel(def, proposal)`), so it names the
+  instance (`Rows[b]/Inc`). See [the SAM loop](architecture/sam-loop.md#composed-definitions).
 - **Nested forwarding is one hop, applied inside the step.** `toChild`/`toParent` run as the last
   acceptors, on the other side's own acceptors only, so one proposal is one history record and two
   sides forwarding to each other cannot loop.

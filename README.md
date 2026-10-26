@@ -46,9 +46,9 @@ every figure, its baseline and its command are):
 
 | Package | Role |
 |---|---|
-| `@mufw/core` | Definition, nesting, pure step, ports, local layers, forwarding between definitions, graph exploration, history export and replay, model persistence; the `./sync` entry (`@mufw/core/sync`) holds event-log synchronisation, so a page that never syncs does not ship it |
+| `@mufw/core` | Definition, nesting and composition, pure step, ports, local layers, forwarding between definitions, graph exploration, history export and replay, model persistence; the `./sync` entry (`@mufw/core/sync`) holds event-log synchronisation, so a page that never syncs does not ship it |
 | `@mufw/rpc` | Wire contract and remote adapters of the ports (platform-free) |
-| `@mufw/view-uhtml` | Mounts a pure [uhtml](https://github.com/WebReflection/uhtml) v4 view (`layerMount`; `layerMountReadOnly` for an island that only reads the model); `layerInputScheduler`, the scheduler a browser page runs on so a click is rendered in its own task; the `./ssr` entry renders a view to markup in Node (`makeSsr`) |
+| `@mufw/view-uhtml` | Mounts a pure [uhtml](https://github.com/WebReflection/uhtml) v4 view (`layerMount`; `layerMountReadOnly` for an island that only reads the model); `makeKeyedList(htmlFor)`, a keyed list whose memo holds only the rows of the latest render, so a removed row's node is released; `layerInputScheduler`, the scheduler a browser page runs on so a click is rendered in its own task; the `./ssr` entry renders a view to markup in Node (`makeSsr`) |
 | `@mufw/devtools` | Time-travel panel, history list, Stately inspector adapter |
 | `@mufw/test` | Model-based path testing (returns Effects; test-runner agnostic) |
 | `@mufw/example-auction` | A live auction running in all four browser/server placements and in a web worker |
@@ -378,6 +378,14 @@ key, or a missing `nap` key, does not compile.
 model is `{ parent, child }`, the child's proposals and intents are wrapped as `{ _tag: "Child", … }`,
 and `toChild`/`toParent` forward a proposal to the other side in the same step. See
 [the SAM loop](docs/architecture/sam-loop.md#nested-definitions).
+
+`compose(parent, (part) => parts, options?)` composes a parent with named parts on one loop: a
+slot (`part.slot(child)`, one instance) or a keyed collection (`part.collection(child, { keys })`,
+one instance per key the parent's model lists, created and dropped as the list changes). The model
+is `{ parent, parts }`; a part's proposals and intents travel as `{ _tag: "<Part>", proposal }`, or
+with a `key` for a collection; `nap` offers every part's automatic intent in the same step, keyed
+per instance, and the history labels a step with the instance (`Rows[b]/Inc`). See
+[the SAM loop](docs/architecture/sam-loop.md#composed-definitions).
 
 `layerForward(from, to, forward)` connects two definitions on one page: every representation of
 `from` goes through the pure `forward(previous, current)`, and each intent it returns is dispatched

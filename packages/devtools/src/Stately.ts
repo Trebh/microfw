@@ -1,4 +1,4 @@
-import type { AnyDefinition, Ports, StepRecord, XStateDefinition } from "@mufw/core"
+import { type AnyDefinition, type Ports, proposalLabel, type StepRecord, type XStateDefinition } from "@mufw/core"
 import { Effect, Layer, Option, Stream } from "effect"
 
 export interface InspectedSnapshot {
@@ -93,7 +93,7 @@ export const layerStately = <D extends AnyDefinition>(
           const snapshot = { context: record.model, value: record.representation.controlState }
           if (record.kind === "init") return inspector.actor(actorRef, snapshot)
           if (Option.isNone(record.proposal)) return inspector.snapshot(def.name, snapshot, { event: TRAVEL_EVENT })
-          const type: string = record.proposal.value._tag
+          const type = proposalLabel(def, record.proposal.value)
           inspector.event(def.name, { ...record.proposal.value, type })
           inspector.snapshot(def.name, snapshot, { event: { type } })
         })

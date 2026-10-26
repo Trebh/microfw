@@ -123,12 +123,13 @@ between the two is what µFW itself adds, not the renderer's cost.
 - Actions draw the labels from Effect's `Random` service and the acceptors stay pure; selection is one `selected`
   id in the model, recorded in the history.
 
-**Keyed rendering and its retention.** A row is ``htmlFor(rowsKey, row.id)`<tr>…</tr>` ``, which returns the same
-`<tr>` for the same id on every render. `htmlFor` memoizes per `(ref, key)` and uhtml 4 has no API to drop a key,
-so the `<tr>` of a removed or replaced row stays referenced for as long as `rowsKey` does. The memory
-benchmarks that create rows repeatedly show it; in headless Chromium the JS heap after five create and clear
-cycles of 1,000 rows was about twice the heap after one, for both entries (measured, README). The retention is in
-the control too, so it does not separate them, but it inflates both against entries that release nodes.
+**Keyed rendering and its retention.** A row is the `<tr>` of a bound tag for its id, which returns the same `<tr>`
+for the same id on every render. The entries now take the bound tags from a keyed list that keeps the keys of its
+latest render only (`makeKeyedList` of `@mufw/view-uhtml`; `uhtml4` carries a copy of the mechanism), because
+`htmlFor(ref, key)` held the `<tr>` of every removed row for as long as its ref lived. **The Results below were
+measured on the entries before that change**, with `htmlFor` on a fixed ref, and their run-clear figures (9.455 and
+8.405 MiB) are that retention; the figures after it are in the [README](../../examples/jfb/README.md#memory): 2.106
+MiB for `mufw` and 0.770 for `uhtml4`, 3.28× and 1.20× `vanillajs`'s 0.643 (medians of the same five sessions).
 
 **JFB flags.** None is declared in `package.json`. #772: no, the view is a template. #796: no; the input
 scheduler uses microtasks and `setTimeout`. #800: no; one `selected` id in the model. #801: no; uhtml assigns
@@ -414,7 +415,7 @@ puts both µFW entries near the bottom of 196.
 |---|---|
 | µFW costs about 4% to 5% of CPU over its renderer on JFB's nine operations, measured on one machine in three passes | "µFW is X-th in js-framework-benchmark": no µFW entry is in the published table, and a local rank is a rank in 17 |
 | A µFW page is about 10× the bytes of the same page in plain uhtml 4 (40.0 against 3.9 KiB brotli) and smaller than a React or Angular entry | "µFW is as fast as uhtml" or "as fast as vanilla JavaScript": it is 1.43× `vanillajs` in set 1 and 1.32× to 1.33× in the later passes, against 1.36× and 1.27× for the control |
-| A µFW view with a keyed list keeps every removed row today: run-clear memory is 190th of 196, from uhtml 4's `htmlFor`, which the control shares ([TODO](../TODO.md#view)) | That the retention comes from µFW's loop or history: the control has neither and shows 8.41 of µFW's 9.46 MiB |
+| Before the keyed list released rows, run-clear memory was 190th of 196, from uhtml 4's `htmlFor`, which the control shared; after it, 3.28× `vanillajs` ([README](../../examples/jfb/README.md#memory), medians of five sessions run together, not placed in the 196) | That the 2.106 MiB left is the renderer's: 0.42 MiB of it is µFW's history (`HistoryLimit` at 2 ends at 1.67–1.70) and 0.70 is loading µFW and Effect |
 | Estimated place on CPU is the middle of the field, by a method that predicted the 14 anchors to 0.948 to 1.017 times | The estimate as a measurement: the band is not a confidence interval and µFW's architecture is unlike every anchor |
 | JFB shows the cost of a local loop with history on | What a remote placement costs: JFB does not exercise it |
 

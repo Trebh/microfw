@@ -178,7 +178,7 @@ const stationNote = (id: StationId, representation: Representation): string => {
         acceptors: fieldsText(current),
         reactors: current.freed.length > 0 ? `freed ${seatsText(current.freed)}` : "nothing to tidy",
         state: current.controlState,
-        nap: Option.match(current.whisper, { onNone: () => "silent", onSome: (intent) => intent._tag })
+        nap: current.whispers.length === 0 ? "silent" : current.whispers.map((intent) => intent._tag).join(", ")
       }
       return notes[id]
     }
@@ -265,14 +265,15 @@ const stateItem = (scene: Option.Option<Scene>) =>
   }</dd>
   </div>`
 
-const whisperLine = (scene: Scene): string =>
-  Option.match(scene.whisper, {
-    onNone: () => (scene.controlState === "curtain" ? "The curtain is up. Nothing more to say." : "Nothing to wait for. I keep quiet."),
-    onSome: (intent) =>
-      intent._tag === "RaiseCurtain"
-        ? "Every seat is sold. Raise the curtain."
-        : "Wait for the earliest hold to run out, then look at the clock."
-  })
+const whisperLine = (scene: Scene): string => {
+  const [intent] = scene.whispers
+  if (intent === undefined) {
+    return scene.controlState === "curtain" ? "The curtain is up. Nothing more to say." : "Nothing to wait for. I keep quiet."
+  }
+  return intent._tag === "RaiseCurtain"
+    ? "Every seat is sold. Raise the curtain."
+    : "Wait for the earliest hold to run out, then look at the clock."
+}
 
 const napItem = (scene: Option.Option<Scene>) =>
   html`<div class="ledger__item ledger__item--prompter" data-spot="ledger-nap">
@@ -282,7 +283,7 @@ const napItem = (scene: Option.Option<Scene>) =>
       onNone: () => html`<p class="ledger__quiet">The prompter has not seen a scene yet.</p>`,
       onSome: (current) =>
         html`<p class="prompter">${whisperLine(current)}</p>
-          <p class="ledger__by mono">${Option.match(current.whisper, { onNone: () => "none", onSome: (intent) => intent._tag })}</p>`
+          <p class="ledger__by mono">${current.whispers.length === 0 ? "none" : current.whispers.map((intent) => intent._tag).join(", ")}</p>`
     })
   }</dd>
   </div>`

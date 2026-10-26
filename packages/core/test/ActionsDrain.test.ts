@@ -18,6 +18,12 @@ const NestedClears = nest(Counter, Clears)
 const NestedClearsPorts = makePorts(NestedClears)
 const NestedClearsLoop = layerLoopLocal(NestedClears, NestedClearsPorts)
 
+const TwinClears = nest(Clears, Clears, {
+  toChild: (proposal) => (proposal._tag === "ArmA" ? Option.some(proposal) : Option.none())
+})
+const TwinClearsPorts = makePorts(TwinClears)
+const TwinClearsLoop = layerLoopLocal(TwinClears, TwinClearsPorts)
+
 const Loop = layerLoopLocal(Counter, Ports)
 const LoopWithoutAutoActions = Loop.pipe(Layer.provide(Layer.succeed(AutoActions, false)))
 
@@ -114,4 +120,24 @@ describe("layerActionsDrain over a nested definition", () => {
       const child = representations[representations.length - 1]?.child
       assert.deepStrictEqual(child, { controlState: "busy", a: true, b: false })
     }).pipe(Effect.provide(NestedClearsLoop)))
+})
+
+describe("layerActionsDrain over a step that offers two intents", () => {
+  it.effect("starts both actions in the same step", () =>
+    Effect.gen(function*() {
+      const model = yield* TwinClearsPorts.ModelPort
+      const representations = yield* collect(model.representations)
+
+      yield* model.present({ _tag: "ArmA" })
+      yield* settle
+      yield* TestClock.adjust("10 seconds")
+      yield* settle
+
+      const last = representations[representations.length - 1]
+      assert.deepStrictEqual(last, {
+        controlState: "idle",
+        parent: { controlState: "idle", a: false, b: false },
+        child: { controlState: "idle", a: false, b: false }
+      })
+    }).pipe(Effect.provide(TwinClearsLoop)))
 })

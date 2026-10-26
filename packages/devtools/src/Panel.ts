@@ -38,9 +38,9 @@ const downloadFile = (file: ExportedFile) =>
 const travelSource = <D extends AnyDefinition>(travel: StepRecord<D>) =>
   travel.travelledTo === undefined ? "↩" : `↩ ${travel.travelledTo}`
 
-const label = <D extends AnyDefinition>(record: StepRecord<D>) => {
+const label = <D extends AnyDefinition>(def: D, record: StepRecord<D>) => {
   if (record.kind === "travel") return travelSource(record)
-  return Option.match(record.proposal, { onNone: () => "", onSome: proposalLabel })
+  return Option.match(record.proposal, { onNone: () => "", onSome: (proposal) => proposalLabel(def, proposal) })
 }
 
 interface Renderer {
@@ -93,7 +93,7 @@ const layerHistoryView = <D extends AnyDefinition>(
       const exportClicked = () => runFork(exportHistory(def, records.slice(), save))
       const row = (record: StepRecord<D>, latest: number | undefined) =>
         html`<li class=${record.seq === latest ? "mufw-latest" : ""} onclick=${() => select(record.seq)}>
-          #${record.seq} ${record.kind} ${label(record)} → ${record.representation.controlState}
+          #${record.seq} ${record.kind} ${label(def, record)} → ${record.representation.controlState}
         </li>`
       const paint = () => {
         const latest = records.at(-1)?.seq
