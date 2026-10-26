@@ -212,7 +212,7 @@ code as it is. Update the affected document in the same change that makes it fal
 | direction, principles, non-goals | VISION.md |
 | a port, layer, contract, boundary or design decision | docs/ARCHITECTURE.md and the matching page |
 | a change to a definition (its schemas, acceptors, `nap`, explore function or samples) | its `<Unit>.behaviour.md`, regenerated with `vitest -u` and reviewed as part of the diff |
-| a change that moves a measured cost (bundle, startup, step, interaction, server) | docs/architecture/performance.md, with the figures of a fresh run of the `bench:*` script that measures it |
+| a change that moves a measured cost (bundle, startup, step, interaction, server) | docs/architecture/performance.md, with the figures of a fresh run of the `bench:*` script that measures it, and the rounded figures of README.md's "What it costs" |
 | a gap found or closed | docs/TODO.md (add it, or delete the item) |
 | a rule for contributors | AGENTS.md |
 

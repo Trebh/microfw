@@ -5,7 +5,8 @@
 Which parts of the SAM loop run in the browser and which on the server is decided per deployment
 by composing Effect `Layer`s; the domain code does not change.
 
-Status: **proof of concept**. APIs move freely; there is no build step and nothing is published.
+Status: **proof of concept**. APIs move freely; the packages export their TypeScript sources, with no
+build step, and nothing is published to npm.
 
 ## What you get
 
@@ -20,27 +21,44 @@ Status: **proof of concept**. APIs move freely; there is no build step and nothi
   replays each generated path against the real system, in-process or over the wire, or by clicking
   the rendered UI and reading the DOM. Each definition with an explore function also gets a committed
   behaviour card (`<Unit>.behaviour.md`), regenerated from the same exploration and kept current by a test.
+- **Composition.** `nest` puts a child definition inside a parent, `compose` gives a parent named parts
+  and keyed collections on one loop, and `layerForward` connects two loops on one page.
+- **Server-side.** The model persists to a directory; several servers share one model through an event
+  log, with a lease that picks the one instance that runs automatic actions; a server renders a page's
+  first paint and streams a view as HTML with no client bundle.
 - **Devtools.** A time-travel panel, a read-only history list, JSON export of a history, and an adapter for the
   [Stately inspector](https://stately.ai/docs/inspector) that draws the state and sequence diagrams.
 
 ## What it costs
 
-µFW trades speed and size for a typed, recorded, relocatable loop, and says so. Measured against
-the same pages written in plain uhtml ([performance.md](docs/architecture/performance.md), where
-every figure, its baseline and its command are):
+µFW trades bytes, load time and per-step work for a typed, recorded, relocatable loop. The figures
+below are rounded from [performance.md](docs/architecture/performance.md), which holds each
+measurement with its plain baseline, the machine it ran on and the command that regenerates it.
 
-- **Bundle.** The smallest µFW page ships about thirteen times the JavaScript of the plain page, tens
-  of KiB gzipped, most of it the Effect runtime and `Schema`.
-- **Startup.** First content takes two to three times as long, script time three to seven times.
-- **Interaction.** Pages run on `layerInputScheduler`, which runs the fiber hops of a click as
-  microtasks in the task of the click, so its step is shown in the same task as in the plain page;
-  Effect's default scheduler posts each hop as a macrotask, which a browser holds until the next
-  frame. A fiber that keeps working still yields to the event loop after a few milliseconds.
-- **Steps.** A step costs a few microseconds over the reducer it runs, and an intent's round trip
-  tens; both are fixed costs that matter for trivial steps and fade as the domain does more work.
-- **Server.** One definition is one serialised writer, so proposals per second do not grow with
-  connections; every update sends the whole representation to every subscriber; history is
-  bounded by records and by an estimate of the bytes they retain.
+- **Bundle.** A counter page ships about 43 KiB of JavaScript gzipped, against about 3 KiB for the same
+  page in plain uhtml; the `browser-only` auction ships about 74 KiB. Nine tenths of the bytes are
+  Effect (runtime, `Schema`, streams, layers); µFW's own packages are a few KiB. That is about two
+  thirds of a React hello world ([measured with another bundler](docs/architecture/performance.md#against-other-libraries)).
+- **Startup.** First content takes two to two and a half times as long as in the plain page. Script
+  time, where the extra JavaScript is parsed and run, is about three times as long for a 1000-row list
+  and seven times for a counter.
+- **Interaction.** A click reaches the screen as soon as in the plain page: click to next frame is
+  within 2% of the baseline's at every CPU throttling rate measured. Browser pages run on
+  `layerInputScheduler`, which runs the fiber hops of a click as microtasks in the click's own task
+  (Effect's default scheduler posts each hop as a macrotask, which the browser holds until the next
+  frame), and still yields to the event loop after 5 ms of work.
+- **Against other frameworks.** In a local [js-framework-benchmark](docs/architecture/performance.md#against-other-frameworks)
+  pass over 17 keyed entries, µFW is within about 5% of its plain uhtml 4 control on CPU, 10th of 17
+  between Vue and Elm. It takes about 2.7 times the control's memory after creating and clearing rows,
+  part of it the recorded history, and ten times its bytes, which about doubles its first paint.
+- **Steps.** In Node a step costs a few microseconds over the reducer it runs and an intent's round
+  trip about 30 more: fixed costs that dominate a step that is one addition and fade in one that does
+  real work (3 times the reducer at 1000 rows).
+- **Server.** One definition is one serialised writer: a few thousand proposals per second over
+  websockets, which more connections do not raise. Every update sends the whole representation to
+  every subscriber, so fan-out grows with updates times subscribers. History is bounded by count and
+  by an estimate of the bytes it retains; the model is not. Synchronising adds a fraction of a
+  millisecond on loopback, and a round trip to the host at a joiner on a real network.
 
 ## Packages
 
@@ -53,6 +71,7 @@ every figure, its baseline and its command are):
 | `@mufw/test` | Model-based path testing (returns Effects; test-runner agnostic) |
 | `@mufw/example-auction` | A live auction running in all four browser/server placements and in a web worker |
 | `@mufw/example-showcase` | A presentation of µFW as a theatre play: the deck is itself a SAM definition, and each act runs µFW live in the browser |
+| `@mufw/example-jfb` | The js-framework-benchmark keyed table in µFW and in plain uhtml 4 (the control), built into directories a js-framework-benchmark checkout can serve |
 
 ## Quick start
 
@@ -125,15 +144,15 @@ applies whatever proposal the page presents anyway, so the page states its own i
 `?bidder=` (default `alice`) at its composition root. A server that serves only `Submit`,
 `Representations` and `History` never believes a visitor about who is bidding.
 
-Every auction page (all but `/devtools.html`) also mounts a second island beside the auction: a wallet (`src/wallet/Wallet.ts`, credit
-100) with its own loop, root and placement, always in the browser. `layerForward` feeds it from
-the auction: when the leading bid is the page's bidder's, the wallet reserves its amount, and when
-another bidder leads it releases. The wallet follows the bidder its page says it is (`Whoami`): where the actions run in the
-browser or in the web worker (`browser-only`, `server-model`, `worker`) that is `?bidder=` (default `alice`), the page's
-identity too; where they run on the server (`server-owned`, `server-actions`, the demo with `actions:server`)
-the page asks the server, which answers from the session the page sends (`Whoami`, below), so the wallet follows
-the session's bidder with no `?bidder=`. A session the server refuses leaves the wallet mounted and fed by
-nobody ("follows no bidder"). The wallet is the visitor's own and the server trusts nothing from it. On the demo page,
+Every auction page (all but `/devtools.html`) also mounts a second island beside the auction: a wallet
+(`src/wallet/Wallet.ts`, credit 100) with its own loop, root and placement, always in the browser.
+`layerForward` feeds it from the auction: when the leading bid is the page's bidder's, the wallet
+reserves its amount, and when another bidder leads it releases. The page's bidder is `?bidder=`
+(default `alice`) where the actions run in the browser or in the web worker (`browser-only`,
+`server-model`, `worker`); where they run on the server (`server-owned`, `server-actions`, the demo
+with `actions:server`) it is the session's bidder, which the page asks the server with `Whoami`
+(above). A session the server refuses leaves the wallet mounted and fed by nobody ("follows no
+bidder"). The wallet is the visitor's own and the server trusts nothing from it. On the demo page,
 `?placement=model:server,actions:server` runs the auction on the server and the wallet in the browser.
 
 The demo page also mounts a read-only ticker beside the auction (`src/client/ticker.ts`): the server's
@@ -350,16 +369,19 @@ pnpm test:browser:ui                    # visible Chromium, steps slowed down, w
 ## A definition, in short
 
 ```ts
+import { Effect, Option, Schema } from "effect"
+import { define, layerLoopLocal, makePorts, noIntent } from "@mufw/core"
+
 export const Counter = define({
   name: "counter",
   model: Schema.Struct({ count: Schema.Int }),
-  proposal: Schema.Union([Schema.TaggedStruct("Inc", { by: Schema.Int }), Schema.TaggedStruct("Reset", {})]),
-  intent: Schema.Union([Schema.TaggedStruct("Inc", { by: Schema.Int }), Schema.TaggedStruct("AutoReset", {})]),
+  proposal: Schema.Union([Schema.TaggedStruct("Incremented", { by: Schema.Int }), Schema.TaggedStruct("Reset", {})]),
+  intent: Schema.Union([Schema.TaggedStruct("Increment", { by: Schema.Int }), Schema.TaggedStruct("AutoReset", {})]),
   representation: Schema.Struct({ controlState: Schema.Literals(["low", "high"]), count: Schema.Int })
 })({
   initial: { count: 0 },
   acceptors: {
-    Inc: (model, proposal) => ({ count: model.count + proposal.by }),
+    Incremented: (model, proposal) => ({ count: model.count + proposal.by }),
     Reset: () => ({ count: 0 })
   },
   reactors: [],
@@ -369,7 +391,7 @@ export const Counter = define({
     high: () => Option.some({ _tag: "AutoReset" })
   },
   actions: {
-    Inc: (intent) => Effect.succeed({ _tag: "Inc", by: intent.by }),
+    Increment: (intent) => Effect.succeed({ _tag: "Incremented", by: intent.by }),
     AutoReset: () => Effect.sleep("1 second").pipe(Effect.as({ _tag: "Reset" }))
   }
 })
