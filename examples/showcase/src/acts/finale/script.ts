@@ -25,6 +25,10 @@ export const script: ActScript = {
       spot: "bill-server"
     },
     {
+      line: "Against other frameworks, on the field's common 1000-row test: 1.43 times hand-written JavaScript, where plain uhtml takes 1.36. And 2.106 MiB of memory left after clearing the rows, against 0.770.",
+      spot: "bill-field"
+    },
+    {
       line: "In return, every step is checked and recorded, and the same code can run in the browser, in a worker or on a server.",
       spot: "bill-total"
     },

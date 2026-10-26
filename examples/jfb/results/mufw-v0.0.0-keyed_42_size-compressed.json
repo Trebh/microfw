@@ -1,0 +1,1 @@
+{"framework":"mufw-v0.0.0-keyed","keyed":true,"benchmark":"42_size-compressed","type":"size","values":{"DEFAULT":{"min":40.1,"max":40.1,"median":40.1,"mean":40.1,"stddev":null,"values":[40.1]}}}

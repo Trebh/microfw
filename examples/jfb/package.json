@@ -6,7 +6,8 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "build": "tsx scripts/build.ts",
-    "jfb:install": "tsx scripts/install.ts"
+    "jfb:install": "tsx scripts/install.ts",
+    "jfb:table": "tsx scripts/table.ts"
   },
   "dependencies": {
     "effect": "^4.0.5",

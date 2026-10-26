@@ -25,8 +25,9 @@ interface BillGroup {
 
 /**
  * `docs/architecture/performance.md` in everyday words. Every figure is quoted as that page prints it.
- * The pages are its counter and its 1000-row list; the browser rows run at 4× CPU throttling, which
- * that page uses to stand for a mid-range phone.
+ * The pages are the project's bench pages, a counter and a 1000-row list, except the last group, which
+ * is js-framework-benchmark's 1000-row table; the browser rows run at 4× CPU throttling, which that
+ * page uses to stand for a mid-range phone.
  */
 const bill: ReadonlyArray<BillGroup> = [
   {
@@ -82,6 +83,25 @@ const bill: ReadonlyArray<BillGroup> = [
           "Time for one update to reach 1000 people watching (1.36 ms for one). Every update sends the whole view to each of them, not only the change."
       }
     ]
+  },
+  {
+    spot: "bill-field",
+    lines: [
+      {
+        item: "Against other frameworks",
+        figure: "1.43×",
+        plain: "1.36×",
+        note:
+          "Time on js-framework-benchmark's 1000-row table, the field's common test, relative to hand-written JavaScript (1.00×). The later passes: 1.32 against 1.27. Most of the gap is the renderer, not µFW."
+      },
+      {
+        item: "Memory left over",
+        figure: "2.106 MiB",
+        plain: "0.770 MiB",
+        note:
+          "Memory left after creating and clearing 1000 rows five times; hand-written JavaScript: 0.643 MiB. Part of the extra is the history µFW keeps so steps can be replayed."
+      }
+    ]
   }
 ]
 
@@ -127,8 +147,9 @@ const finale = (recorded: Tally) =>
       <header class="finale__bill-head">
         <h2 class="marquee" id="finale-bill">The bill</h2>
         <p class="finale__baseline">
-          Measured against the same pages written with uhtml alone, no framework: a counter and a list of 1000
-          rows. Read each figure as µFW vs plain uhtml.
+          Measured against the same pages written with uhtml alone, no framework: the project's bench pages, a
+          counter and a list of 1000 rows, and js-framework-benchmark's 1000-row table. Read each figure as µFW
+          vs plain uhtml.
         </p>
       </header>
       <ul class="finale__groups">${bill.map(billGroup)}</ul>
@@ -136,8 +157,8 @@ const finale = (recorded: Tally) =>
         <span class="marquee">In return</span>
         <span class="finale__total-text">checked, recorded steps that run in the browser, a worker or a server</span>
         <p class="finale__source">
-          From the project's benchmark scripts, run on one laptop, so yours will differ. The performance notes in
-          the docs explain how each figure was measured.
+          From the project's benchmark scripts and js-framework-benchmark, run on one laptop, so yours will
+          differ. The performance notes in the docs explain how each figure was measured.
         </p>
       </footer>
     </section>

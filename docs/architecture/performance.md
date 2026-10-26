@@ -1,8 +1,9 @@
 # Performance
 
 Living document. Source of truth: `examples/auction/scripts/bench-bundle.ts`, `bench-loop.ts`,
-`bench-browser.ts`, `bench-server.ts`, the bench pages and floors under `scripts/bench/`, and the code
-named in each section.
+`bench-browser.ts`, `bench-server.ts`, the bench pages and floors under `scripts/bench/`,
+`examples/jfb/scripts/table.ts` with the result files in `examples/jfb/results/`, and the code named in
+each section.
 
 This page records what µFW costs and where the cost comes from. Performance is not what µFW is for:
 the reasons to use it are flexibility (one definition, several placements), correctness (a schema at every
@@ -20,10 +21,13 @@ needs Chromium, installed once with `pnpm exec playwright install chromium`):
 | `BENCH_CPU_RATES=6,10 pnpm --filter @mufw/example-auction bench:browser` | the 6× and 10× rows |
 | `pnpm --filter @mufw/example-auction bench:loop` | [The loop in Node](#the-loop-in-node) |
 | `pnpm --filter @mufw/example-auction bench:server` | [Server](#server) |
+| `pnpm --filter @mufw/example-jfb build`, then `jfb:install <jfb-checkout>` and JFB's runner, as in [`examples/jfb/README.md`](../../examples/jfb/README.md) | the js-framework-benchmark rows of the [summary](#summary) and the result files of [Against other frameworks](#against-other-frameworks) |
+| `pnpm --filter @mufw/example-jfb jfb:table examples/jfb/results` | the tables of [Against other frameworks](#against-other-frameworks), and the per-benchmark tables behind them |
 
 The figures come from one run of each script on an Apple M5 (10 CPUs, 16.0 GiB), Node 24.21.0, headless
-Chromium 156.0.8078.4 and localhost. A figure moves with the machine and with what else it runs; rerun
-the scripts when a change moves a cost, and do not quote a figure from this page as a constant. Each
+Chromium 156.0.8078.4 (Google Chrome 156.0.8078.48 for the js-framework-benchmark rows) and localhost. A
+figure moves with the machine and with what else it runs; rerun the scripts when a change moves a cost,
+and do not quote a figure from this page as a constant. Each
 script's header comment lists what it does not measure; the biases that matter are repeated in the
 section that uses them.
 
@@ -41,7 +45,9 @@ own unit: bundlejs and the Effect posts use kB (1000 bytes), and the tables that
 | Counter, script time at 1× / 4× / 10× | 6.2 / 25.9 / 71.3 ms | 0.9 / 3.5 / 9.3 ms | 6.61× / 7.37× / 7.67× |
 | Counter, click to DOM at 1× | 0.5 ms | 0.3 ms | 1.67× |
 | Counter, click to next frame at 1× | 15.2 ms | 15.3 ms | 0.99× |
-| [js-framework-benchmark](../spikes/benchmark-positioning.md), keyed table, CPU weighted geometric mean against vanilla JavaScript, three passes | 1.43 / 1.32 / 1.33 (derived) | 1.36 / 1.27 / 1.27, the `uhtml4` control | 1.048× / 1.040× / 1.051× (derived) |
+| [js-framework-benchmark](#against-other-frameworks), keyed table, CPU weighted geometric mean against vanilla JavaScript, three passes of the [spike](../spikes/benchmark-positioning.md) and one with the keyed list | 1.43 / 1.32 / 1.33 / 1.29 (derived) | 1.36 / 1.27 / 1.27 / 1.22, the `uhtml4` control | 1.048× / 1.040× / 1.051× / 1.054× (derived) |
+| [js-framework-benchmark](../../examples/jfb/README.md#memory), keyed table, memory after load (`21_ready-memory`), median of 5 sessions | 1.328 MiB | 0.627 MiB, the `uhtml4` control; vanilla JavaScript 0.567 | 2.12× (derived) |
+| js-framework-benchmark, memory after creating and clearing 1,000 rows five times (`25_run-clear-memory`), median of 5 sessions | 2.106 MiB | 0.770 MiB, the `uhtml4` control; vanilla JavaScript 0.643 | 2.74× (derived) |
 | Node: `ModelPort.present`, counter, median per step | 2.875 µs | 0.007 µs, a plain reducer | 399× |
 | Node: `IntentPort.dispatch` until its record, counter, median | 34.00 µs | 0.007 µs | 3951× |
 | Server: `Present` over a websocket, one connection | 5926 steps/s, p50 0.14 ms, p99 0.64 ms | none measured | |
@@ -313,7 +319,59 @@ implementation in that benchmark. The unweighted geometric mean against vanilla 
 64th (derived from the published results; the site shows neither). The published uhtml entry carries note
 [#772](https://github.com/krausest/js-framework-benchmark/issues/772), manual DOM manipulation, so it is not
 an idiomatic-uhtml measurement. µFW's own entry, run locally next to a plain uhtml 4 control, is in the
-[benchmark positioning spike](../spikes/benchmark-positioning.md).
+[benchmark positioning spike](../spikes/benchmark-positioning.md). A keyed list in a view uses
+`makeKeyedList(htmlFor)` from `@mufw/view-uhtml`, which keeps only the latest render's rows. Of `mufw`'s
+1.34 MiB over the control after run-clear, 0.70 is there after load, about 0.42 is history (records holding
+1,000-row models within `HistoryLimit`) and 0.21 is unattributed (derived); the method and its limits are in
+[`examples/jfb/README.md`](../../examples/jfb/README.md#memory).
+
+## Against other frameworks
+
+One pass of js-framework-benchmark (JFB) over 17 keyed entries: `mufw`, its plain uhtml 4 control
+`uhtml4`, and 15 entries of the JFB checkout, the same set as the
+[benchmark positioning spike](../spikes/benchmark-positioning.md), run again once a keyed list released
+its removed rows. Each entry ran in its own invocation (`npm run bench -- --framework keyed/<entry>`
+from the checkout), with JFB's defaults: 15 CPU samples per benchmark (25 for select), one sample for
+memory, size and first paint, the puppeteer runner, Google Chrome 156.0.8078.48 in a headed window. Apple
+M5, macOS 27.0.1, JFB commit `3ab4cea`; the pass took 1 h 23 min and every invocation exited 0. The
+result files are in `examples/jfb/results/`.
+
+| Entry | CPU weighted geomean | CPU rank | memory after create and clear ×5, MiB | vs `vanillajs` | brotli KiB | first paint ms |
+|---|---|---|---|---|---|---|
+| vanillajs | 1.038 | 1 | 0.649 | 1.00× | 2.5 | 70.9 |
+| solid | 1.152 | 2 | 0.775 | 1.19× | 4.5 | 86.6 |
+| svelte | 1.187 | 3 | 0.983 | 1.51× | 9.7 | 100.6 |
+| mobx-jsx | 1.211 | 4 | 1.202 | 1.85× | 15.6 | 119.9 |
+| uhtml (5.0.3, note #772) | 1.229 | 5 | 0.862 | 1.33× | 6.7 | 102.9 |
+| hyperapp | 1.238 | 6 | 0.699 | 1.08× | 2.6 | 87.2 |
+| uhtml4, the control | 1.266 | 7 | 0.765 | 1.18× | 4.0 | 97.5 |
+| lit | 1.284 | 8 | 0.881 | 1.36× | 7.3 | 127.5 |
+| vue | 1.310 | 9 | 1.188 | 1.83× | 23.3 | 161.4 |
+| **mufw** | **1.334** | **10** | **2.106** | **3.24×** | **40.1** | **220.6** |
+| elm | 1.348 | 11 | 1.034 | 1.59× | 10.4 | 111.2 |
+| angular-cf | 1.445 | 12 | 2.218 | 3.42× | 44.7 | 255.7 |
+| react-hooks | 1.511 | 13 | 1.982 | 3.05× | 51.4 | 274.7 |
+| preact-hooks | 1.562 | 14 | 0.795 | 1.23× | 5.9 | 63.9 |
+| react-zustand | 1.593 | 15 | 2.015 | 3.10× | 49.8 | 248.3 |
+| react-redux-hooks | 1.645 | 16 | 1.990 | 3.07× | 50.6 | 301.2 |
+| re-frame | 2.663 | 17 | 3.333 | 5.13× | 80.8 | 475.0 |
+
+The CPU column is JFB's headline: each of the nine operations is a median over the fastest median of
+these 17 entries, and the nine are combined with JFB's weights (`webdriver-ts-results/src/Common.ts`), so
+`vanillajs` is 1.038 where another entry is faster at an operation. The memory ratio is against
+`vanillajs` in the same pass. Sizes are every file the page requests, brotli-compressed by the benchmark
+server.
+
+Against its control, `mufw` is 1.054× on CPU, 2.75× on memory after create and clear, 10.0× in brotli
+bytes and 2.26× in first paint (derived). It places 10th of 17 on CPU, 12th on the memory geomean (1.349,
+3.136 and 2.106 MiB after load, after 1,000 rows and after create and clear) and 12th on size and first
+paint; `jfb:table` prints every operation and every sample count. The CPU price of µFW is small next to
+the renderer's; its bytes and its load are not.
+
+Limits. One pass on one machine that was not idle (load average 5.97 when it started); compare within the
+pass only. Memory, size and first paint are one sample per entry. A rank is a rank in these 17, not in
+the 196 keyed entries JFB publishes: `@mufw/core` is not on npm, so `mufw` cannot be in the official
+table. The `uhtml` entry is uhtml 5.0.3 with manual DOM updates (note #772), not idiomatic uhtml.
 
 ## The loop in Node
 

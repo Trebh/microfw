@@ -1,0 +1,1 @@
+{"framework":"uhtml-v5.0.3-keyed","keyed":true,"benchmark":"25_run-clear-memory","type":"memory","values":{"DEFAULT":{"min":0.8622322082519531,"max":0.8622322082519531,"median":0.8622322082519531,"mean":0.8622322082519531,"stddev":null,"values":[0.8622322082519531]}}}

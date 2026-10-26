@@ -48,6 +48,7 @@ docs/                ARCHITECTURE.md, architecture/*.md, TODO.md
 | `pnpm --filter @mufw/example-auction bench:server` | starts servers of its own on ports 4800–4999: `Present`/`Submit` throughput and latency, `Representations` fan-out, RSS as history fills, synced host and joiner latency |
 | `pnpm --filter @mufw/example-jfb build` | builds the two js-framework-benchmark entries (`mufw`, and `uhtml4` as the plain-uhtml control) into `examples/jfb/out/keyed/<name>`, shaped like built `frameworks/keyed/<name>` directories, and prints each `dist/main.js` size |
 | `pnpm --filter @mufw/example-jfb jfb:install <jfb-checkout>` | copies both built directories into `<jfb-checkout>/frameworks/keyed/`, replacing them; fails if the checkout or the build is missing |
+| `pnpm --filter @mufw/example-jfb jfb:table <results-dir>` | prints the CPU, memory, size and comparison tables of a directory of js-framework-benchmark result files (`examples/jfb/results/` holds the pass `performance.md` reports); fails naming the file when an entry lacks a benchmark or a file does not parse |
 
 A change is done when `pnpm typecheck` and `pnpm test` pass and the changed behaviour has been
 exercised: a UI change in the browser, a server change against a running server.

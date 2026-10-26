@@ -1,0 +1,1 @@
+{"framework":"re-frame-v1.4.3-keyed","keyed":true,"benchmark":"25_run-clear-memory","type":"memory","values":{"DEFAULT":{"min":3.332972526550293,"max":3.332972526550293,"median":3.332972526550293,"mean":3.332972526550293,"stddev":null,"values":[3.332972526550293]}}}

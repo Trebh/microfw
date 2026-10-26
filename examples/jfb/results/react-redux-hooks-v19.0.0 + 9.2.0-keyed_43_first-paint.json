@@ -1,0 +1,1 @@
+{"framework":"react-redux-hooks-v19.0.0 + 9.2.0-keyed","keyed":true,"benchmark":"43_first-paint","type":"size","values":{"DEFAULT":{"min":301.2,"max":301.2,"median":301.2,"mean":301.2,"stddev":null,"values":[301.2]}}}

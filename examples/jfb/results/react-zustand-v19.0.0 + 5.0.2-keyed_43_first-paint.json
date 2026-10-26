@@ -1,0 +1,1 @@
+{"framework":"react-zustand-v19.0.0 + 5.0.2-keyed","keyed":true,"benchmark":"43_first-paint","type":"size","values":{"DEFAULT":{"min":248.3,"max":248.3,"median":248.3,"mean":248.3,"stddev":null,"values":[248.3]}}}

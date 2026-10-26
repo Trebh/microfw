@@ -1,0 +1,1 @@
+{"framework":"preact-hooks-v11.0.0-keyed","keyed":true,"benchmark":"43_first-paint","type":"size","values":{"DEFAULT":{"min":63.9,"max":63.9,"median":63.9,"mean":63.9,"stddev":null,"values":[63.9]}}}

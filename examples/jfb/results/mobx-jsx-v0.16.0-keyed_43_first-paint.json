@@ -1,0 +1,1 @@
+{"framework":"mobx-jsx-v0.16.0-keyed","keyed":true,"benchmark":"43_first-paint","type":"size","values":{"DEFAULT":{"min":119.9,"max":119.9,"median":119.9,"mean":119.9,"stddev":null,"values":[119.9]}}}

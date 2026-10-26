@@ -1,0 +1,1 @@
+{"framework":"react-redux-hooks-v19.0.0 + 9.2.0-keyed","keyed":true,"benchmark":"22_run-memory","type":"memory","values":{"DEFAULT":{"min":5.973664283752441,"max":5.973664283752441,"median":5.973664283752441,"mean":5.973664283752441,"stddev":null,"values":[5.973664283752441]}}}

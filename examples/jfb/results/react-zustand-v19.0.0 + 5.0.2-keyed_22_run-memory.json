@@ -1,0 +1,1 @@
+{"framework":"react-zustand-v19.0.0 + 5.0.2-keyed","keyed":true,"benchmark":"22_run-memory","type":"memory","values":{"DEFAULT":{"min":6.118015289306641,"max":6.118015289306641,"median":6.118015289306641,"mean":6.118015289306641,"stddev":null,"values":[6.118015289306641]}}}

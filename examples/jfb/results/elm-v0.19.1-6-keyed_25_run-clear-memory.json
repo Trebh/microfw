@@ -1,0 +1,1 @@
+{"framework":"elm-v0.19.1-6-keyed","keyed":true,"benchmark":"25_run-clear-memory","type":"memory","values":{"DEFAULT":{"min":1.0343399047851562,"max":1.0343399047851562,"median":1.0343399047851562,"mean":1.0343399047851562,"stddev":null,"values":[1.0343399047851562]}}}

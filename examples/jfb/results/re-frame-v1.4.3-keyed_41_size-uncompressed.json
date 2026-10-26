@@ -1,0 +1,1 @@
+{"framework":"re-frame-v1.4.3-keyed","keyed":true,"benchmark":"41_size-uncompressed","type":"size","values":{"DEFAULT":{"min":351.1,"max":351.1,"median":351.1,"mean":351.1,"stddev":null,"values":[351.1]}}}

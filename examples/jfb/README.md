@@ -14,7 +14,12 @@ operations of `src/rows.ts` and the word lists of `src/labels.ts`.
 ```sh
 pnpm --filter @mufw/example-jfb build                        # out/keyed/{mufw,uhtml4}, and the gzip size of each dist/main.js
 pnpm --filter @mufw/example-jfb jfb:install <jfb-checkout>   # copies both into <jfb-checkout>/frameworks/keyed/, replacing them
+pnpm --filter @mufw/example-jfb jfb:table <results-dir>      # the CPU, memory, size and comparison tables of a directory of JFB result files
 ```
+
+`results/` holds the result files of the 17-entry pass that
+[performance](../../docs/architecture/performance.md#against-other-frameworks) reports, copied from
+`<jfb-checkout>/webdriver-ts/results/` after one `npm run bench -- --framework keyed/<entry>` per entry.
 
 Each `out/keyed/<name>` holds what a JFB framework directory holds after its build: `index.html`,
 `dist/main.js` (one minified ES module, no other chunk), `package.json` with the `js-framework-benchmark`

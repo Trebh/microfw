@@ -1,0 +1,1 @@
+{"framework":"preact-hooks-v11.0.0-keyed","keyed":true,"benchmark":"22_run-memory","type":"memory","values":{"DEFAULT":{"min":3.3148059844970703,"max":3.3148059844970703,"median":3.3148059844970703,"mean":3.3148059844970703,"stddev":null,"values":[3.3148059844970703]}}}
