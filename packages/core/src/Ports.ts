@@ -55,6 +55,10 @@ export interface ActionRunnerShape<D extends AnyDefinition, R = never> {
 }
 
 export interface ModelPortShape<D extends AnyDefinition> {
+  /**
+   * A port that fences stale automatic proposals reads `AutoEpoch`; the signature takes no epoch so that user
+   * actions and remote ports see no change.
+   */
   present(proposal: ProposalOf<D>): Effect.Effect<void>
   /** Emits the current representation first, then every change. */
   readonly representations: Stream.Stream<RepresentationOf<D>>

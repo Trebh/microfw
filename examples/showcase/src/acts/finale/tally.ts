@@ -20,9 +20,9 @@ export interface Tally {
 
 export const emptyTally: Tally = { deck: 0, stage: 0, rewinds: 0 }
 
-/** The opening record of a history is no step; a travel is counted apart from the steps. */
+/** The opening record of a history and a restore from an event log's snapshot are no step; a travel is counted apart from the steps. */
 export const tally = (current: Tally, seen: Seen): Tally => {
-  if (seen.kind === "init") return current
+  if (seen.kind === "init" || seen.kind === "restore") return current
   if (seen.kind === "travel") return { ...current, rewinds: current.rewinds + 1 }
   return seen.source === "deck" ? { ...current, deck: current.deck + 1 } : { ...current, stage: current.stage + 1 }
 }

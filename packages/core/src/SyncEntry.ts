@@ -1,4 +1,6 @@
 export * from "./Sync.ts"
+export * from "./SyncHead.ts"
 export * from "./SyncLease.ts"
 export * from "./SyncPersistence.ts"
+export * from "./SyncSnapshot.ts"
 export * from "./SyncStorage.ts"

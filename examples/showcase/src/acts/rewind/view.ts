@@ -23,6 +23,7 @@ const spaced = (label: string): string => label.replace(/([a-z])([A-Z])/g, "$1 $
 const titles: Record<Frame["kind"], (frame: Frame) => string> = {
   init: () => "empty house",
   step: (frame) => spaced(frame.label),
+  restore: () => "snapshot",
   travel: (frame) =>
     Option.match(frame.travelledTo, { onNone: () => "jump back", onSome: (seq) => `back to ${pad(seq)}` })
 }

@@ -40,6 +40,7 @@ const travelSource = <D extends AnyDefinition>(travel: StepRecord<D>) =>
 
 const label = <D extends AnyDefinition>(def: D, record: StepRecord<D>) => {
   if (record.kind === "travel") return travelSource(record)
+  if (record.kind === "restore") return "snapshot"
   return Option.match(record.proposal, { onNone: () => "", onSome: (proposal) => proposalLabel(def, proposal) })
 }
 

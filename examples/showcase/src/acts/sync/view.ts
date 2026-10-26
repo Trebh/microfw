@@ -111,6 +111,7 @@ const tapeRow = (row: Row) =>
     class="tape__row"
     data-event=${row.event}
     data-refused=${String(row.refused)}
+    data-skipped=${String(row.skipped)}
     data-seq=${row.seq}
   >
     <span class="tape__seq mono">${String(row.seq).padStart(3, "0")}</span>

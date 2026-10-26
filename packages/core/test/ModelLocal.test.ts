@@ -1,7 +1,7 @@
 import { assert, describe, it } from "@effect/vitest"
 import { Deferred, Effect, Exit, Fiber, Layer, Option, Stream } from "effect"
-import { AutoActions, HistoryBacklog, HistoryLimit, layerLoopLocal, NoSuchStep } from "../src/index.ts"
-import { Counter, Ports } from "./fixtures/Counter.ts"
+import { AutoActions, HistoryBacklog, HistoryLimit, layerLoopLocal, makeLocalModel, NoSuchStep } from "../src/index.ts"
+import { Counter, type Intent, Ports } from "./fixtures/Counter.ts"
 import { collect, settle } from "./support.ts"
 
 const Loop = layerLoopLocal(Counter, Ports)
@@ -238,4 +238,50 @@ describe("layerModelLocal with an initial model", () => {
       assert.deepStrictEqual(stepped, Option.some({ controlState: "high", count: 3 }))
       assert.deepStrictEqual(restored, Option.some({ controlState: "low", count: 2 }))
     }).pipe(Effect.provide(FromTwo)))
+})
+
+describe("makeLocalModel restore", () => {
+  const recordingBus = () => {
+    const dispatched: Array<typeof Intent.Type> = []
+    const bus = {
+      dispatchAuto: (intent: typeof Intent.Type) => Effect.sync(() => void dispatched.push(intent)),
+      interruptAuto: Effect.void
+    }
+    return { bus, dispatched }
+  }
+
+  it.effect("records a restore with the model it was given and the next seq", () =>
+    Effect.gen(function*() {
+      const { bus } = recordingBus()
+      const local = yield* makeLocalModel(Counter, bus)
+      yield* local.port.present(inc2)
+      const records = yield* collect(local.port.records)
+
+      yield* local.restore({ count: 9 })
+      const restored = yield* Stream.runHead(local.port.representations)
+      yield* local.port.present(inc1)
+      yield* settle
+
+      assert.deepStrictEqual(records.map((r) => [r.seq, r.kind, r.proposal, r.model.count]), [
+        [0, "init", Option.none(), 0],
+        [1, "step", Option.some(inc2), 2],
+        [2, "restore", Option.none(), 9],
+        [3, "step", Option.some(inc1), 10]
+      ])
+      assert.deepStrictEqual(restored, Option.some({ controlState: "high", count: 9 }))
+      assert.deepStrictEqual(yield* local.model, { count: 10 })
+    }))
+
+  it.effect("does not run nap on restore", () =>
+    Effect.gen(function*() {
+      const { bus, dispatched } = recordingBus()
+      const local = yield* makeLocalModel(Counter, bus)
+
+      yield* local.restore({ count: 9 })
+      const afterRestore = dispatched.slice()
+      yield* local.napAgain
+
+      assert.deepStrictEqual(afterRestore, [])
+      assert.deepStrictEqual(dispatched, [{ _tag: "AutoReset" }])
+    }))
 })

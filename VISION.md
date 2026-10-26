@@ -50,8 +50,8 @@ visible end to end.
 
 Near term. The open gaps, each with what done looks like, are in [docs/TODO.md](docs/TODO.md):
 
-- A synchronised log that can be cut at a snapshot, refuses a checkpoint ahead of it, and fences
-  the proposals of an instance that lost the automatic actions.
+- A synchronised log that notices a restore from a backup grown past an instance's checkpoint, and
+  recognises a writer's resend however long the writer was cut off.
 - A browser page that ships only the loop it runs and shows a click's step in the click's frame,
   and a history bounded by the memory it holds as well as by its records.
 - Packages a consumer outside the workspace can install.

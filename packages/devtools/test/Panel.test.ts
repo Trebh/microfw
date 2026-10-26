@@ -124,6 +124,23 @@ describe("layerPanel travel rows", () => {
   })
 })
 
+describe("layerPanel restore rows", () => {
+  it.effect("label a restore as a snapshot", () => {
+    const root = document.createElement("div") as unknown as Element
+    const restore = { ...step(2, 7), kind: "restore" as const, proposal: Option.none() }
+    const records = Stream.make(initial, step(1, 1), restore)
+    const history = Layer.succeed(Ports.HistoryPort, { records, travelTo: () => Effect.void, replay: () => Effect.void })
+    const layer = layerPanel(Counter, Ports, { root, render, html }).pipe(Layer.provideMerge(history))
+    return Effect.gen(function*() {
+      yield* rowsRendered(root, 3)
+
+      const rows = findElements(root as unknown as DomNode, "li")
+
+      assert.match(rows[2]!.textContent ?? "", /#2 restore snapshot → low/)
+    }).pipe(Effect.provide(layer))
+  })
+})
+
 describe("layerPanel across a restarted history", () => {
   it.effect("starts the rows over at a new init record", () => {
     const root = document.createElement("div") as unknown as Element

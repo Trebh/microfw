@@ -20,12 +20,16 @@ export type LeaseState = typeof LeaseState.Type
 
 export const noLease: LeaseState = { epoch: 0, holder: null }
 
+/** The number of a claim that won: 1 for the first holder of a log, then one more for each. */
+export const Epoch = Schema.Natural.pipe(Schema.check(Schema.isGreaterThanOrEqualTo(1)))
+export type Epoch = typeof Epoch.Type
+
 /**
  * The payload of a `Lease` log entry. The holder writes one with its own epoch to renew; an
  * instance that has seen the holder silent for too long writes one for the next epoch to claim.
  */
 export const Lease = Schema.Struct({
-  epoch: Schema.Natural.pipe(Schema.check(Schema.isGreaterThanOrEqualTo(1))),
+  epoch: Epoch,
   holder: InstanceId
 })
 export type Lease = typeof Lease.Type
@@ -47,6 +51,13 @@ export const leaseOutcome = (state: LeaseState, lease: Lease): LeaseOutcome => {
 /** The state after one lease entry, as every instance computes it from the same entries in the same order. */
 export const applyLease = (state: LeaseState, lease: Lease): LeaseState =>
   leaseOutcome(state, lease) === "claimed" ? lease : state
+
+/**
+ * Whether a proposal that an automatic action produced under `epoch` is applied at a position of the log where the lease is
+ * `state`: only in the epoch the log is in. An earlier epoch has been taken away; a later one names a claim the log has
+ * not ordered before the entry, which no holder can have produced, so it is not applied either.
+ */
+export const isCurrentEpoch = (state: LeaseState, epoch: number): boolean => state.epoch === epoch
 
 /**
  * How long the lease is held without being heard from. The holder appends a renewal every
@@ -90,20 +101,35 @@ export const makeLeaseTracker = (resume: LeaseState | undefined) =>
 /** What applying an entry did to this instance's ownership. */
 export type LeaseChange = "gained" | "lost" | "none"
 
+const ownershipChange = (tracker: LeaseTracker, before: LeaseState, after: LeaseState): LeaseChange => {
+  const held = before.holder === tracker.id
+  const holds = after.holder === tracker.id
+  if (holds && !held) return "gained"
+  if (held && !holds) return "lost"
+  return "none"
+}
+
 /** Applies one lease entry in log order and says whether this instance began or stopped holding the lease. */
 export const observeLease = (tracker: LeaseTracker, lease: Lease) =>
   Effect.gen(function*() {
     const before = yield* Ref.get(tracker.state)
-    const outcome = leaseOutcome(before, lease)
-    if (outcome === "ignored") return "none" as const
+    if (leaseOutcome(before, lease) === "ignored") return "none" as const
     yield* Ref.set(tracker.heardAt, yield* Clock.currentTimeMillis)
     const after = applyLease(before, lease)
     yield* Ref.set(tracker.state, after)
-    const held = before.holder === tracker.id
-    const holds = after.holder === tracker.id
-    if (holds && !held) return "gained" as const
-    if (held && !holds) return "lost" as const
-    return "none" as const
+    return ownershipChange(tracker, before, after)
+  })
+
+/**
+ * Replaces the state by the one a snapshot carries and says what that did to this instance's
+ * ownership. `heardAt` stays: the snapshot's lease is the lease at the cut, not a sign of life; the
+ * entries after it refresh it.
+ */
+export const installLease = (tracker: LeaseTracker, state: LeaseState) =>
+  Effect.gen(function*() {
+    const before = yield* Ref.get(tracker.state)
+    yield* Ref.set(tracker.state, state)
+    return ownershipChange(tracker, before, state)
   })
 
 /** The entry that claims the epoch after the one this instance has applied. */

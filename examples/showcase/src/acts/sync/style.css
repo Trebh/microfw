@@ -427,6 +427,14 @@
   color: color-mix(in oklab, var(--standby-blue) 45%, var(--ink));
 }
 
+#act-sync .tape__row[data-skipped="true"] {
+  opacity: 0.55;
+}
+
+#act-sync .tape__row[data-skipped="true"] .tape__label {
+  text-decoration: line-through;
+}
+
 #act-sync .tape__row[data-refused="true"] {
   box-shadow: inset 0.22rem 0 0 var(--velvet);
   padding-inline-start: 0.5rem;

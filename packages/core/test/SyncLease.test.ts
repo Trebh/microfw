@@ -1,18 +1,24 @@
 import { assert, describe, it } from "@effect/vitest"
-import { Context, Effect, Latch, Layer, Option, Queue, Stream } from "effect"
-import { EventJournal } from "effect/eventlog"
+import { Context, Effect, Fiber, Layer, Option, Queue, Ref } from "effect"
+import { EventJournal, EventLogMessage } from "effect/eventlog"
 import { TestClock } from "effect/testing"
+import { AutoEpoch } from "../src/index.ts"
 import {
   applyLease,
+  installLease,
   InstanceId,
+  isCurrentEpoch,
   type Lease,
   leaseOutcome,
   type LeaseState,
+  type LeaseTracker,
   SyncLog,
-  type SyncCheckpoint
+  type SyncCheckpoint,
+  type SyncOptions
 } from "../src/SyncEntry.ts"
 import { Counter } from "./fixtures/Counter.ts"
-import { countsOf, harness, instanceOn, stoppableOn } from "./fixtures/SyncHarness.ts"
+import { countsOf, harness, instanceOn, readLog, stoppableOn } from "./fixtures/SyncHarness.ts"
+import { cutOff, linkedBy, openLink } from "./fixtures/SyncLinks.ts"
 import { settle } from "./support.ts"
 
 const inc = (by: number) => ({ _tag: "Inc", by }) as const
@@ -65,38 +71,91 @@ describe("the lease rule", () => {
   it("ignores a renewal from an instance that does not hold the current epoch", () => {
     assert.strictEqual(leaseOutcome(heldBy(first, 2), claim(second, 2)), "ignored")
   })
+
+  it("applies an automatic proposal that names the epoch the log is in", () => {
+    assert.isTrue(isCurrentEpoch(heldBy(first, 2), 2))
+  })
+
+  it("skips an automatic proposal that names an epoch that is over", () => {
+    assert.isFalse(isCurrentEpoch(heldBy(second, 2), 1))
+  })
+
+  it("skips an automatic proposal that names an epoch the log has not reached", () => {
+    assert.isFalse(isCurrentEpoch(heldBy(first, 2), 3))
+  })
 })
 
-/** The two directions of an instance's link to the log: entries delivered to it, and entries it writes. */
-interface Link {
-  readonly deliver: Latch.Latch
-  readonly write: Latch.Latch
-}
+const trackerHolding = (state: LeaseState) =>
+  Effect.gen(function*() {
+    return { id: first, state: yield* Ref.make(state), heardAt: yield* Ref.make(0) } satisfies LeaseTracker
+  })
 
-/** Wraps a log so that, while a latch of `link` is closed, the entries it guards are held, not lost. */
-const linkedBy = <E, R>(log: Layer.Layer<SyncLog, E, R>, link: Link) =>
-  Layer.effect(
-    SyncLog,
+describe("installing the lease a snapshot carries", () => {
+  it.effect("says a snapshot took the lease from the instance that held it, and replaces the state", () =>
     Effect.gen(function*() {
-      const inner = yield* SyncLog
-      const held = (entries: Stream.Stream<EventJournal.RemoteEntry, any>) =>
-        Stream.mapEffect(entries, (entry) => Effect.as(link.deliver.await, entry))
-      return SyncLog.of({
-        append: (entry) => link.write.await.pipe(Effect.andThen(inner.append(entry))),
-        follow: (from) => Effect.map(inner.follow(from), (subscription) => ({ ...subscription, entries: held(subscription.entries) }))
-      })
-    })
-  ).pipe(Layer.provide(log))
+      const tracker = yield* trackerHolding(heldBy(first, 1))
 
-const openLink = Effect.gen(function*() {
-  return { deliver: yield* Latch.make(true), write: yield* Latch.make(true) } satisfies Link
+      const change = yield* installLease(tracker, heldBy(second, 2))
+
+      assert.deepStrictEqual(
+        { change, state: yield* Ref.get(tracker.state) },
+        { change: "lost", state: { epoch: 2, holder: second } }
+      )
+    }))
+
+  it.effect("says a snapshot gave the lease to the instance that did not hold it, and replaces the state", () =>
+    Effect.gen(function*() {
+      const tracker = yield* trackerHolding(heldBy(second, 1))
+
+      const change = yield* installLease(tracker, heldBy(first, 2))
+
+      assert.deepStrictEqual(
+        { change, state: yield* Ref.get(tracker.state) },
+        { change: "gained", state: { epoch: 2, holder: first } }
+      )
+    }))
+
+  it.effect("changes nothing for an instance that neither held nor holds the lease, and replaces the state", () =>
+    Effect.gen(function*() {
+      const tracker = yield* trackerHolding(heldBy(second, 1))
+
+      const change = yield* installLease(tracker, { epoch: 3, holder: null })
+
+      assert.deepStrictEqual(
+        { change, state: yield* Ref.get(tracker.state) },
+        { change: "none", state: { epoch: 3, holder: null } }
+      )
+    }))
 })
-
-const cutOff = (link: Link) => Effect.andThen(link.deliver.close, link.write.close)
 
 /** The newest checkpoint an instance has offered. */
 const checkpointsOf = (checkpoints: Queue.Queue<SyncCheckpoint<typeof Counter>>) =>
   Effect.map(Queue.clear(checkpoints), (all) => Option.getOrThrow(Option.fromUndefinedOr(all.at(-1))))
+
+/**
+ * A holder that is cut off from the log while its automatic action runs and finishes, and a successor that
+ * claims the next epoch and runs an action of its own. Then only the holder's writes are let through, so
+ * its finished action reaches the log after the successor's claim while the holder has still heard nothing.
+ */
+const deposedHolderWithLateAction = (successorOptions?: SyncOptions<typeof Counter>) =>
+  Effect.gen(function*() {
+    const { hostLog, clientLog } = yield* harness
+    const link = yield* openLink
+    const deposed = yield* instanceOn(linkedBy(clientLog, link), true)
+    const successor = yield* instanceOn(hostLog, true, successorOptions)
+    yield* deposed.model.present(inc(3))
+    yield* settle
+    yield* cutOff(link)
+    yield* TestClock.adjust("1 second")
+    yield* settle
+    yield* TestClock.adjust("15 seconds")
+    yield* settle
+    yield* TestClock.adjust("1 second")
+    yield* settle
+    yield* link.write.open
+    yield* settle
+    return { hostLog, link, deposed, successor }
+  })
 
 describe("automatic actions across instances", () => {
   it.effect("runs a tick on one instance only when two take part", () =>
@@ -289,6 +348,89 @@ describe("automatic actions across instances", () => {
 
       assert.deepStrictEqual(yield* countsOf(a), [0])
     }))
+
+  it.effect(
+    "skips the proposal of an automatic action that finished under an epoch the log has since left, when it reaches the log after the successor's claim",
+    () =>
+      Effect.gen(function*() {
+        const { link, deposed, successor } = yield* deposedHolderWithLateAction()
+
+        yield* link.deliver.open
+        yield* settle
+
+        assert.deepStrictEqual(yield* countsOf(successor), [0, 3, 0])
+        assert.deepStrictEqual(yield* countsOf(deposed), [0, 3, 0])
+      })
+  )
+
+  it.effect("keeps the skipped proposal of a deposed holder in the log and moves the checkpoint past it", () =>
+    Effect.gen(function*() {
+      const checkpoints = yield* Queue.unbounded<SyncCheckpoint<typeof Counter>>()
+      const { hostLog } = yield* deposedHolderWithLateAction({ checkpoints })
+
+      const { entries } = yield* readLog(hostLog, 0)
+      const automatic = entries.filter((remote) => remote.entry.event === "AutoProposal")
+      const stale = Option.getOrThrow(Option.fromUndefinedOr(automatic.at(-1)))
+      const offered = yield* Queue.clear(checkpoints)
+
+      assert.strictEqual(automatic.length, 2)
+      assert.include(offered.map((checkpoint) => checkpoint.sequence), stale.remoteSequence)
+    }))
+
+  it.effect("applies the proposal of a user intent from a deposed holder that reaches the log after the successor's claim", () =>
+    Effect.gen(function*() {
+      const { hostLog, clientLog } = yield* harness
+      const link = yield* openLink
+      const deposed = yield* instanceOn(linkedBy(clientLog, link), true)
+      const successor = yield* instanceOn(hostLog, true)
+      yield* cutOff(link)
+      const presenting = yield* Effect.forkScoped(deposed.model.present(inc(2)))
+
+      yield* TestClock.adjust("15 seconds")
+      yield* settle
+      yield* link.write.open
+      yield* settle
+      yield* link.deliver.open
+      yield* settle
+      yield* Fiber.join(presenting)
+
+      assert.deepStrictEqual(yield* countsOf(successor), [0, 2])
+      assert.deepStrictEqual(yield* countsOf(deposed), [0, 2])
+    }))
+})
+
+describe("automatic proposals and the epoch of the log", () => {
+  it.effect("applies a proposal stamped with the epoch the instance holds", () =>
+    Effect.gen(function*() {
+      const { hostLog } = yield* harness
+      const a = yield* instanceOn(hostLog, true)
+
+      yield* a.model.present(inc(2)).pipe(Effect.provideService(AutoEpoch, Option.some(1)))
+
+      assert.deepStrictEqual(yield* countsOf(a), [0, 2])
+    }))
+
+  it.effect("releases the caller of present when its stamped proposal is skipped, and leaves the model as it was", () =>
+    Effect.gen(function*() {
+      const { hostLog } = yield* harness
+      const a = yield* instanceOn(hostLog, true)
+
+      yield* a.model.present(inc(2)).pipe(Effect.provideService(AutoEpoch, Option.some(7)))
+
+      assert.deepStrictEqual(yield* countsOf(a), [0])
+    }))
+
+  it.effect("offers a checkpoint past a skipped proposal", () =>
+    Effect.gen(function*() {
+      const { hostLog } = yield* harness
+      const checkpoints = yield* Queue.unbounded<SyncCheckpoint<typeof Counter>>()
+      const a = yield* instanceOn(hostLog, true, { checkpoints })
+
+      yield* a.model.present(inc(2)).pipe(Effect.provideService(AutoEpoch, Option.some(7)))
+      const checkpoint = yield* checkpointsOf(checkpoints)
+
+      assert.deepStrictEqual({ sequence: checkpoint.sequence, count: checkpoint.model.count }, { sequence: 3, count: 0 })
+    }))
 })
 
 describe("the lease in a checkpoint", () => {
@@ -340,7 +482,7 @@ describe("the lease in a checkpoint", () => {
     }))
 })
 
-describe("layerSyncAuthorization and layerSyncServer for lease entries", () => {
+describe("layerSyncAuthorization and layerSyncServer for lease and automatic-proposal entries", () => {
   it.effect("refuses a lease entry whose payload does not decode", () =>
     Effect.gen(function*() {
       const { clientLog } = yield* harness
@@ -355,5 +497,22 @@ describe("layerSyncAuthorization and layerSyncServer for lease entries", () => {
       const error = yield* Effect.flip(log.append(entry))
 
       assert.strictEqual(error._tag, "EventLogRemoteError")
+    }))
+
+  it.effect("refuses an automatic-proposal entry whose payload does not decode", () =>
+    Effect.gen(function*() {
+      const { clientLog } = yield* harness
+      const log = Context.get(yield* Layer.build(clientLog), SyncLog)
+      const entry = new EventJournal.Entry({
+        id: EventJournal.makeEntryIdUnsafe({ msecs: 0 }),
+        event: "AutoProposal",
+        primaryKey: Counter.name,
+        payload: Uint8Array.of(255, 255, 255)
+      }, { disableChecks: true })
+
+      const error = yield* Effect.flip(log.append(entry))
+
+      const refusal = Option.liftPredicate(error.cause, EventLogMessage.EventLogProtocolError.is)
+      assert.deepStrictEqual(Option.map(refusal, (protocolError) => protocolError.code), Option.some("InternalServerError"))
     }))
 })

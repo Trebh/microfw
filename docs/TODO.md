@@ -7,25 +7,18 @@ history lives in git). Each item names where the gap is and what done looks like
 
 ### Persistence and synchronisation
 
-- [ ] **A checkpoint can be ahead of its log.** A joiner resumes at its stored sequence plus one and
-  checks only the log's id. If the host's store lost its newest entries (a power loss with a store
-  that does not sync, a directory restored from a backup) the id still matches while the log ends
-  before the checkpoint: the joiner waits, and the entries the log appends under sequences it has
-  already seen are never delivered to it. Done: a subscription reports the log's last sequence, an
-  instance whose checkpoint is past it stops with a typed error, tested over a log truncated after a
-  checkpoint was stored.
-- [ ] **The event log only grows.** Every proposal, every `Joined` marker and every lease renewal
-  stays in the log, which `layerSyncStorage` reads whole into memory when the host starts; with
-  automatic actions on, each tick and a renewal every few seconds add one more. Done: a rule that
-  cuts the log (a snapshot of the model at a sequence that instances resume from, the entries before
-  it dropped), tested with a joiner that starts from the snapshot.
-- [ ] **The proposal of a deposed holder is applied if it was appended before the holder heard.** The
-  lease stops a holder's automatic actions when it applies the entry that took it away, but an action
-  that finished and appended its proposal while the instance was cut off or paused lands in the log
-  after the claim and every instance applies it (one tick too many on the auction). Done: a proposal
-  produced by an automatic action names the epoch it ran under and instances skip one whose epoch is
-  no longer current, tested with a holder cut off from the log whose finished action reaches it after
-  the successor's claim.
+- [ ] **A log restored from a backup and grown past a checkpoint is not noticed.** An instance stops
+  (`SyncLogBehind`) when its log ends before its checkpoint, but a log that lost entries and then
+  appended until it is as long again holds other entries under sequences the instance applied, and the
+  instance keeps going on a model the log does not explain. Done: a checkpoint names the entry at its
+  sequence, a subscription from that sequence delivers that entry or the instance stops with a typed
+  error, tested over a log restored to an earlier state and grown past a checkpoint.
+- [ ] **A writer's resend of an entry cut away long ago is stored and applied again.** A cut keeps the
+  ids of the last `retain` entries it stands for (`SyncStorage.ts`, `appliedAfter`), so the log
+  recognises a resend of one of them as the duplicate it is; an entry cut away more than `retain`
+  entries before its writer, cut off from the log in between, sends it again is stored under a new
+  sequence and applied twice. Done: a writer's resend is recognised however long it was cut off, or
+  refused with a typed failure, tested with a writer cut off across more than one window.
 
 ### Tooling
 

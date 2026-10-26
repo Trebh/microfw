@@ -68,10 +68,11 @@ export const replayOnStart = (inspector: StartableInspector): StartableInspector
 }
 
 const TRAVEL_EVENT: InspectedEvent = { type: "@mufw.travel" }
+const RESTORE_EVENT: InspectedEvent = { type: "@mufw.restore" }
 
 /**
  * Mirrors the history into a Stately inspector: `init` registers the actor, a step sends its
- * proposal as the event and the new control state as the snapshot value, a travel sends a snapshot.
+ * proposal as the event and the new control state as the snapshot value, a travel or a restore sends a snapshot.
  */
 export const layerStately = <D extends AnyDefinition>(
   def: D,
@@ -92,6 +93,7 @@ export const layerStately = <D extends AnyDefinition>(
         Effect.sync(() => {
           const snapshot = { context: record.model, value: record.representation.controlState }
           if (record.kind === "init") return inspector.actor(actorRef, snapshot)
+          if (record.kind === "restore") return inspector.snapshot(def.name, snapshot, { event: RESTORE_EVENT })
           if (Option.isNone(record.proposal)) return inspector.snapshot(def.name, snapshot, { event: TRAVEL_EVENT })
           const type = proposalLabel(def, record.proposal.value)
           inspector.event(def.name, { ...record.proposal.value, type })

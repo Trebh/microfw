@@ -12,7 +12,8 @@ export const applyProposal = <D extends AnyDefinition>(
   return def.reactors.reduce((m: ModelOf<D>, react) => react(m), accepted)
 }
 
-export type StepKind = "init" | "step" | "travel"
+/** `restore` is the model of an event log's snapshot replacing the instance's own. */
+export type StepKind = "init" | "step" | "travel" | "restore"
 
 export interface StepRecord<D extends AnyDefinition> {
   readonly seq: number
@@ -29,7 +30,7 @@ export const stepRecordSchema = <D extends AnyDefinition>(def: D): Schema.Codec<
   Schema.Struct({
     seq: Schema.Int,
     at: Schema.Number,
-    kind: Schema.Literals(["init", "step", "travel"]),
+    kind: Schema.Literals(["init", "step", "travel", "restore"]),
     proposal: Schema.Option(def.proposal),
     model: def.model,
     representation: def.representation,

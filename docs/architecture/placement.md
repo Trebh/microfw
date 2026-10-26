@@ -1,7 +1,7 @@
 # Placement
 
-Living document. Source of truth: `packages/core/src/Ports.ts`, `Layers.ts`, `Forward.ts`, `Persistence.ts`, `Sync.ts`, `SyncPersistence.ts`,
-`packages/rpc/src/index.ts`, `examples/auction/src/client/`, `examples/auction/src/server.ts` and the route modules beside it.
+Living document. Source of truth: `packages/core/src/Ports.ts`, `Layers.ts`, `Forward.ts`, `Persistence.ts`, `Sync.ts`, `SyncHead.ts`, `SyncSnapshot.ts`,
+`SyncStorage.ts`, `SyncLease.ts`, `SyncPersistence.ts`, `packages/rpc/src/index.ts`, `examples/auction/src/client/`, `examples/auction/src/server.ts` and the route modules beside it.
 
 Placement is a deployment decision. Each deployment has its own composition root, which chooses
 layers; nothing is switched at runtime except on the demo page.
@@ -34,16 +34,17 @@ never fails; the remote port fails with it.
 | `layerIntentBus` | `IntentBus`, `IntentPort` (local) | — |
 | `layerModelLocal(def, ports, options?)` | `ModelPort`, `HistoryPort` (one state object); `options.initial` replaces `def.initial` as seq 0 | `IntentBus` |
 | `layerActionRunnerLocal` | `ActionRunner` | the actions' services except the ports' `R`, which `run`'s caller supplies |
-| `layerActionsDrain` | — (background fiber) | `IntentBus`, `ActionRunner`, `ModelPort`; asks an `AutoActionsGate` when one is provided |
+| `layerActionsDrain` | — (background fiber) | `IntentBus`, `ActionRunner`, `ModelPort`; when an `AutoActionsGate` is provided, asks it for an epoch (`admit`) as it takes each automatic intent, drops the intent when there is none, and presents the action's proposal with `AutoEpoch` set to the epoch it got |
 | `layerLoopLocal(def, ports, options?)` | all five ports, drain running; takes the options of `layerModelLocal` | the actions' services except the ports' `R` |
 | `layerLoopWith(def, ports, { model, runner })` | the intent bus and the actions drain around a model layer (provides `ModelPort`, may require `IntentBus`) and a runner layer (provides `ActionRunner`), plus everything those provide; each side is local or remote as its layer says, and `browserOnly`, `serverModel` and `serverActions` in `src/client/placements/` each call it once; core imports no adapter | what `model` and `runner` require |
 | `layerPersistModel(def, ports, key?)` | — (background fiber) | `HistoryPort`, `KeyValueStore` |
 | `layerLoopPersisted(def, ports, key?)` | what `layerLoopLocal` provides, started from the stored model | the actions' services except the ports' `R`, `KeyValueStore` |
-| `layerLoopSynced(def, ports, options?)` | what `layerLoopLocal` provides, and `AutoActionsGate`; `ModelPort.present` appends to the `SyncLog` and returns once the log's entry is applied; the instance that holds the log's lease runs the automatic actions; `options`: `resume`, `checkpoints`, `stopped`, `lease` | the actions' services except the ports' `R`, `SyncLog` |
-| `layerLoopSyncedPersisted(def, ports, options?)` | what `layerLoopSynced` provides, resumed from the stored checkpoint (log id, sequence, model, lease) and storing one after each applied entry | the actions' services except the ports' `R`, `SyncLog`, `KeyValueStore` |
-| `layerSyncLogStorage(def)` / `layerSyncLogRemote(def)` / `layerSyncLogClient(def)` | `SyncLog` (the host's storage in-process / over an event-log client protocol / over `EventLogRemoteClient`) | `Storage` / `RpcClient.Protocol` / `EventLogRemoteClient` |
-| `layerSyncServer(def)` / `layerSyncAuthorization` | the event-log RPC handlers over the `Storage` in context / `EventLogServerAuthorization`: read by anyone, write only `Proposal`, `Joined` and `Lease` entries | `Storage`, `EventLogServerAuthorization` / — |
-| `layerSyncStorage(def)` | the event-log `Storage` over a `KeyValueStore`: the log and its id survive a restart | `KeyValueStore` |
+| `layerLoopSynced(def, ports, options?)` | what `layerLoopLocal` provides, and `AutoActionsGate`; `ModelPort.present` appends to the `SyncLog` and returns once the log's entry is applied; the instance that holds the log's lease runs the automatic actions, and their proposals are written as `AutoProposal { epoch, proposal }`, which every instance skips unless `epoch` is the lease's at that entry; `options`: `resume`, `checkpoints`, `stopped`, `lease`, `cut` (the host's cut, see [Server](#server)) | the actions' services except the ports' `R`, `SyncLog` |
+| `layerLoopSyncedPersisted(def, ports, options?)` | what `layerLoopSynced` provides, resumed from the stored checkpoint (log id, sequence, model, lease) and storing one after each applied entry; `options`: `key`, `stopped`, `lease`, `cut` | the actions' services except the ports' `R`, `SyncLog`, `KeyValueStore` |
+| `layerSyncLogStorage(def)` / `layerSyncLogRemote(def)` / `layerSyncLogClient(def)` | `SyncLog` (the host's storage in-process, which can cut when `SyncStorageCut` is provided / over a client protocol that carries `SyncRpcs` / over `SyncClient`); a subscription says which log it is and where it ends | `Storage`, `SyncHead` / `RpcClient.Protocol` / `SyncClient` |
+| `layerSyncServer(def)` / `layerSyncAuthorization` | the `SyncRpcs` handlers (the event-log RPCs and `Sync.Head`) over the `Storage` and `SyncHead` in context / `EventLogServerAuthorization`: read by anyone, write only `Proposal`, `AutoProposal`, `Joined` and `Lease` entries | `Storage`, `SyncHead`, `EventLogServerAuthorization` / — |
+| `layerSyncStorage(def)` | the event-log `Storage` over a `KeyValueStore`: the log and its id survive a restart; `SyncHead`; `SyncStorageCut`, which replaces the log's first entries by a `Snapshot` | `KeyValueStore` |
+| `layerSyncStorageMemory(def)` | the `Storage` in memory, gone with the process, and its `SyncHead`; no `SyncStorageCut`, so it cannot be cut | — |
 | `layerForward(from, to, forward)` | — (background fiber) | `from.ModelPort`, `to.IntentPort` (and `to`'s `R`) |
 | `Rpc.layerIntentPortRemote` / `layerModelRemote` / `layerHistoryRemote` / `layerActionRunnerRemote` | the port | `Rpc.Client` |
 | `Rpc.layerClient` | `Rpc.Client`, whose unary calls are counted by the hold layer when it is the protocol | `RpcClient.Protocol` (transport chosen by the app), the client half of the authentication middleware |
@@ -51,7 +52,7 @@ never fails; the remote port fails with it.
 | `Rpc.layerHoldRequestsWhileDisconnected` | `RpcClient.Protocol` that holds a request made while the socket is down until the next connection, whichever client made it, and `HeldRequests`, the count of unary calls of `Rpc.layerClient` waiting | an inner socket `RpcClient.Protocol` that redials without end (see [Deployments](#deployments)) |
 | `Rpc.layerHandlers` | the RPC handlers | `IntentPort`, `ModelPort`, `HistoryPort`, `ActionRunner`, and the ports' `R` except what the middleware provides |
 
-`layerLoopSynced`, `layerLoopSyncedPersisted`, the `layerSync*` layers and the lease and checkpoint
+`layerLoopSynced`, `layerLoopSyncedPersisted`, the `layerSync*` layers, `SyncRpcs`, `SyncClient`, `SyncHead` and the lease and checkpoint
 schemas are imported from `@mufw/core/sync`; every other `@mufw/core` layer above comes from the entry.
 
 ## Wire contract
@@ -482,6 +483,7 @@ value stops the server at start with a typed error:
 | `MUFW_SYNC` | `Config.option(Config.schema(SyncTarget))`: `host`, or the `ws://` or `wss://` URL of a host's `/eventlog` (its sync port) | unset: one instance |
 | `MUFW_SYNC_PORT` | `Config.Port`: with `host`, the port of the event-log listener; must differ from `MUFW_PORT` (`SyncConfigError`) | `3101` |
 | `MUFW_SYNC_HOST` | `Config.NonEmptyString`: with `host`, the interface the event-log listener binds | `127.0.0.1` |
+| `MUFW_SYNC_CUT_EVERY` | `Config.schema` of an `Int` of at least 1: with `host` and `MUFW_STORE`, how many entries the host applies after the log's last cut before it cuts again; an instance that joins, or a host without a store, never cuts | `1000` |
 
 Wiring: `RpcServer.layer(serving(rpcs))` (`ServerRpc.exposing(rpcs)` plus `Whoami`, always served) + `layerServerHandlers` + the loop from
 `layerAuctionLoop(store)` (`src/persistence.ts`; with `layerCreditCheckTable` and `AutoActions`,
@@ -532,12 +534,12 @@ processes overwrite each other's file.
 
 With `MUFW_SYNC` the loop is `layerLoopSynced` over a `SyncLog` (`layerAuctionSync`, `src/sync.ts`; see
 [Synchronisation across instances](sam-loop.md#synchronisation-across-instances)). `host` serves the
-event-log RPCs (`RpcServer.layer(EventLogRemoteRpcs)` over `layerSyncServer(Auction)` and
-`layerSyncAuthorization`) with `RpcServer.layerProtocolWebsocket({ path: "/eventlog" })` and
+event-log RPCs (`RpcServer.layer(SyncRpcs)` over `layerSyncServer(Auction)` and
+`layerSyncAuthorization`: the stock event-log RPCs plus `Sync.Head`, which answers the log's id and the sequence of its newest entry) with `RpcServer.layerProtocolWebsocket({ path: "/eventlog" })` and
 `RpcSerialization.layerSchemaBinary()` in a second `HttpRouter.serve` on its own `NodeHttpServer`, at
 `MUFW_SYNC_HOST:MUFW_SYNC_PORT` (`127.0.0.1:3101` by default), and reads and writes the same `Storage`
-in-process (`layerSyncLogStorage`): in memory, or `layerSyncStorage` over the file store with
-`MUFW_STORE`. The event log is not on the public port: whoever can
+in-process (`layerSyncLogStorage`): in memory (`layerSyncStorageMemory`, so a restart starts a new log), or `layerSyncStorage` over the file store with
+`MUFW_STORE`. Both provide the `SyncHead` that each subscription is checked against; Effect's bare `layerStorageMemory` does not, and no sync layer accepts it. The event log is not on the public port: whoever can
 write to it appends proposals that every instance applies without a session or a credit check, and
 the server's authorization sees a generated key, not the connection, so no secret can guard it. What
 keeps it private is the listener: loopback by default, a private interface when instances run on
@@ -546,30 +548,60 @@ several machines, never reachable from clients. The routes and the loop share on
 outside the public `HttpRouter.serve` (`Layer.provide(Loop)` after it) because a layer built inside
 a `serve` is private to that router. A `ws://<host>:<sync port>/eventlog` target joins that
 log through `layerSyncLogRemote` over `RpcClient.layerProtocolSocket` (redialling without end,
-`layerHoldRequestsWhileDisconnected`) and `NodeSocket.layerWebSocket`. The public listener is bound
+`layerHoldRequestsWhileDisconnected`) and `NodeSocket.layerWebSocket`, and asks `Sync.Head` at every subscription. The public listener is bound
 before the loop is built and no route exists until the log has been reached and replayed, since every
 route layer needs the loop: an instance started while its host is unreachable accepts connections
 and answers none until then. The server refuses `MUFW_SYNC` with `TravelTo` or `Replay` in
 `MUFW_RPCS` (they would move this instance's model away from the log's), with a `SyncConfigError`.
+
 `MUFW_STORE` combines with it (`layerAuctionSync` takes the store as an option): the loop is then
 `layerLoopSyncedPersisted` over the directory's file store, which holds the instance's checkpoint
 under `<directory>/auction`, and on the host `layerSyncStorage` over the same store holds the log
-(`auction%2Flog%2Fid`, `auction%2Flog%2F<n>`). A checkpoint of another log or a bare model in
-`<directory>/auction` stops the server at start (`SyncLogMismatch`, `SchemaError`) and is left as it
-was. `server.ts` creates one `Deferred` (`syncStopped`), passes it to `layerAuctionSync` as the
-loop's `stopped`, and races `Layer.launch` against it, so an instance whose log was replaced ends the
-process with the `SyncLogMismatch` (exit code 1) instead of serving a model nothing updates. Each
-instance needs a directory of its own. `MUFW_AUTO_ACTIONS` defaults to `on` everywhere: with `MUFW_SYNC`
+(`auction%2Flog%2Fid`, `auction%2Flog%2F<n>`, and `auction%2Flog%2Fstart` once the log has been cut). A checkpoint of another log or a bare model in
+`<directory>/auction` stops the server at start (`SyncLogMismatch`, `SchemaError`), and so does a
+checkpoint past the end of the log (`SyncLogBehind`: a store that lost its newest entries, a restored backup); the checkpoint is left as it
+was, and a log that is refused gets no `Joined`. The log is checked at every subscription, so a running instance stops the same way when its host is replaced
+(`SyncLogMismatch`) or restarted over a store that lost entries (`SyncLogBehind`). A log restored from a backup and
+grown back past a checkpoint is not noticed. `server.ts` creates one `Deferred` (`syncStopped`), passes it to `layerAuctionSync` as the
+loop's `stopped`, and races `Layer.launch` against it, so an instance that stops applying (`SyncLogMismatch`, `SyncLogBehind`, or
+`SyncSnapshotUnreadable` for a snapshot it cannot read) ends the process with that stop (exit code 1) instead of serving a model nothing updates. Each
+instance needs a directory of its own.
+
+A host with `MUFW_STORE` cuts its log: once its loop has applied `MUFW_SYNC_CUT_EVERY` entries past the log's last cut, `SyncLog.cut` (from the
+`SyncStorageCut` that `layerSyncStorage` provides) replaces entries `1..through` by one `Snapshot` of the
+host's model and lease, stored at sequence `through`, so sequences, the log's id and every checkpoint keep their meaning.
+An instance that reads a snapshot (a joiner with no checkpoint, or one from before the cut) installs its lease, restores its
+model (a history record of kind `restore`, no proposal), runs `nap` again and releases the callers
+waiting on an entry the snapshot stands for. `<directory>/auction%2Flog%2Fstart` is written when a cut retires older
+segments; a segment that begins with a `Snapshot` starts at its `through`, the last such segment wins on load, and a load removes
+what an interrupted cut left behind. The snapshot keeps the ids of the last `every` entries it stands for, so a writer's resend of an entry that was cut away is
+dropped; a writer cut off for longer than that may get a resend stored again. A memory host and a joiner cannot cut
+(`options.cut` fails the build with `SyncCutUnsupported`), so the example passes it only to a host with a store. A client may never write a
+`Snapshot`: `layerSyncAuthorization` refuses it (`"Snapshot" is not an event a client may write to this log`), and the server's handler and the storage refuse it
+too.
+
+`MUFW_AUTO_ACTIONS` defaults to `on` everywhere: with `MUFW_SYNC`
 every instance that has it takes part in the lease that decides which one runs the automatic actions
 (the first to build against a log nobody has claimed, then whoever takes it over after the holder has
 been silent for 15 seconds), and `off` is an instance that never ticks. A restarted instance holds nothing
-until it wins an epoch, so a lone one resumes ticking after the timeout. `pnpm
+until it wins an epoch, so a lone one resumes ticking after the timeout. An automatic action's proposal is
+written as `AutoProposal { epoch, proposal }`, the epoch being the one the instance held when the action started
+(`AutoActionsGate.admit`, kept as `AutoEpoch`); every instance skips one whose epoch is not the lease's at its position in the log, so the proposal of a holder deposed
+while its action ran stays in the log and changes no model. The fence guards honest stale holders, not a hostile writer on the trusted endpoint. A user intent's
+proposal is a `Proposal` and is never skipped.
+
+Upgrade hosts before joiners: a joiner waits against a host that does not serve `Sync.Head`, retrying the subscription every second. Upgrade every instance
+of a log together for `AutoProposal` and `Snapshot`: an instance that does not know them ignores the entry and diverges, and a host with a store cuts by default.
+
+`pnpm
 --filter @mufw/example-auction test:sync` (`test/syncLive.ts`) bids on two running servers at once and
 fails unless both hold the same bids in the same order; `test:sync:restart`
-(`test/syncRestartLive.ts`) starts a host and a joiner with stores, restarts the host over its store
+(`test/syncRestartLive.ts`) starts a host (cutting every 4 entries) and a joiner with stores, restarts the host over its store
 (log, id and model survive, the joiner keeps converging in both directions), restarts the joiner (its
-only record is the checkpoint's model, no entry replayed) and starts the host over an empty store (the
-joiner exits on the mismatch); `test:sync:failover` (`test/syncFailoverLive.ts`) starts a host that
+only record is the checkpoint's model, no entry replayed), starts a joiner with no store that begins from the host's snapshot (its records are
+`init`, `restore`, then steps, holding every bid), starts the host over an empty store (the
+joiner exits on `SyncLogMismatch`), and restarts a host over a store whose log lost its entries and kept its id (a joiner of that log exits on `SyncLogBehind`);
+`test:sync:failover` (`test/syncFailoverLive.ts`) starts a host that
 never ticks and two joiners, kills the one that holds the lease and fails unless nothing ticks until the
 lease has timed out, the other joiner then takes it over and the host and that joiner show the same
 auction as it goes on ticking.

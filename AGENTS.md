@@ -39,7 +39,7 @@ docs/                ARCHITECTURE.md, architecture/*.md, TODO.md
 | `pnpm --filter @mufw/example-auction test:live` | replays the path tests against a running server started without `MUFW_STORE` (or with an empty store): seq 0 must be `Auction.initial` |
 | `pnpm --filter @mufw/example-auction test:live:wallet` | replays the wallet's path tests against the wallet a running server serves at `/sam/wallet`; any freshly started server has `Wallet.initial` at seq 0 |
 | `pnpm --filter @mufw/example-auction test:sync` | against two running servers that share an event log (`MUFW_SYNC=host` on :3001 with its log on `127.0.0.1:3101`, `MUFW_PORT=3002 MUFW_SYNC=ws://127.0.0.1:3101/eventlog` on :3002, freshly started): bids on both at once and fails unless they end with the same bids |
-| `pnpm --filter @mufw/example-auction test:sync:restart` | starts a host and a joiner of its own, each with a `MUFW_STORE`, on :3211 (log on :3311) and :3212; restarts the host over its store, then the joiner, then the host over an empty store, and fails unless the log, the model and the convergence survive the first two and the joiner stops on the third |
+| `pnpm --filter @mufw/example-auction test:sync:restart` | starts a host (`MUFW_SYNC_CUT_EVERY=4`) and a joiner of its own, each with a `MUFW_STORE`, on :3211 (log on :3311) and :3212; restarts the host over its store, then the joiner, then the host over an empty store, and fails unless the log, the model and the convergence survive the first two and the joiner stops on the third; also starts a joiner with no store from the host's snapshot (history `init`, `restore`, steps) and a host over a store that lost its entries, which stops the joiner with `SyncLogBehind` |
 | `pnpm --filter @mufw/example-auction test:sync:failover` | starts a host that never ticks (`MUFW_AUTO_ACTIONS=off`) and two joiners of its own on :3221 (log on :3321), :3222 and :3223; kills the first joiner, which holds the lease, and fails unless nothing ticks until the lease has timed out, then the second joiner ticks, and the host and it show the same auction (takes about 30 seconds) |
 | `pnpm --filter @mufw/example-auction compare:transports` | starts a server of its own, builds the two ticker pages and prints first paint and update latency of the websocket, HTTP and HTML-stream islands in headless Chromium (once: `pnpm exec playwright install chromium`) |
 | `pnpm --filter @mufw/example-auction bench:bundle` | builds the Effect floors, the bench pages (`scripts/bench/pages/`: counter and 1000-row list, plain uhtml and µFW) and every deployment in memory and prints gzip/brotli size, size per origin and the largest modules |
@@ -91,7 +91,8 @@ for Effect idioms; do not rely on Effect 3 knowledge.
   `Present` does, and its authorization cannot tell who writes. Serve it only to trusted instances:
   on a listener and router of its own (`MUFW_SYNC_PORT`, loopback unless `MUFW_SYNC_HOST` says
   otherwise), never on the public port or beside the client routes, and with an authorization that
-  refuses every event the log does not define (`layerSyncAuthorization`).
+  refuses every event the log does not define and every event a client may not write (`Snapshot`,
+  which only the host's cut writes) (`layerSyncAuthorization`).
 - Tests replace a dependency by providing another layer, never by patching modules.
 
 ### Parse, don't validate
@@ -149,7 +150,7 @@ transport loss is turned into a defect, in `@mufw/rpc`.
 - The representation always carries `controlState`. One `nap` entry per control state, keyed by it,
   `noIntent` for a state with no automatic intent; `controlStates` is derived from those keys and
   never written (only `nest` and `compose` take a `controlStates` option).
-- A `nap` entry returns at most one intent; the compiled `nap` returns a list, which a combinator (`nest`, `compose`) fills with one intent per part, and the loop dispatches every one. Automatic intents with an `intentKey` (default their tag) already in flight are skipped. In a synced loop `nap` runs on every instance and only the holder of the log's lease runs its intents, so an automatic action must be safe to interrupt when the instance loses the lease.
+- A `nap` entry returns at most one intent; the compiled `nap` returns a list, which a combinator (`nest`, `compose`) fills with one intent per part, and the loop dispatches every one. Automatic intents with an `intentKey` (default their tag) already in flight are skipped. In a synced loop `nap` runs on every instance and only the holder of the log's lease runs its intents, so an automatic action must be safe to interrupt when the instance loses the lease, and must not count on its proposal being applied: every instance skips one that reaches the log after the lease has moved on.
 - Model mutation happens only in `layerModelLocal`, under its permit.
 
 ## Testing rules

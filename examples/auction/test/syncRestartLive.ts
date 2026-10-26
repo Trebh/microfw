@@ -23,7 +23,13 @@ import { samPath } from "../src/samPath.ts"
  * 2. the joiner restarts over its store: it holds the model of the log as its initial record and
  *    reads only the entries after its checkpoint, not the whole log;
  * 3. the host restarts over a store that is empty, so a new log: the joiner finds it is not the
- *    log it joined and stops with `SyncLogMismatch`.
+ *    log it joined and stops with `SyncLogMismatch`;
+ * 4. on that new log, a second joiner stores a checkpoint, then the host restarts over its store
+ *    with the log's entries deleted and its id kept (a store that lost its writes): the joiner
+ *    finds the log ends before its checkpoint and stops with `SyncLogBehind`;
+ * 5. before that, once the host has applied enough entries to cut its log (`MUFW_SYNC_CUT_EVERY=4`),
+ *    a joiner with no store starts from the host's snapshot: its history is the initial record, a
+ *    `restore` and the steps after it, holding every bid.
  *
  * The servers run `src/server.ts` with `MUFW_AUTO_ACTIONS=off`, so only what this script does moves
  * the model. Needs no running server; stops everything it starts.
@@ -31,6 +37,8 @@ import { samPath } from "../src/samPath.ts"
 const HOST_PORT = 3211
 const LOG_PORT = 3311
 const JOINER_PORT = 3212
+const SNAPSHOT_JOINER_PORT = 3213
+const LOG_URL = `ws://127.0.0.1:${LOG_PORT}/eventlog`
 const AUCTION_ROOT = fileURLToPath(new URL("..", import.meta.url))
 const TIMEOUT = "20 seconds"
 
@@ -95,12 +103,15 @@ const startServer = (scope: Scope.Scope, port: number, env: NodeJS.ProcessEnv) =
 /** A scope of its own, so that a server can be stopped and started again without ending the script. */
 const ownScope = Effect.acquireRelease(Scope.make(), (scope) => Scope.close(scope, Exit.void))
 
+/** The host cuts its log every 4 entries, so that a few bids are enough for a snapshot. */
 const startHost = (scope: Scope.Scope, store: string | undefined) =>
-  startServer(scope, HOST_PORT, serverEnv(HOST_PORT, "host", store)).pipe(Effect.tap(() => untilListening(LOG_PORT)))
+  startServer(scope, HOST_PORT, { ...serverEnv(HOST_PORT, "host", store), MUFW_SYNC_CUT_EVERY: "4" }).pipe(
+    Effect.tap(() => untilListening(LOG_PORT))
+  )
 
 /** A joiner of the host's log, which `store` (when given) lets resume from its checkpoint. */
 const startJoiner = (scope: Scope.Scope, store: string | undefined) =>
-  startServer(scope, JOINER_PORT, serverEnv(JOINER_PORT, `ws://127.0.0.1:${LOG_PORT}/eventlog`, store))
+  startServer(scope, JOINER_PORT, serverEnv(JOINER_PORT, LOG_URL, store))
 
 /** One server's remote ports over their own connection, acting as the bidder that owns `session`. */
 const connectTo = (port: number, session: string) => {
@@ -210,10 +221,24 @@ const program = Effect.gen(function*() {
     "ok the restarted joiner starts from its checkpoint: its only record is the initial one, holding the 3 bids; no entry of the log was replayed"
   )
 
+  const snapshotJoinerScope = yield* ownScope
+  yield* startServer(snapshotJoinerScope, SNAPSHOT_JOINER_PORT, serverEnv(SNAPSHOT_JOINER_PORT, LOG_URL, undefined))
+  const fromSnapshot = yield* connectTo(SNAPSHOT_JOINER_PORT, "demo-bob")
+  assert.deepEqual(yield* bidders(fromSnapshot, 3), ["alice:5", "alice:10", "bob:15"])
+  const records = yield* recordsHeld(fromSnapshot)
+  assert.deepEqual(records.slice(0, 2).map(({ kind }) => kind), ["init", "restore"])
+  assert.ok(records.slice(2).every(({ kind }) => kind === "step"), `records after the snapshot are steps: ${JSON.stringify(records)}`)
+  assert.equal(records.at(-1)?.bids, 3)
+  yield* Console.log(
+    `ok a joiner with no store starts from the host's snapshot: its records are the initial one, a restore and ${records.length - 2} steps, holding the 3 bids`
+  )
+  yield* Scope.close(snapshotJoinerScope, Exit.void)
+
   yield* Scope.close(restartedHostScope, Exit.void)
   yield* Console.log("host stopped")
   const newLogScope = yield* ownScope
-  yield* startHost(newLogScope, yield* temporaryDirectory("empty"))
+  const newLogStore = yield* temporaryDirectory("empty")
+  yield* startHost(newLogScope, newLogStore)
   yield* Console.log("host started over an empty store: a new log")
   const code = yield* exitWithin(restartedJoiner, 30_000)
   const output = restartedJoiner.output.join("")
@@ -221,6 +246,36 @@ const program = Effect.gen(function*() {
   assert.match(output, /sync log replaced, this instance stopped applying/)
   assert.match(output, /SyncLogMismatch/)
   yield* Console.log(`ok the joiner found a log that is not the one it joined and stopped (exit code ${code})`)
-}).pipe(Effect.scoped, Effect.timeout("120 seconds"))
+
+  const secondJoinerStore = yield* temporaryDirectory("joiner-again")
+  const secondJoinerScope = yield* ownScope
+  const secondJoiner = yield* startJoiner(secondJoinerScope, secondJoinerStore)
+  const onNewJoiner = yield* connectTo(JOINER_PORT, "demo-bob")
+  const onNewLogHost = yield* connectTo(HOST_PORT, "demo-alice")
+  yield* onNewLogHost.intents.dispatch({ _tag: "Open" })
+  yield* onNewJoiner.model.representations.pipe(
+    Stream.filter((representation) => representation.controlState === "open"),
+    Stream.runHead,
+    Effect.timeout(TIMEOUT)
+  )
+  yield* bid(onNewLogHost, 5)
+  assert.deepEqual(yield* bidders(onNewJoiner, 1), ["alice:5"])
+  yield* Effect.sleep("1 second")
+  yield* Console.log("ok a second joiner of the new log holds a bid and has stored its checkpoint")
+
+  yield* Scope.close(newLogScope, Exit.void)
+  yield* Console.log("host stopped")
+  yield* Effect.promise(() => rm(join(newLogStore, "auction%2Flog%2F0")))
+  yield* Effect.promise(() => rm(join(newLogStore, "auction")))
+  const truncatedLogScope = yield* ownScope
+  yield* startHost(truncatedLogScope, newLogStore)
+  yield* Console.log("host started over its store with the log's entries deleted: the same log, ending earlier")
+  const behindCode = yield* exitWithin(secondJoiner, 30_000)
+  const behindOutput = secondJoiner.output.join("")
+  assert.notEqual(behindCode, 0)
+  assert.match(behindOutput, /sync log ends before this instance's checkpoint, this instance stopped applying/)
+  assert.match(behindOutput, /SyncLogBehind/)
+  yield* Console.log(`ok the joiner found the log ending before its checkpoint and stopped (exit code ${behindCode})`)
+}).pipe(Effect.scoped, Effect.timeout("180 seconds"))
 
 NodeRuntime.runMain(program)

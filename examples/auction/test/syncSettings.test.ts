@@ -1,7 +1,7 @@
 import { assert, describe, it } from "@effect/vitest"
-import { Deferred, Effect, Layer, Option } from "effect"
+import { ConfigProvider, Deferred, Effect, Layer, Option } from "effect"
 import { createServer } from "node:net"
-import { type AuctionSyncOptions, checkSyncSettings, layerAuctionSync } from "../src/sync.ts"
+import { type AuctionSyncOptions, checkSyncSettings, layerAuctionSync, SyncCutEvery } from "../src/sync.ts"
 
 const host = Option.some("host" as const)
 const joiner = Option.some("ws://127.0.0.1:3101/eventlog" as const)
@@ -45,6 +45,40 @@ describe("checkSyncSettings", () => {
     }))
 })
 
+/** What `SyncCutEvery` reads when the environment holds exactly `env`. */
+const cutEveryOf = (env: Record<string, string>) =>
+  SyncCutEvery.parse(ConfigProvider.fromEnv({ env }))
+
+describe("SyncCutEvery", () => {
+  it.effect("is 1000 when MUFW_SYNC_CUT_EVERY is unset", () =>
+    Effect.gen(function*() {
+      const every = yield* cutEveryOf({})
+
+      assert.strictEqual(every, 1000)
+    }))
+
+  it.effect("reads MUFW_SYNC_CUT_EVERY as a whole number", () =>
+    Effect.gen(function*() {
+      const every = yield* cutEveryOf({ MUFW_SYNC_CUT_EVERY: "4" })
+
+      assert.strictEqual(every, 4)
+    }))
+
+  it.effect("refuses 0: the log would be cut at every entry it has not yet applied", () =>
+    Effect.gen(function*() {
+      const error = yield* Effect.flip(cutEveryOf({ MUFW_SYNC_CUT_EVERY: "0" }))
+
+      assert.match(error.message, /greater than or equal to 1/)
+    }))
+
+  it.effect("refuses a number with a fraction", () =>
+    Effect.gen(function*() {
+      const error = yield* Effect.flip(cutEveryOf({ MUFW_SYNC_CUT_EVERY: "2.5" }))
+
+      assert.match(error.message, /integer/)
+    }))
+})
+
 /** A TCP server on a free loopback port, held until the test's scope closes: the port a listener would want. */
 const occupiedPort = Effect.acquireRelease(
   Effect.callback<{ readonly port: number; readonly close: () => void }>((resume) => {
@@ -62,7 +96,8 @@ const occupiedPort = Effect.acquireRelease(
 const options = (port: number): AuctionSyncOptions => ({
   listen: { host: "127.0.0.1", port },
   store: Option.none(),
-  stopped: Deferred.makeUnsafe()
+  stopped: Deferred.makeUnsafe(),
+  cutEvery: 1000
 })
 
 describe("layerAuctionSync event-log listener", () => {

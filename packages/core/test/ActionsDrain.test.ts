@@ -1,14 +1,18 @@
 import { assert, describe, it } from "@effect/vitest"
-import { Effect, Layer, Option } from "effect"
+import { Context, Effect, Layer, Option, Ref, Stream } from "effect"
 import { TestClock } from "effect/testing"
 import {
   AutoActions,
+  AutoActionsGate,
+  AutoEpoch,
+  layerActionRunnerLocal,
   layerActionsDrain,
   layerIntentBus,
   layerLoopLocal,
   layerModelLocal,
   makePorts,
-  nest
+  nest,
+  type ProposalOf
 } from "../src/index.ts"
 import { Clears } from "./fixtures/Clears.ts"
 import { Counter, Ports } from "./fixtures/Counter.ts"
@@ -140,4 +144,76 @@ describe("layerActionsDrain over a step that offers two intents", () => {
         child: { controlState: "idle", a: false, b: false }
       })
     }).pipe(Effect.provide(TwinClearsLoop)))
+})
+
+interface Presented {
+  readonly proposal: ProposalOf<typeof Counter>
+  readonly epoch: Option.Option<number>
+}
+
+/** A drain over a model that records each proposal with the `AutoEpoch` it was presented under, behind a gate the test moves. */
+const epochRig = (admitted: Option.Option<number>) =>
+  Effect.gen(function*() {
+    const admit = yield* Ref.make(admitted)
+    const presented = yield* Ref.make<ReadonlyArray<Presented>>([])
+    const recorder = Layer.succeed(Ports.ModelPort, {
+      present: (proposal) =>
+        Effect.gen(function*() {
+          const epoch = yield* AutoEpoch
+          yield* Ref.update(presented, (all) => [...all, { proposal, epoch }])
+        }),
+      representations: Stream.empty
+    })
+    const loop = layerActionsDrain(Counter, Ports).pipe(
+      Layer.provideMerge(
+        Layer.mergeAll(
+          recorder,
+          layerActionRunnerLocal(Counter, Ports),
+          Layer.succeed(AutoActionsGate, { admit: Ref.get(admit) })
+        )
+      ),
+      Layer.provideMerge(layerIntentBus(Counter, Ports))
+    )
+    const context = yield* Layer.build(loop)
+    return { bus: Context.get(context, Ports.IntentBus), admit, presented: Ref.get(presented) }
+  })
+
+describe("layerActionsDrain and the epoch of an automatic action", () => {
+  it.effect(
+    "stamps the proposal of an automatic action with the epoch the gate admitted it under, though the gate has moved on when the action ends",
+    () =>
+      Effect.gen(function*() {
+        const rig = yield* epochRig(Option.some(1))
+
+        yield* rig.bus.dispatchAuto({ _tag: "AutoReset" })
+        yield* settle
+        yield* Ref.set(rig.admit, Option.some(2))
+        yield* TestClock.adjust("1 second")
+        yield* settle
+
+        assert.deepStrictEqual(yield* rig.presented, [{ proposal: { _tag: "Reset" }, epoch: Option.some(1) }])
+      })
+  )
+
+  it.effect("presents the proposal of a user intent without an epoch while the gate admits one", () =>
+    Effect.gen(function*() {
+      const rig = yield* epochRig(Option.some(1))
+
+      yield* rig.bus.dispatch({ _tag: "Inc", by: 1 })
+      yield* settle
+
+      assert.deepStrictEqual(yield* rig.presented, [{ proposal: { _tag: "Inc", by: 1 }, epoch: Option.none() }])
+    }))
+
+  it.effect("drops an automatic intent while the gate admits no epoch", () =>
+    Effect.gen(function*() {
+      const rig = yield* epochRig(Option.none())
+
+      yield* rig.bus.dispatchAuto({ _tag: "AutoReset" })
+      yield* settle
+      yield* TestClock.adjust("1 second")
+      yield* settle
+
+      assert.deepStrictEqual(yield* rig.presented, [])
+    }))
 })

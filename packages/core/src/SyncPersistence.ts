@@ -3,8 +3,9 @@ import { KeyValueStore } from "effect/persistence"
 import type { AnyDefinition, ModelOf } from "./Definition.ts"
 import type { Ports } from "./Ports.ts"
 import { writeKept } from "./StoreWrite.ts"
-import { layerLoopSynced, LogId, type SyncCheckpoint, type SyncLogMismatch } from "./Sync.ts"
+import { layerLoopSynced, LogId, type SyncCheckpoint, type SyncStop } from "./Sync.ts"
 import { LeaseState, type LeaseTimings } from "./SyncLease.ts"
+import type { SyncCutOptions } from "./SyncSnapshot.ts"
 
 /**
  * What a synced instance stores: its position in the log (which log, how far), the model the log's
@@ -59,9 +60,11 @@ export interface PersistedSyncOptions {
   /** Where the checkpoint is stored; the definition's name when absent. */
   readonly key?: string
   /** As `SyncOptions.stopped`. */
-  readonly stopped?: Deferred.Deferred<never, SyncLogMismatch>
+  readonly stopped?: Deferred.Deferred<never, SyncStop>
   /** As `SyncOptions.lease`. */
   readonly lease?: LeaseTimings
+  /** As `SyncOptions.cut`. */
+  readonly cut?: SyncCutOptions
 }
 
 /**
@@ -70,7 +73,8 @@ export interface PersistedSyncOptions {
  * every entry the loop applies. The log is the source of truth: the stored model is a cache of its
  * state at `sequence`, so an instance that restarts reads only the entries after it, and one that
  * loses its latest write reads a few more. A stored checkpoint of another log fails the layer with
- * `SyncLogMismatch`, one that does not decode with a `SchemaError`; neither is replaced. The write
+ * `SyncLogMismatch`, one past the end of the log with `SyncLogBehind`, one that does not decode with
+ * a `SchemaError`; none is replaced. The write
  * is off the loop's permit, as in `layerPersistModel`. Requires `KeyValueStore` and `SyncLog`.
  */
 export const layerLoopSyncedPersisted = <D extends AnyDefinition, R = never>(
@@ -84,7 +88,13 @@ export const layerLoopSyncedPersisted = <D extends AnyDefinition, R = never>(
       const stored = yield* loadCheckpoint(def, key)
       const checkpoints = yield* Queue.sliding<SyncCheckpoint<D>>(1)
       const resume = Option.getOrUndefined(stored)
-      const loop = layerLoopSynced(def, ports, { resume, checkpoints, stopped: options?.stopped, lease: options?.lease })
+      const loop = layerLoopSynced(def, ports, {
+        resume,
+        checkpoints,
+        stopped: options?.stopped,
+        lease: options?.lease,
+        cut: options?.cut
+      })
       return Layer.merge(layerPersistCheckpoints(def, checkpoints, key), loop)
     })
   )

@@ -1,7 +1,7 @@
 import { NodeFileSystem } from "@effect/platform-node"
 import { assert, describe, it } from "@effect/vitest"
 import { AutoActions } from "@mufw/core"
-import type { SyncLogMismatch } from "@mufw/core/sync"
+import type { SyncStop } from "@mufw/core/sync"
 import { Context, Deferred, Effect, Exit, FileSystem, Layer, Option, Schedule, Scope, Stream } from "effect"
 import { layerCreditCheckTable } from "../src/adapters/creditCheckTable.ts"
 import { Amount, Bidder } from "../src/domain/Values.ts"
@@ -12,11 +12,12 @@ import { layerAuctionSync } from "../src/sync.ts"
 const bootHost = (directory: string) =>
   Effect.gen(function*() {
     const scope = yield* Scope.make()
-    const stopped = yield* Deferred.make<never, SyncLogMismatch>()
+    const stopped = yield* Deferred.make<never, SyncStop>()
     const { loop } = layerAuctionSync("host", {
       listen: { host: "127.0.0.1", port: 0 },
       store: Option.some(directory),
-      stopped
+      stopped,
+      cutEvery: 1000
     })
     const context = yield* Layer.build(
       loop.pipe(Layer.provide(layerCreditCheckTable), Layer.provide(Layer.succeed(AutoActions, false)))

@@ -7,7 +7,7 @@ Both adapters read `HistoryPort.records`, so they work with a local model and wi
 ## History panel
 
 `layerPanel(def, ports, { root, render?, html?, save? })` renders one row per record:
-`#seq kind [proposal label | ↩ source seq] → controlState`, the latest highlighted. Clicking a row
+`#seq kind [proposal label | ↩ source seq | snapshot] → controlState`, the latest highlighted. Clicking a row
 calls `travelTo(seq)` and shows that record's model and representation as JSON. The travel runs as
 a fiber of the layer (`FiberSet.makeRuntime`): it sees the layer's logger and references and is
 interrupted when the layer's scope closes.
@@ -27,7 +27,8 @@ text to `options.save`, default a browser download named `<definition name>-hist
 (a `Blob` and an anchor, the DOM boundary). The file decodes back with `decodeHistoryJson(def)`.
 The export runs as a fiber of the layer like the travel; a failed encoding is logged.
 
-A travel row shows its source from the record's `travelledTo`; it does not infer it from the models.
+A travel row shows its source from the record's `travelledTo`; it does not infer it from the models. A `restore` record (a synced
+instance that replaced its model with a log's snapshot) has no proposal and no source, and its row reads `snapshot`.
 
 An `init` record opens a history: the panel drops its rows when one arrives, so a restarted server's
 history replaces the old one.
@@ -51,6 +52,7 @@ record the other pages produce.
 | `init` | `actor(actorRef, { context: model, value: controlState })` |
 | `step` | `event(name, { ...proposal, type: proposalLabel(def, proposal) })`, then `snapshot(...)` with that event |
 | `travel` | `snapshot(...)` with event `@mufw.travel` |
+| `restore` | `snapshot(...)` with event `@mufw.restore` |
 
 - `definition` is usually `toXStateDefinition(def, exploreGraph(def, explore, options))`.
 - The inspector's manual `actor()` reads the state diagram only from `actorRef.logic.config`, so

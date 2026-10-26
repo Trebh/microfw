@@ -44,9 +44,9 @@ flowchart LR
 | Domain | The `SamDefinition`: schemas plus pure acceptors, reactors, `state`, `nap` |
 | Application services | The definition's `actions`: the only effectful part, they turn intents into proposals |
 | Driving ports | `IntentPort.dispatch`, `ModelPort.present` |
-| Driven ports | `ActionRunner`, `ModelPort`, `HistoryPort`, `KeyValueStore` (model, checkpoint and event-log persistence), `SyncLog` (the ordered log several instances share), and domain services the actions require (`CreditCheck`, `CurrentBidder`); a page's `Whoami` |
+| Driven ports | `ActionRunner`, `ModelPort`, `HistoryPort`, `KeyValueStore` (model, checkpoint and event-log persistence), `SyncLog` (the ordered log several instances share), `SyncHead` (where a log's storage ends) and `SyncStorageCut` (replaces the log's oldest entries by a snapshot), and domain services the actions require (`CreditCheck`, `CurrentBidder`); a page's `Whoami` |
 | Driving adapters | the uhtml view, test drivers, RPC handlers on the server, the authentication middleware in front of them |
-| Driven adapters | local layers, remote RPC layers, `KeyValueStore.layerMemory`, the example's `layerAtomicFileStore` (synced temp file + rename + synced directory over `layerFileSystem`), `layerSyncStorage` (the event-log `Storage` over a `KeyValueStore`), `layerCreditCheckTable`/`layerCreditCheckPermissive`, `layerSessionsTable`, `layerCurrentBidderFixed`, `layerWhoamiFixed`/`layerWhoamiRemote`, devtools |
+| Driven adapters | local layers, remote RPC layers, `KeyValueStore.layerMemory`, the example's `layerAtomicFileStore` (synced temp file + rename + synced directory over `layerFileSystem`), `layerSyncStorage` (the event-log `Storage`, with `SyncHead` and `SyncStorageCut`, over a `KeyValueStore`), `layerSyncStorageMemory` (the same without the cut, in memory), `layerCreditCheckTable`/`layerCreditCheckPermissive`, `layerSessionsTable`, `layerCurrentBidderFixed`, `layerWhoamiFixed`/`layerWhoamiRemote`, devtools |
 | Composition roots | one per deployment: `examples/auction/src/client/<page>.ts`, `client/auctionWorker.ts`, `server.ts`, `test/live.ts`, `test/walletLive.ts`; the showcase's `examples/showcase/src/main.ts` and `src/acts/tour/company.worker.ts` |
 
 Ports are Effect service keys (`Context.Service`) created per definition by `makePorts(def)`;
@@ -89,7 +89,7 @@ Code stays inside `Effect`/`Stream`/`Layer` across every package. Effects are ru
 | Devtools page | `examples/auction/src/client/devtools.ts` | `BrowserRuntime.runMain(Layer.launch(page))`, on `layerInputScheduler` |
 | Stream frame | `examples/auction/src/client/streamEmbed.ts` (`runStreamFrame`, called by the demo page's entry point) | `BrowserRuntime.runMain(show)` |
 | Showcase page | `examples/showcase/src/main.ts` | `BrowserRuntime.runMain(Layer.launch(page))`, with the page's layers wrapped last in `layerInputScheduler` |
-| Node server | `examples/auction/src/server.ts` | `Layer.launch(...).pipe(Effect.raceFirst(Deferred.await(syncStopped)), NodeRuntime.runMain)`: a synced instance whose log was replaced stops the process |
+| Node server | `examples/auction/src/server.ts` | `Layer.launch(...).pipe(Effect.raceFirst(Deferred.await(syncStopped)), NodeRuntime.runMain)`: a synced instance that stops applying (its log was replaced, lost entries it applied, or holds a snapshot it cannot read) stops the process |
 | Web worker | `examples/auction/src/client/auctionWorker.ts`, the worker's composition root | `BrowserRuntime.runMain(Layer.launch(workerHost.pipe(Layer.provide(BrowserWorkerRunner.layer))))` |
 | Showcase web worker | `examples/showcase/src/acts/tour/company.worker.ts`, the worker's composition root, started by Act V with `{ type: "module" }` | `BrowserRuntime.runMain(Layer.launch(served), { teardown: reportFailureToPage })`: a failure is raised to the page |
 | Live tests and scripts | `examples/auction/test/live.ts`, `test/walletLive.ts`, `test/syncLive.ts`, `test/syncRestartLive.ts`, `test/syncFailoverLive.ts`, `scripts/*.ts` | `NodeRuntime.runMain(program)` |
@@ -172,15 +172,21 @@ Each entry states the choice and the constraint behind it.
   resolves conflicts afterwards by clock-based ids, which would need the acceptors to commute.
   Actions run where the intent arrived; only proposals travel. The log applies any proposal that
   decodes, as `Present` does, so it is served only to trusted instances. Core holds the mechanism,
-  the server over any event-log `Storage` and a `Storage` over a `KeyValueStore` (effect only); the
-  socket client, the listener and the choice of store are the example's (`MUFW_SYNC`, `MUFW_STORE` in
-  `server.ts`, `src/sync.ts`). Catch-up, the automatic-actions rule and what breaks convergence are in
+  the server over an event-log `Storage` that also provides `SyncHead`, and such a `Storage` over a
+  `KeyValueStore` (effect only); the socket client, the listener and the choice of store are the
+  example's (`MUFW_SYNC`, `MUFW_STORE` in `server.ts`, `src/sync.ts`). A host serves `SyncRpcs`, the
+  event-log protocol plus `Sync.Head`, and a joiner is a `SyncClient`: upgrade a host before its
+  joiners, since a joiner waits against one that does not answer `Sync.Head`. Catch-up, the
+  automatic-actions rule and what breaks convergence are in
   [the SAM loop](architecture/sam-loop.md#synchronisation-across-instances).
 - **A log has an identity, and what is kept next to a sequence names the log.** Sequences mean
   something within one log only. The server's `Storage` id, generated when the log is created and kept
-  with it, is the log's `LogId`; a subscription reports it, and an instance that finds another log
-  than the one it joined (or than the one its stored checkpoint names) applies nothing from it and
-  stops with `SyncLogMismatch`. It does not replay the new log over its model: a running replica
+  with it, is the log's `LogId`; a subscription reports it and the sequence of the log's newest entry,
+  and an instance that finds another log than the one it joined (or than the one its stored
+  checkpoint names) applies nothing from it and stops with `SyncLogMismatch`; one that finds the log
+  ending before the entry it has applied (a store that lost its newest entries) stops with
+  `SyncLogBehind`, and a log it refuses gets no `Joined`. A snapshot it cannot read stops it with
+  `SyncSnapshotUnreadable`. It does not replay the new log over its model: a running replica
   cannot be reset, and a stored model is not discarded without saying so, as a stored value that does
   not decode is not replaced by `def.initial`.
 - **Which instance runs the automatic actions is decided by the log, as a lease, not by configuration.**
@@ -193,8 +199,13 @@ Each entry states the choice and the constraint behind it.
   interrupts its automatic actions in flight, as `travelTo` does. `AutoActions` true means an instance
   takes part, false that it never ticks. The lease state is in the checkpoint, since a resumed instance
   reads only the entries after it, and the instance's identity is new with each layer, so a restarted
-  instance never believes it holds a lease its earlier run held. The rule does not fence the proposal
-  of a holder that has not yet heard it was deposed. See
+  instance never believes it holds a lease its earlier run held. A holder that has not yet heard it
+  was deposed is fenced by the epoch: the proposal of an automatic action is written as an
+  `AutoProposal` naming the epoch the action started under, and every instance skips one whose epoch
+  is not the lease's at that position of the log (the entry stays in the log; a user's `Proposal` is
+  never skipped). That guards an honest stale holder, not a writer of the trusted endpoint that
+  names an epoch of its own, and an instance that does not know `AutoProposal` ignores it and
+  diverges, so instances are upgraded together. See
   [the lease](architecture/sam-loop.md#the-lease).
 - **The log persists in the host's `Storage`, an instance persists a checkpoint, both through a
   `KeyValueStore`.** `layerSyncStorage` stores the log (id, entries) so a host restart keeps it;
@@ -204,6 +215,18 @@ Each entry states the choice and the constraint behind it.
   separate fiber writes after the permit, as `layerPersistModel` does. A model restored from elsewhere
   is still not the log's; a checkpoint is, for the log it names. Persistence and `MUFW_SYNC` combine
   in the example; each instance has a store of its own.
+- **The host keeps its log short by cutting it at a snapshot.** Every proposal, `Joined` and lease
+  renewal stays in the log, so the host's applier, when `SyncOptions.cut` says so, asks the log
+  (`SyncLog.cut`, served by the `SyncStorageCut` that `layerSyncStorage` provides) to replace the
+  entries up to the sequence it has just applied, `every` past the last cut, by one `Snapshot`
+  `{ through, model, lease, applied }` stored at sequence `through`: sequences, the `LogId` and the
+  checkpoints that name them keep their meaning. An instance that reads the snapshot (a joiner
+  starting from nothing, one behind the cut) installs its lease, restores its model without
+  presenting a proposal (a history record of kind `restore`) and goes on after it. The snapshot keeps
+  the ids of the last `retain` entries it stands for, so a writer's resend of one is dropped as the
+  duplicate it is. Memory hosts and joiners cannot cut (`SyncCutUnsupported`), and only the cut
+  writes a `Snapshot`: a client may not. Every instance of a log must understand `Snapshot` before
+  its host cuts.
 - **Domain services are ports; their implementations are adapters in separate modules**
   (`CreditCheck` vs `layerCreditCheckTable`), so a browser bundle never contains server secrets.
 - **Identity is a port, not part of the intent.** `PlaceBid` carries an amount; the action reads

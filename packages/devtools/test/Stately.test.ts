@@ -1,9 +1,10 @@
 import { assert, describe, it } from "@effect/vitest"
 import { exploreGraph, layerLoopLocal, toXStateDefinition } from "@mufw/core"
 import { createInspector, type StatelyInspectionEvent } from "@statelyai/inspect"
-import { Effect, Layer, Stream } from "effect"
+import { Effect, Layer, Option, Stream } from "effect"
 import { Counter, Ports } from "../../core/test/fixtures/Counter.ts"
 import { exploreNested, NestedCounter, NestedPorts } from "../../core/test/fixtures/NestedCounter.ts"
+import { settle } from "../../core/test/support.ts"
 import { layerStately, replayOnStart, type StartableInspector } from "../src/index.ts"
 
 const definition = toXStateDefinition(
@@ -63,6 +64,43 @@ describe("layerStately", () => {
 
       const event = sent.find((e) => e.type === "@xstate.event")
       assert.strictEqual(event?.type === "@xstate.event" && event.event.type, "Child/Inc")
+    }).pipe(Effect.provide(layer))
+  })
+
+  it.effect("sends a restore as a snapshot of the restore event, not of a travel", () => {
+    const calls: Array<string> = []
+    const inspector: StartableInspector = {
+      actor: (actor) => void calls.push(`actor ${actor.sessionId}`),
+      event: (actor, event) => void calls.push(`event ${actor} ${event.type}`),
+      snapshot: (actor, snapshot, info) =>
+        void calls.push(`snapshot ${actor} ${snapshot.value} ${info?.event?.type}`),
+      start: () => void calls.push("start")
+    }
+    const initial = {
+      seq: 0,
+      at: 0,
+      kind: "init" as const,
+      proposal: Option.none(),
+      model: { count: 0 },
+      representation: { controlState: "low" as const, count: 0 }
+    }
+    const restore = {
+      ...initial,
+      seq: 1,
+      kind: "restore" as const,
+      model: { count: 9 },
+      representation: { controlState: "high" as const, count: 9 }
+    }
+    const history = Layer.succeed(Ports.HistoryPort, {
+      records: Stream.make(initial, restore),
+      travelTo: () => Effect.void,
+      replay: () => Effect.void
+    })
+    const layer = layerStately(Counter, Ports, inspector, { definition }).pipe(Layer.provideMerge(history))
+    return Effect.gen(function*() {
+      yield* settle
+
+      assert.deepStrictEqual(calls, ["actor counter", "snapshot counter high @mufw.restore"])
     }).pipe(Effect.provide(layer))
   })
 })

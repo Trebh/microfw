@@ -7,12 +7,19 @@ import {
   layerSyncLogStorage,
   layerSyncServer,
   layerSyncStorage,
+  layerSyncStorageMemory,
+  type SyncCutOptions,
+  type SyncCutUnsupported,
   type SyncLog,
-  type SyncLogMismatch
+  type SyncLogBehind,
+  type SyncLogMismatch,
+  SyncRpcs,
+  type SyncSnapshotUnreadable,
+  type SyncStop
 } from "@mufw/core/sync"
 import { layerHoldRequestsWhileDisconnected, type RpcTag } from "@mufw/rpc"
-import { type Deferred, Effect, Layer, Option, Schedule, Schema } from "effect"
-import { EventLogMessage, type EventLogRemote, EventLogServerUnencrypted } from "effect/eventlog"
+import { Config, type Deferred, Effect, Layer, Option, Schedule, Schema } from "effect"
+import type { EventLogRemote } from "effect/eventlog"
 import { HttpRouter, type HttpServerError } from "effect/http"
 import { RpcClient, RpcSerialization, RpcServer } from "effect/rpc"
 import { createServer } from "node:http"
@@ -30,6 +37,12 @@ export const SyncTarget = Schema.Union([
   Schema.String.check(Schema.isPattern(/^wss?:\/\/[^/?#]+\/eventlog$/, { expected: "ws://<host>:<port>/eventlog" }))
 ])
 export type SyncTarget = typeof SyncTarget.Type
+
+/** `MUFW_SYNC_CUT_EVERY`: how many entries the host applies after a snapshot of the log before it cuts again; at least 1, unset: 1000. */
+export const SyncCutEvery = Config.schema(
+  Schema.Int.pipe(Schema.check(Schema.isGreaterThanOrEqualTo(1))),
+  "MUFW_SYNC_CUT_EVERY"
+).pipe(Config.withDefault(1000))
 
 /** `MUFW_SYNC` combined with a setting that would let an instance's model leave the log's. */
 export class SyncConfigError extends Schema.TaggedError<SyncConfigError>()("SyncConfigError", {
@@ -81,9 +94,15 @@ const layerProtocolTo = (url: string) =>
 
 /**
  * What building the synced loop can fail with: the log server refused the handshake or the first
- * append, or the log is not the one the stored checkpoint belongs to.
+ * append, or the log is not the one the stored checkpoint belongs to, or ends before it, or holds a
+ * snapshot this definition cannot read, or the log asked to be cut cannot be.
  */
-export type SyncFailure = EventLogRemote.EventLogRemoteError | SyncLogMismatch
+export type SyncFailure =
+  | EventLogRemote.EventLogRemoteError
+  | SyncLogMismatch
+  | SyncLogBehind
+  | SyncSnapshotUnreadable
+  | SyncCutUnsupported
 
 /** The auction loop over a shared log, and the listener the log is served on. */
 export interface AuctionSync {
@@ -104,8 +123,10 @@ export interface AuctionSyncOptions {
   readonly listen: EventLogListen
   /** `MUFW_STORE`: a directory for this instance's checkpoint and, on the host, the log. Unset: both in memory. */
   readonly store: Option.Option<string>
-  /** Fails when the loop stops applying because the log it follows is no longer the one it joined. */
-  readonly stopped: Deferred.Deferred<never, SyncLogMismatch>
+  /** Fails when the loop stops applying because the log it follows is no longer the one it joined, has lost entries the instance applied, or holds a snapshot the instance cannot read. */
+  readonly stopped: Deferred.Deferred<never, SyncStop>
+  /** `MUFW_SYNC_CUT_EVERY`: the host with a store replaces the log's entries by a snapshot of the model once this many have been applied since the last one. An instance that joins, and a host without a store, never cut. */
+  readonly cutEvery: number
 }
 
 /** `AuctionLoop` that also needs the log it follows. */
@@ -113,13 +134,17 @@ type SyncedLoop<E> = Layer.Layer<Layer.Success<AuctionLoop<never>>, E, Layer.Ser
 
 /**
  * The synced loop over the `SyncLog` in context: in memory, or, with a directory, resuming from the
- * checkpoint it stores there.
+ * checkpoint it stores there. `cut`, when given, makes the loop cut the log it follows.
  */
-const syncedLoop = (store: Option.Option<FileStore>, stopped: AuctionSyncOptions["stopped"]) =>
+const syncedLoop = (
+  store: Option.Option<FileStore>,
+  stopped: AuctionSyncOptions["stopped"],
+  cut: SyncCutOptions | undefined
+) =>
   Option.match(store, {
-    onNone: (): SyncedLoop<SyncFailure> => layerLoopSynced(Auction, ServerPorts, { stopped }),
+    onNone: (): SyncedLoop<SyncFailure> => layerLoopSynced(Auction, ServerPorts, { stopped, cut }),
     onSome: (files): SyncedLoop<SyncFailure | AuctionStoreFailure> =>
-      layerLoopSyncedPersisted(Auction, ServerPorts, { stopped }).pipe(Layer.provide(files))
+      layerLoopSyncedPersisted(Auction, ServerPorts, { stopped, cut }).pipe(Layer.provide(files))
   })
 
 /**
@@ -127,17 +152,18 @@ const syncedLoop = (store: Option.Option<FileStore>, stopped: AuctionSyncOptions
  * of their own, so that the public router never carries them, and reads and writes the log's
  * storage in-process. The routes and the loop share one storage because both are built from one
  * `server` layer, provided outside the router. With a store directory the log is persisted in it
- * (`layerSyncStorage`), so it survives a restart of the host together with its id; without one it
- * lives in memory and a restart starts a new log.
+ * (`layerSyncStorage`), so it survives a restart of the host together with its id, and the loop cuts
+ * it every `cutEvery` entries; without one it lives in memory, which cannot be cut, and a restart
+ * starts a new log.
  */
-const hosting = ({ listen, store, stopped }: AuctionSyncOptions): AuctionSync => {
+const hosting = ({ listen, store, stopped, cutEvery }: AuctionSyncOptions): AuctionSync => {
   const files = Option.map(store, layerFileStore)
   const storage = Option.match(files, {
-    onNone: () => EventLogServerUnencrypted.layerStorageMemory,
+    onNone: () => layerSyncStorageMemory(Auction),
     onSome: (kv) => layerSyncStorage(Auction).pipe(Layer.provide(kv))
   })
   const server = layerSyncServer(Auction).pipe(Layer.provide(layerSyncAuthorization), Layer.provideMerge(storage))
-  const routes = RpcServer.layer(EventLogMessage.EventLogRemoteRpcs).pipe(
+  const routes = RpcServer.layer(SyncRpcs).pipe(
     Layer.provide(RpcServer.layerProtocolWebsocket({ path: EVENT_LOG_PATH })),
     Layer.provide(RpcSerialization.layerSchemaBinary())
   )
@@ -146,7 +172,8 @@ const hosting = ({ listen, store, stopped }: AuctionSyncOptions): AuctionSync =>
     Layer.provide(layerNodeServer(createServer, listen))
   )
   const log = layerSyncLogStorage(Auction).pipe(Layer.provide(server))
-  return { loop: syncedLoop(files, stopped).pipe(Layer.provide(log)), eventLog }
+  const cut = Option.isSome(files) ? { every: cutEvery } : undefined
+  return { loop: syncedLoop(files, stopped, cut).pipe(Layer.provide(log)), eventLog }
 }
 
 /**
@@ -156,7 +183,7 @@ const hosting = ({ listen, store, stopped }: AuctionSyncOptions): AuctionSync =>
 const joining = (url: string, { store, stopped }: AuctionSyncOptions): AuctionSync => {
   const log = layerSyncLogRemote(Auction).pipe(Layer.provide(layerProtocolTo(url)))
   const files = Option.map(store, layerFileStore)
-  return { loop: syncedLoop(files, stopped).pipe(Layer.provide(log)), eventLog: Layer.empty }
+  return { loop: syncedLoop(files, stopped, undefined).pipe(Layer.provide(log)), eventLog: Layer.empty }
 }
 
 /** The server's auction loop over the shared log (`layerLoopSynced`) for `target`, and the listener the log is served on, which only the host opens. */

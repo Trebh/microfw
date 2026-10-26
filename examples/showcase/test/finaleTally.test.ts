@@ -17,4 +17,8 @@ describe("tally", () => {
   it("counts a travel of either loop as a rewind and not as a step", () => {
     assert.deepStrictEqual(tally(emptyTally, { source: "stage", kind: "travel" }), { deck: 0, stage: 0, rewinds: 1 })
   })
+
+  it("counts a restore from the event log's snapshot as neither a step nor a rewind", () => {
+    assert.deepStrictEqual(tally(emptyTally, { source: "stage", kind: "restore" }), { deck: 0, stage: 0, rewinds: 0 })
+  })
 })

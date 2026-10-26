@@ -1,14 +1,18 @@
 import { assert, describe, it } from "@effect/vitest"
 import { Context, Effect, Exit, Layer, Scope } from "effect"
+import type { EventLogRemote } from "effect/eventlog"
 import { KeyValueStore } from "effect/persistence"
 import { AutoActions } from "../src/index.ts"
-import { layerLoopSyncedPersisted, LogId, type SyncLog } from "../src/SyncEntry.ts"
+import { layerLoopSyncedPersisted, LogId, SyncLog } from "../src/SyncEntry.ts"
 import { Counter, Ports } from "./fixtures/Counter.ts"
 import {
+  bootOver,
   countsOf,
   harness,
   type Instance,
   instanceOn,
+  joinedEntry,
+  losingNewestSegment,
   readLog,
   sharedStore
 } from "./fixtures/SyncHarness.ts"
@@ -40,6 +44,40 @@ const storedText = (store: Layer.Layer<KeyValueStore.KeyValueStore>) =>
   Effect.gen(function*() {
     const kv = Context.get(yield* Layer.build(store), KeyValueStore.KeyValueStore)
     return yield* kv.get(Counter.name)
+  })
+
+interface Logs {
+  readonly hostLog: Layer.Layer<SyncLog>
+  readonly clientLog: Layer.Layer<SyncLog, EventLogRemote.EventLogRemoteError>
+}
+
+const viaHost = (logs: Logs) => logs.hostLog
+const viaClient = (logs: Logs) => logs.clientLog
+
+/**
+ * A persisted instance that reaches the log through `reach` has stored a checkpoint at sequence 302
+ * (its own `Joined`, 300 entries, one proposal); then the host is stopped and rebuilt over a store
+ * that lost the log's newest segment, so that the log ends at sequence 256 and keeps its id.
+ */
+const truncatedAfterCheckpoint = (reach: (logs: Logs) => Layer.Layer<SyncLog, EventLogRemote.EventLogRemoteError>) =>
+  Effect.gen(function*() {
+    const hostStore = yield* sharedStore
+    const checkpointStore = yield* sharedStore
+    const first = yield* bootOver(hostStore)
+    const persisted = yield* persistedOn(reach(first), checkpointStore)
+    const hostLog = Context.get(yield* Layer.build(first.hostLog), SyncLog)
+    yield* Effect.forEach(Array.from({ length: 300 }, (_, index) => joinedEntry(index)), hostLog.append, {
+      discard: true
+    })
+    yield* persisted.instance.model.present(inc(1))
+    yield* settle
+    const { log } = yield* readLog(first.hostLog, 302)
+    const text = yield* storedText(checkpointStore)
+    yield* persisted.stop
+    yield* first.stop
+    yield* losingNewestSegment(hostStore)
+    const second = yield* bootOver(hostStore)
+    return { second, checkpointStore, log, text }
   })
 
 describe("layerLoopSyncedPersisted", () => {
@@ -111,6 +149,28 @@ describe("layerLoopSyncedPersisted", () => {
 
       assert.strictEqual(error._tag, "SyncLogMismatch")
       assert.strictEqual(yield* storedText(store), text)
+    }))
+
+  it.effect(
+    "fails with SyncLogBehind over a stored checkpoint that is past a log truncated after it was stored, and leaves the stored text as it was",
+    () =>
+      Effect.gen(function*() {
+        const { second, checkpointStore, log, text } = yield* truncatedAfterCheckpoint(viaClient)
+
+        const error = yield* Effect.flip(persistedOn(second.clientLog, checkpointStore))
+
+        assert.include(error as object, { _tag: "SyncLogBehind", log, applied: 302, last: 256 })
+        assert.strictEqual(yield* storedText(checkpointStore), text)
+      })
+  )
+
+  it.effect("fails with SyncLogBehind on the host's own instance when its store lost the log's newest entries", () =>
+    Effect.gen(function*() {
+      const { second, checkpointStore, log } = yield* truncatedAfterCheckpoint(viaHost)
+
+      const error = yield* Effect.flip(persistedOn(second.hostLog, checkpointStore))
+
+      assert.include(error as object, { _tag: "SyncLogBehind", log, applied: 302, last: 256 })
     }))
 
   it.effect("fails with a SchemaError over a stored model that is not a checkpoint, and leaves it as it was", () =>

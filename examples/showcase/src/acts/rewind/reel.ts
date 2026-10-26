@@ -9,7 +9,7 @@ export const BoxRecord = stepRecordSchema(BoxOffice)
 /** One exposure of the film: a record, reduced to what a frame shows. */
 export const Frame = Schema.Struct({
   seq: Schema.Int,
-  kind: Schema.Literals(["init", "step", "travel"]),
+  kind: Schema.Literals(["init", "step", "travel", "restore"]),
   label: Schema.String,
   travelledTo: Schema.Option(Schema.Int),
   seats: Schema.Array(SeatView),

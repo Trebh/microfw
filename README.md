@@ -161,6 +161,7 @@ The server is configured, not switched at runtime:
 | `MUFW_SYNC` | `host`: this instance serves the event log at `/eventlog` on its own listener (`MUFW_SYNC_PORT`) and joins it; `ws://<host>:<sync port>/eventlog`: this instance joins the log of that host; with either the server refuses `TravelTo` and `Replay` in `MUFW_RPCS`; `MUFW_STORE` makes the log (host) and the instance's checkpoint survive a restart | unset: one instance |
 | `MUFW_SYNC_PORT` | with `host`: the port of the event-log listener; it must differ from `MUFW_PORT` | `3101` |
 | `MUFW_SYNC_HOST` | with `host`: the interface the event-log listener binds; whoever reaches it can append any proposal, so set it only to a private interface | `127.0.0.1` |
+| `MUFW_SYNC_CUT_EVERY` | with `host` and `MUFW_STORE`: an integer of at least 1; the host replaces the entries of its log by a snapshot of the model once this many have been applied since the last snapshot, so the log stays short; a host without a store keeps its log in memory and never cuts | `1000` |
 
 `pnpm start:server` runs with the defaults, which are what `/server-owned.html` and `/devtools.html`
 need; `pnpm dev:server` serves every RPC, so every page that needs a server works (`/worker.html` needs none).
@@ -216,9 +217,16 @@ starts a new log, and a running joiner that finds it logs `sync log replaced` an
 start it again to join the new log. A stored checkpoint of another log, a checkpoint written without a
 lease, or a bare model stored by an
 instance without `MUFW_SYNC`, stops the server at start without being overwritten: delete
-`<directory>/auction` and start again. `pnpm --filter @mufw/example-auction test:sync:restart` starts a
-host and a joiner of its own, each with a store, on ports 3211, 3311 and 3212, restarts them in turn
-and checks all of this.
+`<directory>/auction` and start again. So does a checkpoint past the end of its host's log (the
+host's store lost its newest entries): the instance logs that the log ends before its checkpoint and
+stops with `SyncLogBehind`, and no entry is written to that log; delete `<directory>/auction` to join
+again from the first entry. The host with a store keeps its log short: every `MUFW_SYNC_CUT_EVERY`
+entries it replaces the oldest ones by a snapshot of the model, and an instance that starts from
+nothing (a joiner with no store, or one whose checkpoint is behind the cut) starts from that
+snapshot instead of replaying every entry. `pnpm --filter @mufw/example-auction test:sync:restart`
+starts a host and a joiner of its own, each with a store, on ports 3211, 3311 and 3212, restarts them
+in turn and checks all of this, including a host restarted over a store that lost its entries and a
+joiner with no store that starts from the host's snapshot.
 
 Only one instance at a time runs the automatic actions, and the log decides which. Each instance with
 `MUFW_AUTO_ACTIONS=on` (the default, the host and the joiners alike) takes part in a lease kept in the
@@ -226,7 +234,8 @@ log: the first to start against a log nobody has claimed takes it and ticks, the
 same next tick and drop it. The holder renews the lease every 5 seconds; an instance that has seen no
 renewal for 15 seconds takes the lease over and ticks from the state the auction is in, and the old
 holder, if it was only cut off, stops its automatic actions the moment it reads the entry that took the
-lease away. `MUFW_AUTO_ACTIONS=off` is an instance that never ticks and never claims. An instance that
+lease away. A tick it had finished by then, if it reaches the log after the takeover, is skipped by
+every instance: the entry stays in the log and changes no model. `MUFW_AUTO_ACTIONS=off` is an instance that never ticks and never claims. An instance that
 restarts holds nothing until it wins the lease again, so a lone instance resumes ticking 15 seconds
 after it restarts. The host carries the log: if it stops, the joiners stop with it. `pnpm --filter
 @mufw/example-auction test:sync:failover` starts a host that never ticks and two joiners of its own on

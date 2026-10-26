@@ -1,6 +1,6 @@
 # The SAM loop
 
-Living document. Source of truth: `packages/core/src/Definition.ts`, `Step.ts`, `History.ts`, `Layers.ts`, `Persistence.ts`, `Sync.ts`, `SyncLease.ts`, `SyncStorage.ts`, `SyncPersistence.ts`, `Nest.ts`, `Compose.ts`.
+Living document. Source of truth: `packages/core/src/Definition.ts`, `Step.ts`, `History.ts`, `Layers.ts`, `Persistence.ts`, `Sync.ts`, `SyncHead.ts`, `SyncLease.ts`, `SyncSnapshot.ts`, `SyncStorage.ts`, `SyncPersistence.ts`, `Nest.ts`, `Compose.ts`.
 
 ## Definition
 
@@ -88,8 +88,13 @@ page) into that model is the caller's job, at its composition root.
   whoever presented the last proposal, and one that needs a per-request service dies.
 - `AutoActions` (`Context.Reference<boolean>`, default `true`) set to `false` drops every `auto`
   intent. Path tests and a server under test use it so ticks cannot move the model between steps.
-  Under `layerLoopSynced` an `AutoActionsGate` also has to be open, which only the holder of the
-  instances' lease is (see [the lease](#the-lease)): `true` there means the instance takes part.
+  Under `layerLoopSynced` an `AutoActionsGate` also has to admit the intent, which it does only for
+  the holder of the instances' lease (see [the lease](#the-lease)): `true` there means the instance
+  takes part.
+- The drain asks the gate once, when it takes an `auto` intent, and the gate answers with the epoch
+  the instance holds. The drain keeps it for that action and presents the action's proposal with
+  `AutoEpoch` (`Context.Reference<Option<number>>`, `none` by default) set to it; no other proposal
+  is presented with it. Only a synced `ModelPort` reads it, any other ignores it.
 
 ### Travel and actions in flight
 
@@ -135,10 +140,13 @@ Interruption (a travel, or the scope closing) is not a defect and is not logged.
 
 ## History and time travel
 
-- Records: `{ seq, at, kind: "init" | "step" | "travel", proposal: Option, model, representation, travelledTo? }`.
+- Records: `{ seq, at, kind: "init" | "step" | "travel" | "restore", proposal: Option, model, representation, travelledTo? }`.
 - `travelledTo` is the seq whose model and representation a `travel` record restored (an
-  `Schema.optional(Schema.Int)`); it is absent on `init` and `step` records, and the `History` RPC
-  carries it because it is part of `stepRecordSchema`.
+  `Schema.optional(Schema.Int)`); it is absent on `init`, `step` and `restore` records, and the
+  `History` RPC carries it because it is part of `stepRecordSchema`.
+- A `restore` record is the model of an event log's snapshot replacing the instance's own (see
+  [Synchronisation across instances](#synchronisation-across-instances)). It has no proposal and
+  takes the next seq like any record.
 - `records` streams every retained record, then live ones, in seq order and without duplicates; a
   subscriber that lags more than the retained records skips the evicted ones (below).
 - `travelTo(seq)` sets model and representation from that record, appends a `travel` record with
@@ -164,7 +172,8 @@ Interruption (a travel, or the scope closing) is not a defect and is not logged.
   oldest records after seq 0 are evicted while the count exceeds `HistoryLimit` or the total exceeds
   the size bound; seq 0 (not counted: it is held whatever its size) and the newest record are always
   kept, even when that record alone is over the bound. A `travel` record costs nothing, since it
-  shares the model of the record it travelled to. The size is an estimate: evicting a record can
+  shares the model of the record it travelled to; a `restore` record costs like a `step`, its model
+  sharing nothing with its predecessor's. The size is an estimate: evicting a record can
   leave its successor holding parts it was counted as sharing with it.
 - Seqs are never reused: the retained records are seq 0 followed by a consecutive window starting at
   the oldest kept seq. `records` replays them, not the evicted gap.
@@ -190,8 +199,8 @@ Interruption (a travel, or the scope closing) is not a defect and is not logged.
 | `replayFrom(def, records, seq)` | pure, `Result<ReadonlyArray<StepRecord>, NoSuchStep>`: starts from the model of record `seq`, re-applies the proposal of every later `step` record with `applyProposal`, and returns the recomputed records (recorded `seq`, `at` and proposal; recomputed model and representation). `NoSuchStep` when `records` has no record `seq` |
 | `replayInto(ports, records, seq)` | `Effect<void, NoSuchStep \| ReplayBaseMismatch, ModelPort \| HistoryPort>`: `HistoryPort.travelTo(seq)`, a check that the live representation equals the one recorded at `seq` (`Equal.equals`), then `HistoryPort.replay` of each later recorded proposal, in order; nothing else of the loop is touched |
 
-- Only `step` records are replayed; a `travel` record after `seq` is skipped. The loop appends a
-  `travel` record and one `step` per proposal under its own next seqs, so a recorded
+- Only `step` records are replayed; a `travel` or `restore` record after `seq` is skipped. The loop
+  appends a `travel` record and one `step` per proposal under its own next seqs, so a recorded
   `travelledTo` cannot be honoured.
 - `replayInto` fails with `NoSuchStep` before touching the ports when `records` has no record `seq`,
   and with the port's `NoSuchStep` when the loop no longer retains it (seq 0 is always retained).
@@ -223,7 +232,7 @@ memory, a directory of files or any other implementation.
 | Function | Contract |
 |---|---|
 | `loadModel(def, key?)` | `Effect<Option<ModelOf<D>>, KeyValueStoreError \| SchemaError, KeyValueStore>`: the JSON text under `key` (default `def.name`) decoded with `def.model`; `none` when the key is absent |
-| `layerPersistModel(def, ports, key?)` | background fiber over `HistoryPort.records`: writes `record.model` under `key` for the newest `step` or `travel` record, coalescing the records that commit while a write is in flight. Requires `KeyValueStore`, `HistoryPort` |
+| `layerPersistModel(def, ports, key?)` | background fiber over `HistoryPort.records`: writes `record.model` under `key` for the newest `step`, `travel` or `restore` record, coalescing the records that commit while a write is in flight. Requires `KeyValueStore`, `HistoryPort` |
 | `layerLoopPersisted(def, ports, key?)` | `loadModel`, then `layerLoopLocal(def, ports, { initial })` (`def.initial` when `none`) with `layerPersistModel` on top; provides what `layerLoopLocal` provides, fails like `loadModel` |
 
 - **Parse, don't validate.** Stored text is untrusted: it is decoded once, at load, with the
@@ -287,16 +296,21 @@ writes reach its `Storage` (`remoteSequence`, assigned inside one transaction). 
 
 | Part | Contract |
 |---|---|
-| `SyncLog` | `Context.Service`: `append(entry)` and `follow(from)`, a scoped subscription to the entries with `remoteSequence >= from` in sequence order, then live ones, every client's own included, that also says which log it follows (`LogId`) |
-| `layerLoopSynced(def, ports, options?)` | `layerLoopLocal` over a `SyncLog`. Requires `SyncLog` and the actions' services; provides the five ports and `AutoActionsGate`; fails with `SyncLogMismatch` when the log is not the one `options.resume` names. `options`: `resume` (a `SyncCheckpoint`: `log`, `sequence`, `model`, `lease`), `checkpoints` (a queue offered the checkpoint after each applied entry), `stopped` (a `Deferred` failed with the `SyncLogMismatch` of a running instance), `lease` (`renewEvery` default 5 seconds, `timeout` default 15 seconds) |
-| `layerSyncServer(def)` | the `EventLogRemoteRpcs` handlers over the `Storage` in context, one store per definition (`syncStoreId`). Requires `Storage`, `EventLogServerAuthorization` and a `Registry` it builds itself. Only `Proposal` entries (decoded with the definition's `proposal` schema; one that does not decode is refused), `Lease` entries (decoded with the `Lease` schema, likewise) and `Joined` entries have a handler. An entry with another tag is stored undecoded unless the authorization refuses it |
-| `layerSyncStorage(def)` | the event-log `Storage` over a `KeyValueStore`: the log's id and entries persist, so the log survives its host's restart. Fails when a stored value does not decode |
-| `layerSyncAuthorization` | `EventLogServerAuthorization`: any identity may read; a write is refused (`Unauthorized` to the client) unless every entry is a `Proposal`, a `Joined` or a `Lease`. It does not say who may write: the endpoint is for trusted instances only |
-| `layerSyncLogStorage(def)` | a `SyncLog` over the server's own `Storage`: the host process appends and reads in-process, in the same transaction and sequence as the RPC writers; the log's id is the storage's |
-| `layerSyncLogClient(def)`, `layerSyncLogRemote(def)` | a `SyncLog` over `EventLogRemote.makeUnencrypted` and a generated identity; the first needs `EventLogRemoteClient`, the second the client `RpcClient.Protocol` (websocket, `RpcSerialization.layerSchemaBinary`: entries are binary) |
-| `layerLoopSyncedPersisted(def, ports, options?)`, `loadCheckpoint(def, key?)` (`SyncPersistence.ts`) | `layerLoopSynced` that resumes from the stored checkpoint and stores one after each applied entry (see [below](#persisting-an-instance-of-a-log)); requires `KeyValueStore` and `SyncLog` |
-| `AutoActionsGate` | `Context.Service` with `open: Effect<boolean>`: the actions drain asks it each time an automatic intent is about to start and drops the intent unless it is open and `AutoActions` is true. `layerLoopSynced` provides it, open while the instance holds the lease |
-| `leaseOutcome`, `applyLease`, `LeaseState`, `Lease`, `noLease`, `LeaseTimings` (`SyncLease.ts`) | the pure rule every instance applies to lease entries, the schemas of the lease in the log and in a checkpoint, and the timings (`renewEvery`, `timeout`) that `options.lease` takes |
+| `SyncLog` | `Context.Service`: `append(entry)` and `follow(from)`, a scoped subscription to the entries with `remoteSequence >= from` in sequence order, then live ones, every client's own included, that also says which log it follows (`LogId`) and where that log ends (`last`: the sequence of its newest entry when the subscription opened, 0 for a log with none); and `cut?`, there only when the log's owner can cut it (`LogCut`: `base` and `cut`, see the cut below) |
+| `layerLoopSynced(def, ports, options?)` | `layerLoopLocal` over a `SyncLog`. Requires `SyncLog` and the actions' services; provides the five ports and `AutoActionsGate`; fails with `SyncLogMismatch` when the log is not the one `options.resume` names, `SyncLogBehind` when it ends before the checkpoint, `SyncSnapshotUnreadable` when a snapshot it reads cannot be applied and `SyncCutUnsupported` when `options.cut` is given over a log that cannot cut. `options`: `resume` (a `SyncCheckpoint`: `log`, `sequence`, `model`, `lease`), `checkpoints` (a queue offered the checkpoint after each applied entry), `stopped` (a `Deferred` failed with the `SyncStop` of a running instance), `lease` (`renewEvery` default 5 seconds, `timeout` default 15 seconds), `cut` (`SyncCutOptions`: the host's applier cuts the log every `every` entries) |
+| `SyncLogMismatch`, `SyncLogBehind`, `SyncSnapshotUnreadable`, `SyncStop` | the typed reasons an instance stops applying its log: the log is not the one it joined; the log ends before the entry the instance has applied (`applied`, `last`); a snapshot it reads does not decode with the definition's model schema, or stands for another sequence than the one it is delivered at. `SyncStop` is their union, what `options.stopped` fails with |
+| `SyncHead`, `Sync.Head`, `SyncRpcs`, `SyncClient` (`SyncHead.ts`) | `SyncHead` is a `Context.Service` with `last: Effect<number>`, the sequence of the newest entry a storage holds (0 for none), which `Storage` cannot say: the storage that backs a log provides it. `Sync.Head` is an RPC with no payload that answers `LogHead { remoteId, last }`, the log's id and end read together; like `EventLog.Hello` it is not authenticated and changes nothing. `SyncRpcs` is `EventLogRemoteRpcs` merged with it, what a host serves (`RpcServer.layer(SyncRpcs)`); `SyncClient` is the client of `SyncRpcs`, which `layerSyncLogClient` hands to `EventLogRemote` as its own client |
+| `Proposal`, `AutoProposal`, `Joined`, `Lease`, `Snapshot` (`syncGroup(def)`) | the events of the log. `Proposal` carries a proposal that no automatic action produced (a user intent, `Present`), encoded with the definition's `proposal` schema. `AutoProposal { epoch, proposal }` (`autoProposalSchema`) carries a proposal an automatic action produced and the epoch the action started under (see [the lease](#the-lease)). `Joined` carries nothing: it is the marker of an instance's join. `Lease` carries a claim or a renewal. `Snapshot { through, model, lease, applied }` (`snapshotPayload`) carries the log's state after a sequence: only a cut writes one |
+| `layerSyncServer(def)` | the `SyncRpcs` handlers over the `Storage` and the `SyncHead` in context, one store per definition (`syncStoreId`). Requires `Storage`, `SyncHead`, `EventLogServerAuthorization` and a `Registry` it builds itself. `Proposal` entries (decoded with the definition's `proposal` schema), `AutoProposal` entries (decoded with `autoProposalSchema`: an epoch of at least 1 and a proposal of the definition), `Lease` entries (decoded with the `Lease` schema) and `Joined` entries have a handler, and one that does not decode is refused. A `Snapshot` is refused whatever it holds, since only the cut writes one. An entry with another tag is stored undecoded unless the authorization refuses it |
+| `layerSyncStorage(def)` | the event-log `Storage` over a `KeyValueStore`, with the log's `SyncHead` and its `SyncStorageCut`: the log's id and entries persist, so the log survives its host's restart. Fails when a stored value does not decode |
+| `layerSyncStorageMemory(def)` | Effect's in-memory `Storage` with a `SyncHead` over it: the log is gone with the process, and it has no `SyncStorageCut`. Effect's own `layerStorageMemory` has no `SyncHead`, so it does not serve a sync log |
+| `layerSyncAuthorization` | `EventLogServerAuthorization`: any identity may read; a write is refused (`Unauthorized` to the client) unless every entry is a `Proposal`, an `AutoProposal`, a `Joined` or a `Lease`, the events a client may write; a `Snapshot` is refused as `"<event>" is not an event a client may write to this log`. It does not say who may write: the endpoint is for trusted instances only |
+| `layerSyncLogStorage(def)` | a `SyncLog` over the server's own `Storage` and `SyncHead`: the host process appends and reads in-process, in the same transaction and sequence as the RPC writers; the log's id is the storage's and its end is the head's; it can cut when the storage provides `SyncStorageCut` |
+| `layerSyncLogClient(def)`, `layerSyncLogRemote(def)` | a `SyncLog` over `EventLogRemote.makeUnencrypted` and a generated identity, which asks the server for its id and end (`Sync.Head`) at each subscription; it cannot cut. The first needs `SyncClient`, the second the client `RpcClient.Protocol` (websocket, `RpcSerialization.layerSchemaBinary`: entries are binary), which carries `SyncRpcs` |
+| `layerLoopSyncedPersisted(def, ports, options?)`, `loadCheckpoint(def, key?)` (`SyncPersistence.ts`) | `layerLoopSynced` that resumes from the stored checkpoint and stores one after each applied entry (see [below](#persisting-an-instance-of-a-log)); takes `key`, `stopped`, `lease` and `cut` as `layerLoopSynced` does; requires `KeyValueStore` and `SyncLog` |
+| `AutoActionsGate`, `AutoEpoch` | `AutoActionsGate` is a `Context.Service` with `admit: Effect<Option<epoch>>`: the actions drain asks it each time an automatic intent is about to start and drops the intent unless it answers `some(epoch)` and `AutoActions` is true. The drain presents the action's proposal with `AutoEpoch` set to that epoch; `AutoEpoch` is `none` for every other proposal. `layerLoopSynced` provides the gate, answering the lease's epoch while the instance holds the lease, and reads `AutoEpoch` to choose the event it appends |
+| `leaseOutcome`, `applyLease`, `installLease`, `isCurrentEpoch`, `Epoch`, `LeaseState`, `Lease`, `noLease`, `LeaseTimings` (`SyncLease.ts`) | the pure rule every instance applies to lease entries, the rule that decides whether an `AutoProposal` is applied (`isCurrentEpoch`: its epoch is the lease's at that position of the log), the replacement of the lease by a snapshot's, `Epoch` (the number of a claim that won, 1 or more), the schemas of the lease in the log and in a checkpoint, and the timings (`renewEvery`, `timeout`) that `options.lease` takes |
+| `SyncStorageCut`, `LogCut`, `SyncCutOptions`, `SyncCutUnsupported`, `makeCutter` (`SyncSnapshot.ts`) | the cut of the log (see below): `LogCut` is `base` (the sequence of the log's snapshot, 0 for a log never cut) and `cut(request)`, which `layerSyncStorage` provides as `SyncStorageCut`; `SyncCutOptions { every }` is `options.cut`; `SyncCutUnsupported` fails the build when `options.cut` is given over a log with no cut |
 
 ```mermaid
 sequenceDiagram
@@ -318,14 +332,16 @@ sequenceDiagram
   produced before the log has ordered it. The applier alone calls the local model's `present`.
 - **No echo.** The applier presents to the replica, never to the exposed port, so an entry read from
   the log is not written back; each proposal is applied exactly once per instance.
-- **`present` returns once the instance has applied the proposal**, not once the log accepted it: the
-  caller then reads its own write.
+- **`present` returns once the instance has applied the proposal, or skipped it** (see
+  [the lease](#the-lease)), not once the log accepted it: the caller then reads its own write.
 - **A lost connection is not a failure of `present`.** A failure of the append that is not an answer
   of the server (the socket dropped with the write in flight, so it is not known whether the log
   stored it) is retried with the same entry, same id, every second: the event-log server drops an
-  entry whose id it holds, so the retry cannot store it twice. `present` also returns as soon as the
-  entry comes back through the subscription, even if its append was never confirmed. Only the server's own
-  answer, an authorization refusal or a payload that does not decode, is a defect. While the log is
+  entry whose id it holds, so the retry cannot store it twice, also after the entry has been cut
+  away, for as long as its id is among those a snapshot keeps (the cut, below). `present` also
+  returns as soon as the entry comes back through the subscription, even if its append was never
+  confirmed. Only the server's own answer, an authorization refusal or a payload that does not
+  decode, is a defect. While the log is
   out of reach `present` waits, and so does building the layer: the example's transport holds a
   request made while the socket is down until the next connection (`layerHoldRequestsWhileDisconnected`),
   so an instance started while the host is unreachable has its port open but answers nothing, every
@@ -338,69 +354,136 @@ sequenceDiagram
 - **Actions stay local.** An intent runs its action (credit check, identity, clock) on the instance
   that received it; only the proposal travels, with everything the acceptors need (`at`, `now`). An
   acceptor that reads anything else is not deterministic across instances.
-- **Catch-up: replay from the first entry, or from a checkpoint; no snapshot of the log itself.** Without
-  `options.resume` the layer starts the applier at sequence 0 from `def.initial` and appends a `Joined`
-  entry; with a checkpoint it starts from the checkpoint's model at the entry after its sequence,
-  and only then appends it. The layer is built once that entry has been applied, and entries are
+- **Catch-up: replay from the first entry, or from a checkpoint.** Without `options.resume` the layer
+  starts the applier at sequence 0 from `def.initial` and reads the log from its first entry, which
+  on a log that has been cut is a `Snapshot` the instance restores its model from (see the cut,
+  below); with a checkpoint it starts from the checkpoint's model at the
+  entry after its sequence, and an instance whose checkpoint is at or after the cut never reads the
+  snapshot. It appends a `Joined` entry once its first subscription has been accepted, so a log it
+  refuses is never written to, and the layer is built once that entry has been applied. Entries are
   applied in order, so everything the log held when the instance joined is in its model before it
-  serves. The cost is the log's length, or the length of its tail past the checkpoint. A `Joined`
-  entry changes no model; it is the marker of that moment. An instance with `AutoActions` true then
-  takes part in the lease, which is also decided before the layer is built when nobody has claimed it.
+  serves. The cost is the length of the log the host retains, or the length of its tail past the
+  checkpoint. A `Joined` entry changes no model; it is the marker of that moment. An instance with
+  `AutoActions` true then takes part in the lease, which is also decided before the layer is built
+  when nobody has claimed it.
 - **The log has an identity, and an instance reads only the log it joined.** Sequences mean something
   within one log only. The server's `Storage` has an id (`Storage.getId`, 16 random bytes generated when
   the log is created and kept with it); `LogId` is its lowercase hex. `SyncLog.follow(from)` answers
-  with the id of the log it subscribed to (the host's process reads its storage; a client asks the
-  server, `EventLog.Hello`, after the subscription is open, so a server replaced in between has already
-  dropped the connection the subscription is on). The loop takes the id at its first subscription, or
+  with the id of the log it subscribed to and the sequence of the log's newest entry (`last`): the
+  host's process reads its storage and its `SyncHead`; a client asks the server, `Sync.Head`, which
+  answers both at once, after the subscription is open, so a server replaced in between has already
+  dropped the connection the subscription is on. The loop takes the id at its first subscription, or
   from the checkpoint it resumes, and every later subscription must report the same one. Another id is
-  a `SyncLogMismatch` and nothing from that subscription is applied. Before the layer is built the
-  build fails with it. Afterwards the applier ends (the resubscription does not retry it; a replica
-  that applied another log's entries cannot be reset), an error is logged, `options.stopped` fails with
-  the mismatch and `present` dies with it rather than wait for an entry nothing will apply; the
-  example waits on `stopped` and ends the process with that error, and an instance restarted without
-  a checkpoint joins the new log from its first entry.
+  a `SyncLogMismatch` and nothing from that subscription is applied. The id is checked first, since
+  the length of another log means nothing. Then the length: a log whose `last` is below the sequence
+  of the entry the instance has applied (the checkpoint's, or the last one it read) has lost its
+  newest entries, and what it appends next would take sequences the instance has seen and would never
+  give it; that is a `SyncLogBehind`, and nothing from that subscription is read and nothing is
+  appended to that log, so a refused log gets no `Joined`. A log that ends exactly at the entry the
+  instance applied is not behind. Before the layer is built the build fails with either error.
+  Afterwards the applier ends (the resubscription does not retry it; a replica that applied another
+  log's entries cannot be reset), an error is logged, `options.stopped` fails with the `SyncStop` and
+  `present` dies with it rather than wait for an entry nothing will apply; the example waits on
+  `stopped` and ends the process with that error, and an instance restarted without a checkpoint joins
+  the new log from its first entry. A snapshot the instance cannot read stops it the same way
+  (`SyncSnapshotUnreadable`).
 - **Resubscription.** When the stream of entries fails (a lost connection) it is subscribed again after
   a second from the next unapplied sequence, so no entry is applied twice or skipped; the log it
-  reports is checked against the joined one each time.
+  reports is checked against the joined one each time, its id and then its end.
 - **A proposal that does not decode, or whose acceptor dies,** is logged and skipped; all instances
   skip it alike. Instances of different versions of the definition can disagree.
+- **Upgrading.** An instance that does not know an event of the log ignores it and goes on with a
+  model the others do not share; it does not stop. Upgrade every instance together, then enable what
+  depends on it: an old instance ignores every `AutoProposal` a new one writes, and a `Snapshot`, so
+  `options.cut` is enabled only when every instance reads one, and a host that has cut is not replaced
+  by one that predates cuts. A new instance against an old host fails loudly instead: the old
+  authorization refuses its `AutoProposal` (`present` dies, the drain logs "action died", nothing
+  ticks), and a joiner against a host that serves only `EventLogRemoteRpcs` finds `Sync.Head`
+  unanswered, so its build waits and retries every second, logging the cause: upgrade hosts before
+  joiners.
 - **`nap` runs on every instance, and the log decides which one runs its intents**: see
   [the lease](#the-lease). Each instance derives the same next intent from the same model, so without
   a rule the auction would receive a tick per instance and second.
 - **What breaks convergence.** `HistoryPort.travelTo` and `HistoryPort.replay` move one instance's
   model away from the log (the example's server refuses `TravelTo` and `Replay` with `MUFW_SYNC`).
+  On a host that cuts the log they do worse than diverge one instance: the snapshot carries the
+  host's model, moved or not, into the shared log and to every instance that starts from it.
   A model restored from elsewhere is not the log's, so the loop takes no `initial`, and the bare model
-  that `layerLoopPersisted` stores is not one of the log's. The one model an instance may start from,
-  other than `def.initial`, is a checkpoint of the log it joins: the model that applying the log's
+  that `layerLoopPersisted` stores is not one of the log's. The models an instance may start from,
+  other than `def.initial`, are a checkpoint of the log it joins: the model that applying the log's
   entries up to `sequence` to `def.initial` gave, the log being the one named by `log`, which is why
-  `options.resume` carries all three and the layer checks the log's id before it applies anything.
+  `options.resume` carries all three and the layer checks the log's id before it applies anything; and
+  a snapshot that log delivers, the model its host had after the entries up to `through`.
   Instances applying the same log hold the same `seq`, `model` and `proposal` for each record that
   started from the same model; only `at`, the instance's own commit time, differs. An instance that
   resumed has fewer records than one that replayed, with other `seq`s, since its history starts at the
-  checkpoint.
-- **The log lives in the host's `Storage`.** `layerSyncServer` takes the `Storage` in context, and
-  its order of entries is the order in which writes reach it. In memory
-  (`EventLogServerUnencrypted.layerStorageMemory`) the log is gone with the process and a restarted
-  host starts a new one, with a new id: the instances that joined the old one find it at their next
-  subscription and stop. `layerSyncStorage(def)` keeps the log in a `KeyValueStore`, so a restarted
-  host serves the same entries at the same sequences under the same id: its instances resubscribe from
-  their next sequence and go on. It stores the id under `<name>/log/id` and the entries 256 to a key
-  under `<name>/log/<n>` (appending rewrites one such key, not the log), reads all of them when it is
-  built, and persists an entry before it publishes it, so no subscriber reads an entry a restart
-  would lose. An entry the store refuses is a defect of its writer (a persistence failure to an RPC
-  client), never delivered. What a crash leaves is the store's to say (the example's
-  `layerAtomicFileStore` syncs each write); a log whose newest entries a store lost can sit behind
-  an instance's checkpoint, which is not detected (see `docs/TODO.md`). Session authentication
-  bindings stay in memory: an instance has a new identity each time it starts, so none would be read
-  again.
+  checkpoint; one that restored from a snapshot has a `restore` record in place of the entries the
+  snapshot stands for.
+- **The log lives in the host's `Storage`.** `layerSyncServer` takes the `Storage` and the `SyncHead`
+  in context, and its order of entries is the order in which writes reach the `Storage`. In memory
+  (`layerSyncStorageMemory`) the log is gone with the process and a restarted host starts a new one,
+  with a new id: the instances that joined the old one find it at their next subscription and stop.
+  `layerSyncStorage(def)` keeps the log in a `KeyValueStore`, so a restarted host serves the same
+  entries at the same sequences under the same id: its instances resubscribe from their next sequence
+  and go on. It stores the id under `<name>/log/id` and the entries 256 to a key under
+  `<name>/log/<n>` (appending rewrites one such key, not the log), reads all the live ones when it is
+  built, and persists an entry before it publishes or counts it, so no subscriber reads an entry a
+  restart would lose. An entry the store refuses is a defect of its writer (a persistence failure to
+  an RPC client), never delivered. What a crash leaves is the store's to say (the example's
+  `layerAtomicFileStore` syncs each write). A log whose newest entries a store lost ends before the
+  checkpoints of its instances, and they stop with `SyncLogBehind`; a log restored from a backup and
+  grown back past a checkpoint's sequence is not noticed, since it has the same id and ends beyond
+  that sequence while holding other entries under the sequences the instance applied (see
+  `docs/TODO.md`).
+  A cut stores the `Snapshot` as the first entry of the segment that holds `through`: that one write
+  commits the cut, a segment being the previous content or the new one. Then `<name>/log/start`, the
+  index of the first live segment (absent for a log never cut), is written and the older segments are
+  removed. A failure of either is logged and the cut stands: on load the newest segment that begins
+  with a `Snapshot` wins over the older ones, the log starts at that snapshot's `through`, and the
+  segments below it are removed (the tidy), so the next build finishes a cut that stopped. A log
+  stored before cuts existed loads as it was and nothing is written. The snapshot keeps the ids of
+  the last `every` entries it stands for, and the storage answers the event-log server's duplicate
+  check for each of them as if the entry were still there, so a writer's resend of an entry cut away
+  is dropped, not stored again, while its id is in that window. The limit: a writer cut off from the
+  log for longer, with more than `every` entries cut in the meantime, may get its resend stored and
+  applied again (`docs/TODO.md`). Session authentication bindings stay in memory: an instance has a
+  new identity each time it starts, so none would be read again.
+- **The log is cut, so that it does not grow without end.** With `options.cut` (`SyncCutOptions`; the
+  example's `MUFW_SYNC_CUT_EVERY`) the host's own loop, the one instance that holds the model at a
+  sequence next to the storage, hands the checkpoint it has just built to a cutter once the sequence
+  it applied is at least `every` past the log's last cut (`LogCut.base`, read from the log, so a
+  restarted host counts from the same point). The cutter asks the log (`SyncLog.cut`, which
+  `layerSyncLogStorage` has over a `SyncStorageCut`) to replace entries `1..through` by one
+  `Snapshot { through, model, lease, applied }` stored at sequence `through`: sequences, the log's id
+  and every checkpoint keep their meaning. It runs in a fiber of the layer's scope, one cut at a time,
+  so a slow or failing storage costs the applier nothing; a failure is logged and the next cut is
+  tried `every` entries later. Only the host can cut: a memory host (`layerSyncStorageMemory`) and a
+  joiner have no cut, and `options.cut` over them fails the build with `SyncCutUnsupported`.
+  An instance that subscribes from a sequence at or before `through` receives the snapshot as its
+  first entry. It installs the snapshot's lease (interrupting its automatic actions in flight first
+  when that takes the lease from it), replaces its model with the snapshot's (a history record of kind
+  `restore`, with no proposal), runs `nap` again, and releases every caller waiting for an entry whose
+  id is in `applied`: such an entry was cut away before its writer heard it. An instance whose
+  checkpoint is at or after `through` never receives it. A snapshot that does not decode with the
+  definition's model schema, or whose `through` is not the sequence it is delivered at, stops the
+  instance with `SyncSnapshotUnreadable`, as a foreign log does: skipping it would leave a model no
+  other instance has. A cut also drops the `Joined` and `Lease` entries it stands for, so they
+  accumulate only between cuts, and the log stops being an audit trail: the entries before the
+  snapshot are gone, while each instance's own history is not touched. A cut host that is replaced
+  by a version without cuts cannot read what it left; downgrading is not supported.
 - **The log is for trusted instances only.** Whoever can write to the event-log endpoint can append any
   proposal that decodes, and every instance applies it: it bypasses the sessions and the credit check
   of the RPC that would have produced the proposal, the way `Present` does on one server. The write is
   open to every identity because the server's authorization interface sees only a generated public
   key, never the connection, so a shared secret has nowhere to be checked.
-  `layerSyncAuthorization` still refuses entries of events the log does not hold, and the example
-  serves the endpoint on a listener of its own (`MUFW_SYNC_PORT`) on a router of its own, bound to
-  `127.0.0.1` unless `MUFW_SYNC_HOST` says otherwise, never on the public port.
+  `layerSyncAuthorization` still refuses entries of events a client may not write, those the log does
+  not hold and `Snapshot`, which only the host's cut writes; a `Snapshot` is refused three times, by
+  the authorization, by the server's handler and by the storage, whose `write` dies on one, since a
+  writer that could append one would replace the model of every instance. An `AutoProposal` that names
+  the current epoch has the same power as a `Proposal`: the epoch fence (below) guards against honest
+  stale holders, not against a writer of this endpoint. The example serves the endpoint on a listener
+  of its own (`MUFW_SYNC_PORT`) on a router of its own, bound to `127.0.0.1` unless `MUFW_SYNC_HOST`
+  says otherwise, never on the public port.
 
 ### The lease
 
@@ -423,15 +506,17 @@ would receive a tick per instance and second. Which instance runs them is decide
   log, and two instances that claim at the same moment end with the one whose claim the log ordered
   first.
 - **An instance runs automatic actions only while it holds the lease.** `layerLoopSynced` provides an
-  `AutoActionsGate`, open while the state names this instance, and the actions drain drops an automatic
-  intent unless the gate is open and `AutoActions` is true. `nap` still runs on every instance; its
-  intents are dropped on the others. When an instance applies its own winning claim it runs `nap` again
-  for the state it is in, since the intent `nap` returned until then was dropped, so a takeover continues
-  the tick loop instead of waiting for the next proposal.
+  `AutoActionsGate` that admits an automatic intent, under the lease's epoch, only while the state
+  names this instance, and the actions drain drops an automatic intent unless the gate admits it and
+  `AutoActions` is true. `nap` still runs on every instance; its intents are dropped on the others.
+  When an instance applies its own winning claim it runs `nap` again for the state it is in, since the
+  intent `nap` returned until then was dropped, so a takeover continues the tick loop instead of
+  waiting for the next proposal.
 - **Taking the lease away stops the old holder at once.** The instance that applies an entry that
   makes another instance the holder interrupts its automatic actions in flight, before it applies the
   next entry, as `travelTo` does; the interrupted action does not present. Automatic intents that
-  `nap` returns afterwards are dropped by the gate.
+  `nap` returns afterwards are dropped by the gate. An action that had already presented is handled
+  by the epoch fence below.
 - **Who claims, and when.** `AutoActions` true means the instance takes part in the lease; false means it
   never runs automatic actions and never claims, though it applies lease entries. A participant that
   finds a log nobody has claimed appends the claim for epoch 1 right after its `Joined` entry and the
@@ -445,15 +530,29 @@ would receive a tick per instance and second. Which instance runs them is decide
   the lease its earlier run held belongs to a holder that no longer exists and expires like any other:
   a lone instance that restarts takes the lease back after the timeout. The lease state is part of the
   checkpoint, so a resumed instance applies the entries after `sequence` against the epoch they were
-  written under.
-- **The window of a deposed holder.** An action that has finished and appended its proposal before its
-  instance applies the entry that deposed it is in the log and is applied by everyone, as any entry
-  before a later one is: leases bound the duplication to the time an instance takes to hear of its
-  loss (a partition, a pause), they do not fence the proposals of a holder that has not heard.
+  written under; it is part of a snapshot too, which an instance that restores from it installs. That
+  does not count as hearing the holder, so the silence clock still starts when the instance has
+  caught up.
+- **A deposed holder's proposal is fenced by its epoch.** An automatic action's proposal is written as
+  `AutoProposal { epoch, proposal }`, the epoch being the one the gate admitted the action under when
+  it started, not the one the instance holds when the action ends: an instance deposed and then
+  re-elected would otherwise present a stale action as current. Every instance applies an
+  `AutoProposal` only if its epoch is the lease's at that entry's position in the log
+  (`isCurrentEpoch`) and otherwise logs it and skips it. So the proposal of a holder that has not yet
+  heard it was deposed, and that reaches the log after the successor's claim, stays in the log and is
+  skipped by every instance, while one the log orders before the claim was the holder's to make and is
+  applied. A skipped entry changes no model and makes no history record, but it is consumed as any
+  entry is: the checkpoint moves past it and the caller waiting for it is released. A user intent's
+  proposal is never stamped, so it is a `Proposal` and is applied wherever the log orders it, and the
+  bare `Proposal`s that automatic actions wrote into logs stored before the fence are applied as they
+  were. The fence guards honest stale holders, not a hostile writer (see
+  [trusted instances only](#synchronisation-across-instances)).
 - **`core/test/SyncLease.test.ts`** shows it over the in-memory log with `TestClock`: one ticker for two
   participants, takeover after the timeout when the holder's scope closes, a single winner of two
   simultaneous claims, a holder cut off from the log that is deposed, loses its action in flight and
-  claims a later epoch, and a checkpoint that carries the lease. `pnpm --filter @mufw/example-auction
+  claims a later epoch, a checkpoint that carries the lease, and the proposal of a deposed holder that
+  reaches the log after the successor's claim, which is skipped when an action made it and applied
+  when a user did. `pnpm --filter @mufw/example-auction
   test:sync:failover` shows it across processes.
 
 ### Persisting an instance of a log
@@ -478,12 +577,15 @@ failed write is logged, not fatal).
   `sequence + 1`. Entries between the checkpoint and the log's end are applied in order, so the
   instance ends where an instance that replayed the whole log ends (`core/test/Sync.test.ts`,
   `SyncPersistence.test.ts`). A checkpoint a write behind is harmless: the instance reads a few more
-  entries.
-- **A checkpoint of another log is refused, not replayed over.** When the log's id is not the stored
-  one the layer fails with `SyncLogMismatch` and the record is left as it was. Starting from
-  `def.initial` instead would be correct for the log but would discard a stored model without saying
-  so, as falling back on a stored value that does not decode would; the operator who knows the log was
-  replaced deletes the record, and the instance then replays the new log from its first entry.
+  entries. When the log was cut past the checkpoint's sequence, the first entry it reads is the
+  snapshot, which replaces the stored model with the log's.
+- **A checkpoint of another log, or past the end of its log, is refused, not replayed over.** When the
+  log's id is not the stored one the layer fails with `SyncLogMismatch`, and when the log ends before
+  the stored sequence (a store that lost its newest entries, a restored backup) with `SyncLogBehind`;
+  the record is left as it was either way. Starting from `def.initial` instead would be correct for
+  the log but would discard a stored model without saying so, as falling back on a stored value that
+  does not decode would; the operator who knows the log was replaced or lost entries deletes the
+  record, and the instance then replays the log from its first entry.
 - **A checkpoint is trusted, not recomputed.** It is the log's state only for the acceptors that
   produced it: after a change to the definition's acceptors, delete the records, so that the log is
   replayed with the new ones.

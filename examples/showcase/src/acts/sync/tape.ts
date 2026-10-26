@@ -1,5 +1,14 @@
 import { applyProposal } from "@mufw/core"
-import { applyLease, Lease, type LeaseOutcome, type LeaseState, leaseOutcome, noLease } from "@mufw/core/sync"
+import {
+  applyLease,
+  autoProposalSchema,
+  isCurrentEpoch,
+  Lease,
+  type LeaseOutcome,
+  type LeaseState,
+  leaseOutcome,
+  noLease
+} from "@mufw/core/sync"
 import { Cause, Effect, Option, Schema } from "effect"
 import { Event, EventJournal } from "effect/eventlog"
 import { type Model as BoxModel, Proposal } from "../../domain/BoxOffice.ts"
@@ -8,6 +17,7 @@ import { Synced } from "./ticketHouse.ts"
 /** What one log entry says, read from its binary payload with the schemas the log's server decodes it with. */
 export type Body =
   | { readonly _tag: "Proposal"; readonly proposal: Proposal }
+  | { readonly _tag: "AutoProposal"; readonly epoch: number; readonly proposal: Proposal }
   | { readonly _tag: "Joined" }
   | { readonly _tag: "Lease"; readonly lease: Lease }
   | { readonly _tag: "Unreadable"; readonly event: string }
@@ -20,13 +30,24 @@ export interface Logged {
 }
 
 const proposalEvent = Event.make({ tag: "Proposal", primaryKey: () => Synced.name, payload: Proposal })
+const autoProposalEvent = Event.make({
+  tag: "AutoProposal",
+  primaryKey: () => Synced.name,
+  payload: autoProposalSchema(Synced)
+})
 const leaseEvent = Event.make({ tag: "Lease", primaryKey: () => Synced.name, payload: Lease })
 const decodeProposalPayload = Schema.decodeUnknownEffect(proposalEvent.payloadSchemaBinary)
+const decodeAutoProposalPayload = Schema.decodeUnknownEffect(autoProposalEvent.payloadSchemaBinary)
 const decodeLeasePayload = Schema.decodeUnknownEffect(leaseEvent.payloadSchemaBinary)
 
 const decoders: Record<string, (payload: Uint8Array) => Effect.Effect<Body, Schema.SchemaError>> = {
   Proposal: (payload) =>
     Effect.map(decodeProposalPayload(payload), (proposal): Body => ({ _tag: "Proposal", proposal })),
+  AutoProposal: (payload) =>
+    Effect.map(
+      decodeAutoProposalPayload(payload),
+      ({ epoch, proposal }): Body => ({ _tag: "AutoProposal", epoch, proposal })
+    ),
   Lease: (payload) => Effect.map(decodeLeasePayload(payload), (lease): Body => ({ _tag: "Lease", lease })),
   Joined: () => Effect.succeed<Body>({ _tag: "Joined" })
 }
@@ -53,7 +74,7 @@ export const decodeEntry = (remote: EventJournal.RemoteEntry): Effect.Effect<Log
 export interface Row {
   readonly seq: number
   readonly at: number
-  /** `Proposal`, `Joined` or `Lease`: the event tag the log stores the entry under. */
+  /** `Proposal`, `AutoProposal`, `Joined` or `Lease`: the event tag the log stores the entry under. */
   readonly event: string
   readonly label: string
   /** What the acceptors or the lease rule made of the entry, when there is something to say. */
@@ -62,6 +83,8 @@ export interface Row {
   readonly refused: boolean
   /** Who the proposal acts for, when it names someone. */
   readonly patron: Option.Option<string>
+  /** An automatic proposal that every instance skipped because it was not made in the log's epoch. */
+  readonly skipped: boolean
   /** Lease renewals folded into this row, so that the holder's heartbeat does not bury the proposals. */
   readonly renewals: number
   /** `epoch:holder` of a lease row, empty for any other. */
@@ -105,6 +128,7 @@ const bareRow = (logged: Logged, event: string, label: string): Row => ({
   refused: false,
   patron: Option.none(),
   renewals: 0,
+  skipped: false,
   leaseKey: ""
 })
 
@@ -135,16 +159,27 @@ const pushed = (tape: Tape, logged: Logged, row: Row, rest: Partial<Tape> = {}):
   lastSeq: Option.some(logged.seq)
 })
 
-const withProposal = (tape: Tape, logged: Logged, proposal: Proposal): Tape => {
+const withProposal = (tape: Tape, logged: Logged, event: string, proposal: Proposal): Tape => {
   const model = applyProposal(Synced, tape.model, proposal)
   const refusal = isJudged(proposal) ? model.lastRefusal : Option.none()
   const row: Row = {
-    ...bareRow(logged, "Proposal", proposalLabel(proposal)),
+    ...bareRow(logged, event, proposalLabel(proposal)),
     detail: Option.getOrElse(refusal, () => ""),
     refused: Option.isSome(refusal),
     patron: patronOf(proposal)
   }
   return pushed(tape, logged, row, { model })
+}
+
+/** An automatic action's proposal counts only in the epoch the tape's lease is in, as it does for the instances. */
+const withAutoProposal = (tape: Tape, logged: Logged, epoch: number, proposal: Proposal): Tape => {
+  if (isCurrentEpoch(tape.lease, epoch)) return withProposal(tape, logged, "AutoProposal", proposal)
+  const row: Row = {
+    ...bareRow(logged, "AutoProposal", proposalLabel(proposal)),
+    detail: `skipped: the log is not in term ${epoch}`,
+    skipped: true
+  }
+  return pushed(tape, logged, row)
 }
 
 const withLease = (tape: Tape, logged: Logged, lease: Lease): Tape => {
@@ -170,7 +205,9 @@ export const append = (tape: Tape, logged: Logged): Tape => {
   const { body } = logged
   switch (body._tag) {
     case "Proposal":
-      return withProposal(tape, logged, body.proposal)
+      return withProposal(tape, logged, "Proposal", body.proposal)
+    case "AutoProposal":
+      return withAutoProposal(tape, logged, body.epoch, body.proposal)
     case "Lease":
       return withLease(tape, logged, body.lease)
     case "Joined":

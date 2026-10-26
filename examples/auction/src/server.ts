@@ -1,6 +1,6 @@
 import { NodeRuntime } from "@effect/platform-node"
 import { AutoActions } from "@mufw/core"
-import type { SyncLogMismatch } from "@mufw/core/sync"
+import type { SyncStop } from "@mufw/core/sync"
 import { type RpcTag, rpcTags } from "@mufw/rpc"
 import { Config, Deferred, Effect, Layer, Option, Schema } from "effect"
 import { HttpRouter } from "effect/http"
@@ -19,7 +19,14 @@ import { samHttpPath, samPath } from "./samPath.ts"
 import { layerServerHandlers, ServerPorts, serving } from "./serverPorts.ts"
 import { layerSsrRoutes } from "./ssrRoutes.ts"
 import { layerStreamRoutes } from "./streamRoutes.ts"
-import { checkSyncSettings, EVENT_LOG_PATH, layerAuctionSync, SyncTarget, type SyncFailure } from "./sync.ts"
+import {
+  checkSyncSettings,
+  EVENT_LOG_PATH,
+  layerAuctionSync,
+  SyncCutEvery,
+  SyncTarget,
+  type SyncFailure
+} from "./sync.ts"
 import { layerWalletLoop, layerWalletRoutes } from "./walletServer.ts"
 
 /** `pnpm build:client` writes one directory per deployment here. */
@@ -46,7 +53,9 @@ const ServerConfig = Config.all({
   /** With `MUFW_SYNC=host`: the port of the event-log listener, which must differ from `MUFW_PORT`. */
   syncPort: Config.Port("MUFW_SYNC_PORT").pipe(Config.withDefault(3101)),
   /** With `MUFW_SYNC=host`: the interface of the event-log listener. Whoever reaches it can append any proposal, so the default is this machine only. */
-  syncHost: Config.NonEmptyString("MUFW_SYNC_HOST").pipe(Config.withDefault("127.0.0.1"))
+  syncHost: Config.NonEmptyString("MUFW_SYNC_HOST").pipe(Config.withDefault("127.0.0.1")),
+  /** With `MUFW_SYNC=host` and `MUFW_STORE`: the host replaces the log's entries by a snapshot of the model once this many have been applied since the last snapshot. A host without a store keeps its log in memory and never cuts. */
+  syncCutEvery: SyncCutEvery
 })
 
 interface ServerSettings {
@@ -59,15 +68,23 @@ interface ServerSettings {
   readonly tls: Option.Option<TlsFiles>
   readonly syncPort: number
   readonly syncHost: string
+  readonly syncCutEvery: number
 }
 
-/** Fails when a synced instance stops applying because its log was replaced: the process then stops with the error. */
-const syncStopped = Deferred.makeUnsafe<never, SyncLogMismatch>()
+/** Fails when a synced instance stops applying because its log was replaced or lost entries: the process then stops with the error. */
+const syncStopped = Deferred.makeUnsafe<never, SyncStop>()
 
-const makeServer = ({ autoActions, rpcs, store, ssr, sync, port, tls, syncPort, syncHost }: ServerSettings) => {
+const makeServer = (
+  { autoActions, rpcs, store, ssr, sync, port, tls, syncPort, syncHost, syncCutEvery }: ServerSettings
+) => {
   // The bidder comes from the request's session (`Authentication`), not from the layer.
   const synced = Option.map(sync, (target) =>
-    layerAuctionSync(target, { listen: { host: syncHost, port: syncPort }, store, stopped: syncStopped })
+    layerAuctionSync(target, {
+      listen: { host: syncHost, port: syncPort },
+      store,
+      stopped: syncStopped,
+      cutEvery: syncCutEvery
+    })
   )
   const chosen: AuctionLoop<AuctionStoreFailure | SyncFailure> = Option.match(synced, {
     onNone: () => layerAuctionLoop(store),
@@ -127,7 +144,8 @@ const Server = Layer.unwrap(
       port: config.port,
       tls,
       syncPort: config.syncPort,
-      syncHost: config.syncHost
+      syncHost: config.syncHost,
+      syncCutEvery: config.syncCutEvery
     }
     return Layer.merge(makeServer(settings), Layer.effectDiscard(listening))
   })

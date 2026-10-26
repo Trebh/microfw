@@ -5,16 +5,14 @@ import {
   layerSyncLogClient,
   layerSyncLogStorage,
   layerSyncServer,
+  layerSyncStorageMemory,
   type SyncCheckpoint,
-  SyncLog
+  SyncClient,
+  SyncLog,
+  SyncRpcs
 } from "@mufw/core/sync"
 import { Cause, Context, Effect, Exit, Layer, Option, Queue, Ref, Scope, Stream, SubscriptionRef } from "effect"
-import {
-  EventLogMessage,
-  type EventJournal,
-  EventLogRemote,
-  EventLogServerUnencrypted
-} from "effect/eventlog"
+import type { EventJournal, EventLogRemote } from "effect/eventlog"
 import { RpcTest } from "effect/rpc"
 import { layerCurrentPatronFixed } from "../../adapters/currentPatronFixed.ts"
 import { company, type Intent, Patron } from "../../domain/BoxOffice.ts"
@@ -101,7 +99,9 @@ const overSlowLine = <E, R>(log: Layer.Layer<SyncLog, E, R>, line: Line) =>
     Effect.gen(function*() {
       const inner = yield* SyncLog
       const append = (entry: EventJournal.Entry) =>
-        entry.event === "Proposal" ? lagged(line, inner.append(entry)) : inner.append(entry)
+        entry.event === "Proposal" || entry.event === "AutoProposal"
+          ? lagged(line, inner.append(entry))
+          : inner.append(entry)
       return SyncLog.of({ ...inner, append })
     })
   ).pipe(Layer.provide(log))
@@ -127,7 +127,7 @@ const openWindow = <E, R>(side: Side, patron: Patron, log: Layer.Layer<SyncLog, 
       patron,
       intents: Context.get(context, SyncedPorts.IntentPort),
       model: Context.get(context, SyncedPorts.ModelPort),
-      holdsChair: Context.get(context, AutoActionsGate).open,
+      holdsChair: Effect.map(Context.get(context, AutoActionsGate).admit, Option.isSome),
       checkpoints: Stream.fromQueue(checkpoints),
       close: Scope.close(scope, Exit.void)
     }
@@ -150,13 +150,10 @@ export const layerHouse = Layer.effect(
     const paying = yield* Effect.context<PaymentGateway>()
     const server = layerSyncServer(Synced).pipe(
       Layer.provide(layerSyncAuthorization),
-      Layer.provideMerge(EventLogServerUnencrypted.layerStorageMemory)
+      Layer.provideMerge(layerSyncStorageMemory(Synced))
     )
     const built = Layer.succeedContext(yield* Layer.build(server))
-    const rpcClient = Layer.effect(
-      EventLogRemote.EventLogRemoteClient,
-      RpcTest.makeClient(EventLogMessage.EventLogRemoteRpcs)
-    )
+    const rpcClient = Layer.effect(SyncClient, RpcTest.makeClient(SyncRpcs))
     const hostLog = layerSyncLogStorage(Synced).pipe(Layer.provide(built))
     const clientLog = layerSyncLogClient(Synced).pipe(Layer.provide(rpcClient), Layer.provide(built))
     const line: Line = { slow: yield* Ref.make(false), onTheWire: yield* SubscriptionRef.make(0) }
