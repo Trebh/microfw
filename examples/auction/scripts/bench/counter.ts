@@ -1,5 +1,5 @@
-import { define, makePorts } from "@mufw/core"
-import { Effect, Option, Schema } from "effect"
+import { define, makePorts, noIntent } from "@mufw/core"
+import { Effect, Schema } from "effect"
 
 /** The smallest useful definition: what every µFW application pays for at least. */
 export const Counter = define({
@@ -9,12 +9,11 @@ export const Counter = define({
   intent: Schema.Union([Schema.TaggedStruct("Inc", { by: Schema.Int })]),
   representation: Schema.Struct({ controlState: Schema.Literals(["even", "odd"]), count: Schema.Int })
 })({
-  controlStates: ["even", "odd"],
   initial: { count: 0 },
-  acceptors: [(model, proposal) => (proposal._tag === "Inc" ? { count: model.count + proposal.by } : model)],
+  acceptors: { Inc: (model, proposal) => ({ count: model.count + proposal.by }) },
   reactors: [],
   state: (model) => ({ controlState: model.count % 2 === 0 ? "even" : "odd", count: model.count }),
-  nap: () => Option.none(),
+  nap: { even: noIntent, odd: noIntent },
   actions: {
     Inc: (intent) => Effect.succeed({ _tag: "Inc", by: intent.by })
   }

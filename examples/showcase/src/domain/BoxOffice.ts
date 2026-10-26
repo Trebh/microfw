@@ -1,4 +1,4 @@
-import { define, type Explore, makePorts } from "@mufw/core"
+import { define, type Explore, makePorts, type Nap, noIntent, type WithTag } from "@mufw/core"
 import { Clock, Effect, Option, Schema } from "effect"
 import { CurrentPatron } from "./CurrentPatron.ts"
 import { PaymentGateway } from "./PaymentGateway.ts"
@@ -29,8 +29,8 @@ export const Proposal = Schema.Union([
   Schema.TaggedStruct("SeatHeld", { seat: SeatId, by: Patron, at: Schema.Number }),
   Schema.TaggedStruct("SeatSold", { seat: SeatId, by: Patron }),
   Schema.TaggedStruct("PaymentDeclined", { seat: SeatId, reason: Schema.String }),
-  Schema.TaggedStruct("Tick", { now: Schema.Number }),
-  Schema.TaggedStruct("CurtainUp", { at: Schema.Number })
+  Schema.TaggedStruct("Ticked", { now: Schema.Number }),
+  Schema.TaggedStruct("CurtainRaised", { at: Schema.Number })
 ])
 export type Proposal = typeof Proposal.Type
 
@@ -86,11 +86,13 @@ const closedReason = (model: Model): Option.Option<string> => {
   return Option.none()
 }
 
-export const acceptDoorsOpened = (model: Model, proposal: Proposal): Model =>
-  proposal._tag === "DoorsOpened" && model.phase === "dark" ? { ...model, phase: "selling", now: proposal.at } : model
+const release = (place: Place): Place => (place._tag === "Held" ? { _tag: "Free", seat: place.seat } : place)
 
-export const acceptSeatHeld = (model: Model, proposal: Proposal): Model => {
-  if (proposal._tag !== "SeatHeld") return model
+
+export const acceptDoorsOpened = (model: Model, proposal: WithTag<Proposal, "DoorsOpened">): Model =>
+  model.phase === "dark" ? { ...model, phase: "selling", now: proposal.at } : model
+
+export const acceptSeatHeld = (model: Model, proposal: WithTag<Proposal, "SeatHeld">): Model => {
   const closed = closedReason(model)
   if (Option.isSome(closed)) return refuse(model, closed.value)
   const place = placeOf(model, proposal.seat)
@@ -103,8 +105,7 @@ export const acceptSeatHeld = (model: Model, proposal: Proposal): Model => {
   }
 }
 
-export const acceptSeatSold = (model: Model, proposal: Proposal): Model => {
-  if (proposal._tag !== "SeatSold") return model
+export const acceptSeatSold = (model: Model, proposal: WithTag<Proposal, "SeatSold">): Model => {
   const closed = closedReason(model)
   if (Option.isSome(closed)) return refuse(model, closed.value)
   const heldByBuyer = Option.exists(
@@ -116,17 +117,15 @@ export const acceptSeatSold = (model: Model, proposal: Proposal): Model => {
   return { ...withPlace(model, sold), lastRefusal: Option.none() }
 }
 
-export const acceptPaymentDeclined = (model: Model, proposal: Proposal): Model =>
-  proposal._tag === "PaymentDeclined" ? refuse(model, `${proposal.seat} was declined: ${proposal.reason}`) : model
+export const acceptPaymentDeclined = (model: Model, proposal: WithTag<Proposal, "PaymentDeclined">): Model =>
+  refuse(model, `${proposal.seat} was declined: ${proposal.reason}`)
 
-export const acceptTick = (model: Model, proposal: Proposal): Model =>
-  proposal._tag === "Tick" && model.phase !== "dark" ? { ...model, now: Math.max(model.now, proposal.now) } : model
-
-const release = (place: Place): Place => (place._tag === "Held" ? { _tag: "Free", seat: place.seat } : place)
+export const acceptTicked = (model: Model, proposal: WithTag<Proposal, "Ticked">): Model =>
+  model.phase !== "dark" ? { ...model, now: Math.max(model.now, proposal.now) } : model
 
 /** The curtain rising lets go of every hold: nobody can pay once it is up. */
-export const acceptCurtainUp = (model: Model, proposal: Proposal): Model =>
-  proposal._tag === "CurtainUp" && model.phase === "selling"
+export const acceptCurtainRaised = (model: Model, proposal: WithTag<Proposal, "CurtainRaised">): Model =>
+  model.phase === "selling"
     ? { ...model, phase: "curtain", now: Math.max(model.now, proposal.at), seats: model.seats.map(release) }
     : model
 
@@ -176,11 +175,44 @@ const earliestHold = (representation: Representation): Option.Option<number> => 
 }
 
 /** Waits for the earliest hold only: a hold made later expires later, so one wait is enough at a time. */
-export const nap = (representation: Representation): Option.Option<Intent> => {
-  if (representation.controlState === "dark" || representation.controlState === "curtain") return Option.none()
+const napWhileOpen = (representation: Representation): Option.Option<Intent> => {
   if (representation.sold === representation.seats.length) return Option.some({ _tag: "RaiseCurtain" })
   return Option.map(earliestHold(representation), (until) => ({ _tag: "AwaitExpiry", until }) as const)
 }
+
+const nap: Nap<Representation, Intent> = {
+  dark: noIntent,
+  selling: napWhileOpen,
+  full: napWhileOpen,
+  curtain: noIntent
+}
+
+const openDoors = () => Clock.currentTimeMillis.pipe(Effect.map((at) => ({ _tag: "DoorsOpened", at }) as const))
+
+const hold = ({ seat }: WithTag<Intent, "Hold">) =>
+  Effect.gen(function*() {
+    const { patron } = yield* CurrentPatron
+    const at = yield* Clock.currentTimeMillis
+    return { _tag: "SeatHeld", seat, by: patron, at } as const
+  })
+
+const pay = ({ seat }: WithTag<Intent, "Pay">) =>
+  Effect.gen(function*() {
+    const { patron } = yield* CurrentPatron
+    const charge = yield* PaymentGateway.use((gateway) => gateway.charge(seat, patron))
+    if (charge._tag === "Declined") return { _tag: "PaymentDeclined", seat, reason: charge.reason } as const
+    return { _tag: "SeatSold", seat, by: patron } as const
+  })
+
+const awaitExpiry = ({ until }: WithTag<Intent, "AwaitExpiry">) =>
+  Effect.gen(function*() {
+    const before = yield* Clock.currentTimeMillis
+    yield* Effect.sleep(Math.max(0, until - before))
+    const now = yield* Clock.currentTimeMillis
+    return { _tag: "Ticked", now } as const
+  })
+
+const raiseCurtain = () => Clock.currentTimeMillis.pipe(Effect.map((at) => ({ _tag: "CurtainRaised", at }) as const))
 
 export const BoxOffice = define({
   name: "BoxOffice",
@@ -189,43 +221,19 @@ export const BoxOffice = define({
   intent: Intent,
   representation: Representation
 })({
-  controlStates: ["dark", "selling", "full", "curtain"],
   initial,
-  acceptors: [
-    acceptDoorsOpened,
-    acceptSeatHeld,
-    acceptSeatSold,
-    acceptPaymentDeclined,
-    acceptTick,
-    acceptCurtainUp
-  ],
+  acceptors: {
+    DoorsOpened: acceptDoorsOpened,
+    SeatHeld: acceptSeatHeld,
+    SeatSold: acceptSeatSold,
+    PaymentDeclined: acceptPaymentDeclined,
+    Ticked: acceptTicked,
+    CurtainRaised: acceptCurtainRaised
+  },
   reactors: [releaseExpiredHolds],
   state,
   nap,
-  actions: {
-    OpenDoors: () => Clock.currentTimeMillis.pipe(Effect.map((at) => ({ _tag: "DoorsOpened", at }) as const)),
-    Hold: ({ seat }) =>
-      Effect.gen(function*() {
-        const { patron } = yield* CurrentPatron
-        const at = yield* Clock.currentTimeMillis
-        return { _tag: "SeatHeld", seat, by: patron, at } as const
-      }),
-    Pay: ({ seat }) =>
-      Effect.gen(function*() {
-        const { patron } = yield* CurrentPatron
-        const charge = yield* PaymentGateway.use((gateway) => gateway.charge(seat, patron))
-        if (charge._tag === "Declined") return { _tag: "PaymentDeclined", seat, reason: charge.reason } as const
-        return { _tag: "SeatSold", seat, by: patron } as const
-      }),
-    AwaitExpiry: ({ until }) =>
-      Effect.gen(function*() {
-        const before = yield* Clock.currentTimeMillis
-        yield* Effect.sleep(Math.max(0, until - before))
-        const now = yield* Clock.currentTimeMillis
-        return { _tag: "Tick", now } as const
-      }),
-    RaiseCurtain: () => Clock.currentTimeMillis.pipe(Effect.map((at) => ({ _tag: "CurtainUp", at }) as const))
-  }
+  actions: { OpenDoors: openDoors, Hold: hold, Pay: pay, AwaitExpiry: awaitExpiry, RaiseCurtain: raiseCurtain }
 })
 
 export const BoxOfficePorts = makePorts(BoxOffice)
@@ -233,47 +241,3 @@ export const BoxOfficePorts = makePorts(BoxOffice)
 /** The same box office under another name, for an act that runs an instance of its own. */
 export const company = (name: string): typeof BoxOffice => ({ ...BoxOffice, name })
 
-const guest = Patron.make("guest")
-
-const firstSeat = (representation: Representation, status: SeatView["status"]): Option.Option<SeatView> =>
-  Option.fromNullishOr(representation.seats.find((seat) => seat.status === status))
-
-const holdProposals = (representation: Representation, model: Model): ReadonlyArray<Proposal> => {
-  if (representation.sold > 0) return []
-  const hold = (seat: SeatView) => ({ _tag: "SeatHeld", seat: seat.id, by: guest, at: model.now }) as const
-  return Option.toArray(Option.map(firstSeat(representation, "free"), hold))
-}
-
-const saleProposals = (representation: Representation): ReadonlyArray<Proposal> => {
-  if (representation.sold > 0) return []
-  const sell = (seat: SeatView) => Option.map(seat.by, (by) => ({ _tag: "SeatSold", seat: seat.id, by }) as const)
-  return Option.toArray(Option.flatMap(firstSeat(representation, "held"), sell))
-}
-
-const tickProposals = (representation: Representation): ReadonlyArray<Proposal> => {
-  const tickTo = (until: number) => ({ _tag: "Tick", now: until }) as const
-  return Option.toArray(Option.map(earliestHold(representation), tickTo))
-}
-
-/**
- * Holds fill the house one seat at a time, which is the only way to reach `full`; sales, expiries
- * and the curtain are sampled while at most one seat is taken and once the house is full, so the
- * explored states stay a chain with a few side exits.
- */
-export const exploreBoxOffice: Explore<typeof BoxOffice> = (representation, model) => {
-  if (representation.controlState === "dark") return [{ _tag: "DoorsOpened", at: model.now }]
-  if (representation.controlState === "curtain") return []
-  const holds = holdProposals(representation, model)
-  const hasExits = representation.held + representation.sold <= 1 || representation.free === 0
-  if (!hasExits) return holds
-  return [
-    ...holds,
-    ...saleProposals(representation),
-    ...tickProposals(representation),
-    { _tag: "CurtainUp", at: model.now }
-  ]
-}
-
-/** Seats taken and seats free matter to what a state enables; the clock and who holds what do not. */
-export const serializeBoxOffice = (representation: Representation) =>
-  `${representation.controlState}:${representation.free}:${representation.held > 0}:${representation.sold > 0}`

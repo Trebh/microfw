@@ -2,8 +2,8 @@ import { BrowserRuntime } from "@effect/platform-browser"
 import { type IntentOf, layerLoopLocal, type RepresentationOf } from "@mufw/core"
 import { layerInputScheduler, layerMount, type View } from "@mufw/view-uhtml"
 import { Effect, Layer } from "effect"
-import { Table, TablePorts } from "./definition.ts"
-import { type Handlers, tableView } from "./table.ts"
+import { Table, TablePorts } from "./Table.ts"
+import { type Handlers, tableView } from "./Table.view.ts"
 
 type Intent = IntentOf<typeof Table>
 type Representation = RepresentationOf<typeof Table>

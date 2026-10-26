@@ -20,7 +20,7 @@ const CLIENT_DIRECTORY = "src/client/"
 /** The one module of the client that builds the auction's local halves; pages compose its exports. */
 const AUCTION_LOCAL = "src/client/placements/auctionLocal.ts"
 
-const AUCTION_DEFINITION = "src/domain/Auction"
+const AUCTION_DEFINITION = "src/auction/Auction"
 
 const CORE = "@mufw/core"
 const LOCAL_BUILDERS: ReadonlySet<string> = new Set(["layerModelLocal", "layerActionRunnerLocal", "layerLoopLocal"])
@@ -103,7 +103,7 @@ const isClientModule = (source: SourceFile) => source.path.startsWith(CLIENT_DIR
 /**
  * The calls in the client, outside `placements/auctionLocal.ts`, that build a local half of the
  * auction (`layerModelLocal`, `layerActionRunnerLocal`, `layerLoopLocal`) with the auction's
- * definition from `src/domain/Auction.ts`. The bundle check sees a half only through the exports of
+ * definition from `src/auction/Auction.ts`. The bundle check sees a half only through the exports of
  * `auctionLocal.ts`, so a half built anywhere else would reach a bundle that the check cannot
  * attribute to a deployment. The wallet's loop is built with the wallet's definition and is not
  * the auction's. The server composes its own halves at its composition root and is not in the client.

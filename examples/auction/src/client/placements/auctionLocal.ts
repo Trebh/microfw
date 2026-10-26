@@ -2,7 +2,7 @@ import { layerActionRunnerLocal, layerLoopLocal, layerModelLocal } from "@mufw/c
 import { Effect, Layer, Option } from "effect"
 import { layerCreditCheckPermissive } from "../../adapters/creditCheckPermissive.ts"
 import { layerCurrentBidderFixed } from "../../adapters/currentBidderFixed.ts"
-import { Auction } from "../../domain/Auction.ts"
+import { Auction } from "../../auction/Auction.ts"
 import type { Bidder } from "../../domain/Values.ts"
 import { Ports } from "../../ports.ts"
 import { ServerPorts } from "../../serverPorts.ts"

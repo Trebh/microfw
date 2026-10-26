@@ -44,7 +44,7 @@ describe("layerAuctionSync with a store", () => {
       const directory = yield* fileSystem.makeTempDirectoryScoped()
       const first = yield* bootHost(directory)
       yield* first.model.present({ _tag: "Opened", at: 1000 })
-      yield* first.model.present({ _tag: "Bid", bidder: Bidder.make("alice"), amount: Amount.make(5), at: 2000 })
+      yield* first.model.present({ _tag: "BidPlaced", bidder: Bidder.make("alice"), amount: Amount.make(5), at: 2000 })
       yield* awaitCheckpoint(directory, 3)
       yield* first.stop
 

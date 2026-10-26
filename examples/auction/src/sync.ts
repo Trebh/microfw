@@ -16,7 +16,7 @@ import { EventLogMessage, type EventLogRemote, EventLogServerUnencrypted } from 
 import { HttpRouter, type HttpServerError } from "effect/http"
 import { RpcClient, RpcSerialization, RpcServer } from "effect/rpc"
 import { createServer } from "node:http"
-import { Auction } from "./domain/Auction.ts"
+import { Auction } from "./auction/Auction.ts"
 import { layerNodeServer } from "./listener.ts"
 import { type AuctionLoop, type AuctionStoreFailure, type FileStore, layerFileStore } from "./persistence.ts"
 import { ServerPorts } from "./serverPorts.ts"

@@ -24,7 +24,15 @@ import {
   type ServicesOf
 } from "./Definition.ts"
 import { footprint } from "./Footprint.ts"
-import type { HistoryPortShape, IntentBusShape, IntentEnvelope, ModelPortShape, Ports } from "./Ports.ts"
+import type {
+  ActionRunner,
+  HistoryPortShape,
+  IntentBusShape,
+  IntentEnvelope,
+  ModelPort,
+  ModelPortShape,
+  Ports
+} from "./Ports.ts"
 import { applyProposal, NoSuchStep, type StepKind, type StepRecord } from "./Step.ts"
 
 /**
@@ -404,5 +412,27 @@ export const layerLoopLocal = <D extends AnyDefinition, R = never>(
 ) =>
   layerActionsDrain(def, ports).pipe(
     Layer.provideMerge(Layer.merge(layerModelLocal(def, ports, options), layerActionRunnerLocal(def, ports))),
+    Layer.provideMerge(layerIntentBus(def, ports))
+  )
+
+/**
+ * The intent bus and the actions drain around a model layer and an action-runner layer that the
+ * caller chooses, one placement of the loop. `model` provides `ports.ModelPort` (and
+ * `ports.HistoryPort` if it keeps history) and may require `ports.IntentBus`, which this layer
+ * provides; `runner` provides `ports.ActionRunner`. The drain reads `IntentBus`, `ModelPort` and
+ * `ActionRunner`. The result provides everything the two layers and the bus provide, so the caller
+ * has `IntentPort` to dispatch and `ModelPort` to read, and a page that adds services of its own
+ * with `Layer.provideMerge` keeps all of them.
+ */
+export const layerLoopWith = <D extends AnyDefinition, R, MOut, ME, MIn, AOut, AE, AIn>(
+  def: D,
+  ports: Ports<D, R>,
+  layers: {
+    readonly model: Layer.Layer<MOut | ModelPort<D>, ME, MIn>
+    readonly runner: Layer.Layer<AOut | ActionRunner<D>, AE, AIn>
+  }
+) =>
+  layerActionsDrain(def, ports).pipe(
+    Layer.provideMerge(Layer.merge(layers.model, layers.runner)),
     Layer.provideMerge(layerIntentBus(def, ports))
   )

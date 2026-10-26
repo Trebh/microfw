@@ -1,9 +1,9 @@
 import { type IntentPort, layerForward, type ModelPort } from "@mufw/core"
 import { Effect, Layer, Option } from "effect"
-import type { Auction } from "../domain/Auction.ts"
+import type { Auction } from "../auction/Auction.ts"
 import type { Bidder } from "../domain/Values.ts"
-import { holdForBids } from "../domain/WalletFeed.ts"
-import type { Wallet } from "../domain/Wallet.ts"
+import { holdForBids } from "../wallet/Wallet.feed.ts"
+import type { Wallet } from "../wallet/Wallet.ts"
 import { Whoami } from "../domain/Whoami.ts"
 import { Ports, WalletPorts } from "../ports.ts"
 

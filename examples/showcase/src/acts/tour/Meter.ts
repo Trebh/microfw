@@ -1,4 +1,4 @@
-import { define, makePorts, type Ports } from "@mufw/core"
+import { define, makePorts, noIntent, type Ports, type WithTag } from "@mufw/core"
 import { Clock, Effect, Option, Schema } from "effect"
 import { SeatId } from "../../domain/BoxOffice.ts"
 
@@ -38,9 +38,12 @@ export type Representation = typeof Representation.Type
 
 export const initial: Model = { pending: Option.none(), samples: [], count: 0 }
 
+
 /** A click starts the stopwatch; a second click before the first is answered starts it again. */
-export const acceptStarted = (model: Model, proposal: Proposal): Model =>
-  proposal._tag === "Started" ? { ...model, pending: Option.some({ seat: proposal.seat, at: proposal.at }) } : model
+export const acceptStarted = (model: Model, proposal: WithTag<Proposal, "Started">): Model => ({
+  ...model,
+  pending: Option.some({ seat: proposal.seat, at: proposal.at })
+})
 
 const finished = (model: Model, elapsed: number): Model => ({
   pending: Option.none(),
@@ -49,13 +52,11 @@ const finished = (model: Model, elapsed: number): Model => ({
 })
 
 /** The stopwatch stops at the first representation that shows the clicked seat taken. */
-export const acceptObserved = (model: Model, proposal: Proposal): Model => {
-  if (proposal._tag !== "Observed") return model
-  return Option.match(model.pending, {
+export const acceptObserved = (model: Model, proposal: WithTag<Proposal, "Observed">): Model =>
+  Option.match(model.pending, {
     onNone: () => model,
     onSome: (pending) => (proposal.taken.includes(pending.seat) ? finished(model, proposal.at - pending.at) : model)
   })
-}
 
 const meanOf = (samples: ReadonlyArray<number>): Option.Option<number> =>
   samples.length === 0 ? Option.none() : Option.some(samples.reduce((sum, sample) => sum + sample, 0) / samples.length)
@@ -80,12 +81,11 @@ export const Meter = define({
   intent: Intent,
   representation: Representation
 })({
-  controlStates: ["idle", "timing"],
   initial,
-  acceptors: [acceptStarted, acceptObserved],
+  acceptors: { Started: acceptStarted, Observed: acceptObserved },
   reactors: [],
   state,
-  nap: () => Option.none(),
+  nap: { idle: noIntent, timing: noIntent },
   actions: {
     Start: ({ seat }) => Effect.map(nowMillis, (at) => ({ _tag: "Started", seat, at }) as const),
     Observe: ({ taken }) => Effect.map(nowMillis, (at) => ({ _tag: "Observed", taken, at }) as const)

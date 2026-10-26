@@ -4,7 +4,7 @@ import { Effect, Layer, Option, Stream } from "effect"
 import { layerWalletFeed, walletOwner } from "../src/client/walletOwner.ts"
 import { layerAuthenticationClient, type layerAuthenticationAnonymous } from "../src/authentication.ts"
 import { Amount, Bidder, SessionToken } from "../src/domain/Values.ts"
-import { type Representation, Wallet } from "../src/domain/Wallet.ts"
+import { type Representation, Wallet } from "../src/wallet/Wallet.ts"
 import { Ports, Rpc, WalletPorts } from "../src/ports.ts"
 import { clientWith, whoamiWith } from "./serverSide.ts"
 

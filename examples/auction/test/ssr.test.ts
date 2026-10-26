@@ -6,7 +6,7 @@ import { Context, Effect, FileSystem, Layer, Option, Schema } from "effect"
 import { HttpClient, HttpRouter } from "effect/http"
 import { layerCreditCheckTable } from "../src/adapters/creditCheckTable.ts"
 import { deployments } from "../src/deployments.ts"
-import { Auction, initial, type Model, state } from "../src/domain/Auction.ts"
+import { Auction, initial, type Model, state } from "../src/auction/Auction.ts"
 import { Amount, Bidder } from "../src/domain/Values.ts"
 import { ServerPorts } from "../src/serverPorts.ts"
 import { decodeSnapshot } from "../src/snapshot.ts"
@@ -27,7 +27,7 @@ const record = (model: Model): StepRecord<typeof Auction> => ({
 
 const alice = Bidder.make("alice")
 const bid = { bidder: alice, amount: Amount.make(10), at: 500 }
-const open: Model = { ...initial, status: "open", now: 1000, endsAt: 61_000, highest: Option.some(bid), bids: [bid] }
+const open: Model = { ...initial, phase: "open", now: 1000, endsAt: 61_000, highest: Option.some(bid), bids: [bid] }
 
 /** The view of `initial` (opening, no bids) as uhtml serializes it, with `label` in the footer. */
 const openingMarkup = (label: string) =>
@@ -157,7 +157,7 @@ describe("the embedded model", () => {
 
       assert.strictEqual(
         textOfSnapshot(page),
-        "{\"item\":\"Vintage synth\",\"minIncrement\":5,\"highest\":{\"_tag\":\"Some\",\"value\":{\"bidder\":\"alice\",\"amount\":10,\"at\":500}},\"bids\":[{\"bidder\":\"alice\",\"amount\":10,\"at\":500}],\"endsAt\":61000,\"now\":1000,\"status\":\"open\",\"lastRejection\":{\"_tag\":\"None\"}}"
+        "{\"item\":\"Vintage synth\",\"minIncrement\":5,\"highest\":{\"_tag\":\"Some\",\"value\":{\"bidder\":\"alice\",\"amount\":10,\"at\":500}},\"bids\":[{\"bidder\":\"alice\",\"amount\":10,\"at\":500}],\"endsAt\":61000,\"now\":1000,\"phase\":\"open\",\"lastRejection\":{\"_tag\":\"None\"}}"
       )
     }))
 
@@ -275,7 +275,7 @@ describe("the routes", () => {
       const { body } = yield* get("/")
 
       assert.include(body, "<span class=\"badge open\">open</span>")
-      assert.include(textOfSnapshot(body), "\"status\":\"open\"")
+      assert.include(textOfSnapshot(body), "\"phase\":\"open\"")
     }).pipe(Effect.provide(Served)))
 
   it.effect("serve a built asset", () =>

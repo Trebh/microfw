@@ -1,5 +1,5 @@
-import { define, makePorts } from "@mufw/core"
-import { Effect, Option, Schema } from "effect"
+import { define, makePorts, noIntent } from "@mufw/core"
+import { Effect, Schema } from "effect"
 
 /** Rows the list starts with: large enough that a step's cost scales with the model, as a real table's does. */
 export const LIST_ROWS = 1000
@@ -14,21 +14,19 @@ export const List = define({
   intent: Schema.Union([Schema.TaggedStruct("Toggle", { id: Schema.Int })]),
   representation: Schema.Struct({ controlState: Schema.Literals(["ready"]), on: Schema.Int, rows: Schema.Array(Row) })
 })({
-  controlStates: ["ready"],
   initial: { rows: Array.from({ length: LIST_ROWS }, (_, id) => ({ id, on: false })) },
-  acceptors: [
-    (model, proposal) =>
-      proposal._tag === "Toggle"
-        ? { rows: model.rows.map((row) => (row.id === proposal.id ? { id: row.id, on: !row.on } : row)) }
-        : model
-  ],
+  acceptors: {
+    Toggle: (model, proposal) => ({
+      rows: model.rows.map((row) => (row.id === proposal.id ? { id: row.id, on: !row.on } : row))
+    })
+  },
   reactors: [],
   state: (model) => ({
     controlState: "ready",
     on: model.rows.filter((row) => row.on).length,
     rows: model.rows
   }),
-  nap: () => Option.none(),
+  nap: { ready: noIntent },
   actions: {
     Toggle: (intent) => Effect.succeed({ _tag: "Toggle", id: intent.id })
   }

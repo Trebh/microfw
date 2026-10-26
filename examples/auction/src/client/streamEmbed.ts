@@ -1,6 +1,6 @@
 import { BrowserRuntime } from "@effect/platform-browser"
 import { Effect, Schema } from "effect"
-import { Auction } from "../domain/Auction.ts"
+import { Auction } from "../auction/Auction.ts"
 import { samStreamPath } from "../samPath.ts"
 import { HttpServerOrigin } from "./serverOrigin.ts"
 

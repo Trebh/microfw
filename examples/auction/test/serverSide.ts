@@ -5,7 +5,7 @@ import { layerAuthenticationServer } from "../src/adapters/authenticationServer.
 import { layerCreditCheckTable } from "../src/adapters/creditCheckTable.ts"
 import { layerSessionsTable } from "../src/adapters/sessionsTable.ts"
 import type { layerAuthenticationAnonymous } from "../src/authentication.ts"
-import { Auction } from "../src/domain/Auction.ts"
+import { Auction } from "../src/auction/Auction.ts"
 import { Whoami } from "../src/domain/Whoami.ts"
 import { Rpc } from "../src/ports.ts"
 import { layerServerHandlers, ServerPorts } from "../src/serverPorts.ts"

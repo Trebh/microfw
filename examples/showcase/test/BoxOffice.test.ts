@@ -5,16 +5,15 @@ import { TestClock } from "effect/testing"
 import { layerCurrentPatronFixed } from "../src/adapters/currentPatronFixed.ts"
 import { layerPaymentTheatrical } from "../src/adapters/paymentTheatrical.ts"
 import {
-  acceptCurtainUp,
+  acceptCurtainRaised,
   acceptDoorsOpened,
   acceptSeatHeld,
   acceptSeatSold,
-  acceptTick,
+  acceptTicked,
   BoxOffice,
   initial,
   type Intent,
   type Model,
-  nap,
   type Place,
   Patron,
   releaseExpiredHolds,
@@ -102,14 +101,6 @@ describe("acceptSeatHeld", () => {
 
     assert.deepStrictEqual(result.lastRefusal, Option.some("the doors are not open yet"))
   })
-
-  it("ignores other proposals", () => {
-    const open = selling()
-
-    const result = acceptSeatHeld(open, { _tag: "Tick", now: 1_000 })
-
-    assert.strictEqual(result, open)
-  })
 })
 
 describe("acceptSeatSold", () => {
@@ -155,31 +146,31 @@ describe("acceptSeatSold", () => {
   })
 })
 
-describe("acceptTick", () => {
+describe("acceptTicked", () => {
   it("only moves the clock: the reactor does the releasing", () => {
     const holding = selling({ A1: held("A1", alice, 9_000) }, { now: 1_000 })
 
-    const result = acceptTick(holding, { _tag: "Tick", now: 9_500 })
+    const result = acceptTicked(holding, { _tag: "Ticked", now: 9_500 })
 
     assert.deepStrictEqual([result.now, placeAt(result, "A1")], [9_500, held("A1", alice, 9_000)])
   })
 
   it("never moves the clock back", () => {
-    const result = acceptTick(selling({}, { now: 5_000 }), { _tag: "Tick", now: 2_000 })
+    const result = acceptTicked(selling({}, { now: 5_000 }), { _tag: "Ticked", now: 2_000 })
 
     assert.strictEqual(result.now, 5_000)
   })
 
   it("is ignored while the doors are closed", () => {
-    const result = acceptTick(initial, { _tag: "Tick", now: 2_000 })
+    const result = acceptTicked(initial, { _tag: "Ticked", now: 2_000 })
 
     assert.strictEqual(result, initial)
   })
 })
 
-describe("acceptCurtainUp", () => {
+describe("acceptCurtainRaised", () => {
   it("raises the curtain", () => {
-    const result = acceptCurtainUp(selling(), { _tag: "CurtainUp", at: 20_000 })
+    const result = acceptCurtainRaised(selling(), { _tag: "CurtainRaised", at: 20_000 })
 
     assert.deepStrictEqual([result.phase, result.now], ["curtain", 20_000])
   })
@@ -187,7 +178,7 @@ describe("acceptCurtainUp", () => {
   it("lets go of holds and keeps sales", () => {
     const busy = selling({ A1: held("A1", alice, 30_000), A2: sold("A2", bob) })
 
-    const result = acceptCurtainUp(busy, { _tag: "CurtainUp", at: 20_000 })
+    const result = acceptCurtainRaised(busy, { _tag: "CurtainRaised", at: 20_000 })
 
     assert.deepStrictEqual(
       [placeAt(result, "A1"), placeAt(result, "A2")],
@@ -196,7 +187,7 @@ describe("acceptCurtainUp", () => {
   })
 
   it("is ignored while the doors are closed", () => {
-    const result = acceptCurtainUp(initial, { _tag: "CurtainUp", at: 20_000 })
+    const result = acceptCurtainRaised(initial, { _tag: "CurtainRaised", at: 20_000 })
 
     assert.strictEqual(result, initial)
   })
@@ -232,7 +223,7 @@ describe("a tick past the hold, through the step", () => {
   it("frees the seat", () => {
     const holding = selling({ A1: held("A1", alice, 9_000) }, { now: 1_000 })
 
-    const result = applyProposal(BoxOffice, holding, { _tag: "Tick", now: 9_000 })
+    const result = applyProposal(BoxOffice, holding, { _tag: "Ticked", now: 9_000 })
 
     assert.deepStrictEqual(placeAt(result, "A1"), free("A1"))
   })
@@ -240,7 +231,7 @@ describe("a tick past the hold, through the step", () => {
   it("keeps the seat before its time", () => {
     const holding = selling({ A1: held("A1", alice, 9_000) }, { now: 1_000 })
 
-    const result = applyProposal(BoxOffice, holding, { _tag: "Tick", now: 8_999 })
+    const result = applyProposal(BoxOffice, holding, { _tag: "Ticked", now: 8_999 })
 
     assert.deepStrictEqual(placeAt(result, "A1"), held("A1", alice, 9_000))
   })
@@ -290,31 +281,34 @@ describe("nap", () => {
   it("awaits the earliest hold", () => {
     const holding = selling({ A1: held("A1", alice, 9_000), B2: held("B2", bob, 5_000) })
 
-    assert.deepStrictEqual(nap(state(holding)), Option.some<Intent>({ _tag: "AwaitExpiry", until: 5_000 }))
+    assert.deepStrictEqual(BoxOffice.nap(state(holding)), Option.some<Intent>({ _tag: "AwaitExpiry", until: 5_000 }))
   })
 
   it("awaits the earliest hold while the house is full of holds", () => {
     const everyoneInside = selling({}, { seats: everySeat((seat) => held(seat, bob, seat === "C6" ? 4_000 : 9_000)) })
 
-    assert.deepStrictEqual(nap(state(everyoneInside)), Option.some<Intent>({ _tag: "AwaitExpiry", until: 4_000 }))
+    assert.deepStrictEqual(
+      BoxOffice.nap(state(everyoneInside)),
+      Option.some<Intent>({ _tag: "AwaitExpiry", until: 4_000 })
+    )
   })
 
   it("raises the curtain when every seat is sold", () => {
     const soldOut = selling({}, { seats: everySeat((seat) => sold(seat, alice)) })
 
-    assert.deepStrictEqual(nap(state(soldOut)), Option.some<Intent>({ _tag: "RaiseCurtain" }))
+    assert.deepStrictEqual(BoxOffice.nap(state(soldOut)), Option.some<Intent>({ _tag: "RaiseCurtain" }))
   })
 
   it("has nothing to say with no hold", () => {
-    assert.deepStrictEqual(nap(state(selling({ A1: sold("A1", alice) }))), Option.none())
+    assert.deepStrictEqual(BoxOffice.nap(state(selling({ A1: sold("A1", alice) }))), Option.none())
   })
 
   it("has nothing to say before the doors open", () => {
-    assert.deepStrictEqual(nap(state(initial)), Option.none())
+    assert.deepStrictEqual(BoxOffice.nap(state(initial)), Option.none())
   })
 
   it("has nothing to say once the curtain is up", () => {
-    assert.deepStrictEqual(nap(state({ ...selling(), phase: "curtain" })), Option.none())
+    assert.deepStrictEqual(BoxOffice.nap(state({ ...selling(), phase: "curtain" })), Option.none())
   })
 })
 
@@ -383,7 +377,7 @@ describe("actions", () => {
 
       const proposal = yield* Fiber.join(waiting)
 
-      assert.deepStrictEqual(proposal, { _tag: "Tick", now: 9_000 })
+      assert.deepStrictEqual(proposal, { _tag: "Ticked", now: 9_000 })
     }))
 
   it.effect("RaiseCurtain proposes the curtain at the clock", () =>
@@ -392,6 +386,6 @@ describe("actions", () => {
 
       const proposal = yield* BoxOffice.actions.RaiseCurtain({ _tag: "RaiseCurtain" }).pipe(Effect.provide(Stage))
 
-      assert.deepStrictEqual(proposal, { _tag: "CurtainUp", at: 12_000 })
+      assert.deepStrictEqual(proposal, { _tag: "CurtainRaised", at: 12_000 })
     }))
 })

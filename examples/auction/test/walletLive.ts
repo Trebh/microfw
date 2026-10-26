@@ -2,10 +2,10 @@ import { NodeRuntime, NodeSocket } from "@effect/platform-node"
 import { createTestModel } from "@mufw/test"
 import { Config, Console, Effect, Layer } from "effect"
 import { RpcClient, RpcSerialization } from "effect/rpc"
-import { Wallet } from "../src/domain/Wallet.ts"
+import { Wallet } from "../src/wallet/Wallet.ts"
 import { WalletPorts, WalletRpc } from "../src/ports.ts"
 import { samPath } from "../src/samPath.ts"
-import { walletTestModel } from "./walletModel.ts"
+import { walletTestModel } from "./wallet/Wallet.pathModel.ts"
 
 /**
  * Replays the wallet's shortest paths against the second definition a live server serves, at

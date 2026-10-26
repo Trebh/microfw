@@ -1,5 +1,5 @@
 import { Effect, Option, Schema } from "effect"
-import { ActionFailure, define, makePorts } from "../../src/index.ts"
+import { type Acceptors, ActionFailure, define, makePorts, type Nap, noIntent } from "../../src/index.ts"
 
 export const Model = Schema.Struct({ count: Schema.Int })
 export const Proposal = Schema.Union([
@@ -17,6 +17,16 @@ export const Representation = Schema.Struct({
   count: Schema.Int
 })
 
+export const counterAcceptors: Acceptors<typeof Model.Type, typeof Proposal.Type> = {
+  Inc: (model, proposal) => ({ count: model.count + proposal.by }),
+  Reset: () => ({ count: 0 })
+}
+
+export const counterNap: Nap<typeof Representation.Type, typeof Intent.Type> = {
+  low: noIntent,
+  high: () => Option.some({ _tag: "AutoReset" })
+}
+
 export const Counter = define({
   name: "counter",
   model: Model,
@@ -24,15 +34,11 @@ export const Counter = define({
   intent: Intent,
   representation: Representation
 })({
-  controlStates: ["low", "high"],
   initial: { count: 0 },
-  acceptors: [
-    (model, proposal) => (proposal._tag === "Inc" ? { count: model.count + proposal.by } : model),
-    (model, proposal) => (proposal._tag === "Reset" ? { count: 0 } : model)
-  ],
+  acceptors: counterAcceptors,
   reactors: [],
   state: (model) => ({ controlState: model.count >= 3 ? "high" : "low", count: model.count }),
-  nap: (representation) => (representation.count >= 3 ? Option.some({ _tag: "AutoReset" }) : Option.none()),
+  nap: counterNap,
   actions: {
     Inc: (intent) => Effect.succeed({ _tag: "Inc", by: intent.by }),
     Reset: () => Effect.succeed({ _tag: "Reset" }),

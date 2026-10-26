@@ -7,7 +7,7 @@ import { connect, createServer } from "node:net"
 import { cpus, totalmem } from "node:os"
 import { fileURLToPath } from "node:url"
 import { layerAuthenticationAnonymous, layerAuthenticationClient } from "../src/authentication.ts"
-import { Auction, type Proposal } from "../src/domain/Auction.ts"
+import { Auction, type Proposal } from "../src/auction/Auction.ts"
 import { Amount, Bidder, SessionToken } from "../src/domain/Values.ts"
 import { Ports, Rpc } from "../src/ports.ts"
 import { samPath } from "../src/samPath.ts"
@@ -420,7 +420,7 @@ const opened: Proposal = { _tag: "Opened", at: 1_000 }
 
 /** Bid `index` is valid when it arrives after bid `index - 1` (the minimum increment is 5). */
 const bidNumber = (index: number): Proposal => ({
-  _tag: "Bid",
+  _tag: "BidPlaced",
   bidder: Bidder.make(`x${index}x`),
   amount: Amount.make(5 * (index + 1)),
   at: 1_000 + index

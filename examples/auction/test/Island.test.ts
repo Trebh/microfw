@@ -2,10 +2,10 @@ import { assert, describe, it } from "@effect/vitest"
 import { layerForward, layerLoopLocal } from "@mufw/core"
 import { Effect, Layer, Option, Stream } from "effect"
 import { Amount, Bidder } from "../src/domain/Values.ts"
-import { holdForBids } from "../src/domain/WalletFeed.ts"
-import { type Representation, Wallet } from "../src/domain/Wallet.ts"
+import { holdForBids } from "../src/wallet/Wallet.feed.ts"
+import { type Representation, Wallet } from "../src/wallet/Wallet.ts"
 import { Ports, WalletPorts } from "../src/ports.ts"
-import { Local } from "./drivers.ts"
+import { Local } from "./auction/Auction.pathModel.ts"
 
 const alice = Bidder.make("alice")
 const bob = Bidder.make("bob")
@@ -52,7 +52,7 @@ describe("auction and wallet islands", () => {
       yield* aliceBids(40)
       yield* walletShows((representation) => representation.reserved === 40)
 
-      yield* Ports.ModelPort.use((auction) => auction.present({ _tag: "Bid", bidder: bob, amount: Amount.make(45), at: 0 }))
+      yield* Ports.ModelPort.use((auction) => auction.present({ _tag: "BidPlaced", bidder: bob, amount: Amount.make(45), at: 0 }))
       const wallet = yield* walletShows((representation) => representation.reserved === 0)
 
       assert.deepStrictEqual(wallet, { controlState: "funded", credit: 100, reserved: 0, available: 100 })
@@ -65,7 +65,7 @@ describe("auction and wallet islands", () => {
       yield* walletShows((representation) => representation.reserved === 40)
 
       yield* Ports.ModelPort.use((auction) =>
-        auction.present({ _tag: "Bid", bidder: alice, amount: Amount.make(150), at: 0 })
+        auction.present({ _tag: "BidPlaced", bidder: alice, amount: Amount.make(150), at: 0 })
       )
       const wallet = yield* walletShows((representation) => representation.reserved === 0)
 

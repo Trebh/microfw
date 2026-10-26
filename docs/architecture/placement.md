@@ -36,6 +36,7 @@ never fails; the remote port fails with it.
 | `layerActionRunnerLocal` | `ActionRunner` | the actions' services except the ports' `R`, which `run`'s caller supplies |
 | `layerActionsDrain` | — (background fiber) | `IntentBus`, `ActionRunner`, `ModelPort`; asks an `AutoActionsGate` when one is provided |
 | `layerLoopLocal(def, ports, options?)` | all five ports, drain running; takes the options of `layerModelLocal` | the actions' services except the ports' `R` |
+| `layerLoopWith(def, ports, { model, runner })` | the intent bus and the actions drain around a model layer (provides `ModelPort`, may require `IntentBus`) and a runner layer (provides `ActionRunner`), plus everything those provide; each side is local or remote as its layer says, and `browserOnly`, `serverModel` and `serverActions` in `src/client/placements/` each call it once; core imports no adapter | what `model` and `runner` require |
 | `layerPersistModel(def, ports, key?)` | — (background fiber) | `HistoryPort`, `KeyValueStore` |
 | `layerLoopPersisted(def, ports, key?)` | what `layerLoopLocal` provides, started from the stored model | the actions' services except the ports' `R`, `KeyValueStore` |
 | `layerLoopSynced(def, ports, options?)` | what `layerLoopLocal` provides, and `AutoActionsGate`; `ModelPort.present` appends to the `SyncLog` and returns once the log's entry is applied; the instance that holds the log's lease runs the automatic actions; `options`: `resume`, `checkpoints`, `stopped`, `lease` | the actions' services except the ports' `R`, `SyncLog` |
@@ -199,13 +200,22 @@ takes also provides the page's `Whoami` (see [Identity](#identity)); `runPage` m
 | `worker` | worker | worker | remote `IntentPort`, `ModelPort`, `HistoryPort` over `RpcClient.layerProtocolWorker`, anonymous, `?bidder=` sent as the worker's initial message (`placements/worker.ts`) and also the page's `layerWhoamiFixed`; the worker serves them from `layerLoopLocal` (`placements/workerHost.ts`, `auctionLoopLocal`) | `Submit`, `Representations`, `History`, `TravelTo` |
 | `index` (demo) | from `?placement=` | | any of the four, chosen at runtime; plus the ticker island, over HTTP (`httpReadOnly.ts`) or the websocket (`socketReadOnly.ts`) from `?ticker=`, and the HTML stream in an `<iframe>` | all, and `Representations` over HTTP |
 
+Where each fixed page runs its auction is stated once, in the `placements` table of
+`src/deployments.ts` (layer-free: `{ model, actions }`, each `client` or `server`, per page but the
+demo, whose placement comes from its query string). Three readers derive from it and nothing copies
+it: the footer labels (`pageLabels` in `src/client/labels.ts`, through `formatPlacement`), the
+`check:bundle` expectations for the four pages (a local half is present exactly for a `client`
+side), and the server-rendered first paint (`embedsModel` in `src/ssr.ts`: a page carries the model
+snapshot exactly when its model side is `client`). The composition in `src/client/placements/` is
+written to match the table; the bundle check is what fails when it does not.
+
 - Each deployment is built on its own: `vite build --mode <deployment>` takes that page as its only
   entry and writes `dist/<deployment>`, so a server-owned bundle contains no local model or action
   runner of the auction (`demo` is the one build that holds all four placements). Every page but
   `devtools` runs the wallet's local loop, so `layerModelLocal` and `layerActionRunnerLocal` of
   `@mufw/core` are in those bundles and say nothing about the auction. `pnpm build:client` builds
   every deployment and then runs `check:bundle`, which reads which exports each build kept (names
-  that survive minification): `walletBrowserOnly` and `makeView` in every checked deployment but `devtools` (`demo` holds all four placements and is not checked), as the
+  that survive minification): `walletBrowserOnly` and `makeAuctionView` in every checked deployment but `devtools` (`demo` holds all four placements and is not checked), as the
   control that the names are not stale, and the exports of `src/client/placements/auctionLocal.ts`
   (`auctionModelLocal`, `auctionActionRunnerLocal`), the one place a page builds the auction's local
   halves. It fails when a deployment ships a half of the auction it delegates, or lacks one it runs;
@@ -221,7 +231,7 @@ takes also provides the page's `Whoami` (see [Identity](#identity)); `runPage` m
   that the check looks at a local loop and not at an empty bundle.
   Before it builds, `check:bundle` parses every module under `src/client` (TypeScript compiler API,
   `scripts/auctionLocalHalves.ts`) and fails on a call to `layerModelLocal`, `layerActionRunnerLocal`
-  or `layerLoopLocal` whose definition is the auction's (`src/domain/Auction.ts`) outside
+  or `layerLoopLocal` whose definition is the auction's (`src/auction/Auction.ts`) outside
   `placements/auctionLocal.ts`, the only allowed module: the worker host and every placement import
   that module's exports rather than call the builders. Imports of the builders and of the definition
   may be aliased or namespaced and the definition may sit in a `const`; the wallet's loop, built with
@@ -362,13 +372,13 @@ Deduplicating is `forward`'s business: it returns `none` when nothing relevant c
 the dispatch (a lost transport, for a remote `to`) is logged at error level and forwarding continues
 too. Both sides are ports, so each may be local or remote.
 
-The example's second island is the wallet (`src/domain/Wallet.ts`): model `{ credit, reserved }`,
+The example's second island is the wallet (`src/wallet/Wallet.ts`): model `{ credit, reserved }`,
 control states `funded` | `exhausted` (no credit left), intents `Reserve { amount }` | `Release`,
 proposals `Reserved` | `Released` | `Refused`. A reservation replaces the previous one (the wallet
 holds what backs the leading bid, not a sum); `Reserve` above the credit is `Refused` by the action
-and leaves nothing held. Its acceptors are pure and tested with literal models; the path tests use
-`test/walletModel.ts`. The wallet is mounted browser-only on every auction page (`walletBrowserOnly`, a
-`layerLoopLocal`) and fed by `holdForBids(bidder)` (`src/domain/WalletFeed.ts`): the leading bid
+and leaves nothing held. Its acceptors are pure and tested with literal models (`test/wallet/Wallet.rules.test.ts`); the path tests use
+`test/wallet/Wallet.pathModel.ts`. The wallet is mounted browser-only on every auction page (`walletBrowserOnly`, a
+`layerLoopLocal`) and fed by `holdForBids(bidder)` (`src/wallet/Wallet.feed.ts`): the leading bid
 when it is the bidder's becomes `Reserve`, anything else `Release`, and only a change of that hold
 is forwarded (a wallet starts released, so a first representation without a bid asks nothing).
 
@@ -388,7 +398,7 @@ Nothing about the server changes for an island: it serves each definition it hos
 (see [Server](#server)).
 
 The ticker is the example's read-only island: the auction's control state and highest bid
-(`src/tickerViewTemplate.ts`), mounted on the demo page beside the auction in its own root
+(`src/auction/Ticker.view.ts`), mounted on the demo page beside the auction in its own root
 (`<div id="ticker">`) by `runTicker` (`src/client/ticker.ts`). Where it reads from is data that the
 demo's composition root passes in (`TickerTransport`: a placement and the line the view shows as its
 source), picked by `?ticker=http|socket` in `src/client/demo.ts`; a missing or unknown value is the
@@ -642,12 +652,13 @@ loop is provided once outside it, so every route gets the one instance). It need
 
 - `GET /` reads `dist/<deployment>/<page>.html` on every request (`ssrPages` in `src/ssr.ts` names the
   file: the page of `scripts/pages.ts`, `index.html` for `demo`) and renders
-  `makeViewWith(html)(label)(representation, () => {})` with `makeSsr()` into the empty
+  `makeAuctionViewWith(html)(label)(representation, () => {})` with `makeSsr()` into the empty
   `<div id="app">`. The representation is the one of the server's latest history record, which a
   follower fiber keeps current; the record carries the model too, so a page never mixes steps. The
   label is `pageLabels[deployment](query)` (`src/client/labels.ts`), the function the page entry calls
   with `location.search`, so `?bidder=bob` gives the footer the browser will render.
-- A deployment whose browser owns the auction model (`demo`, `browser-only`, `server-actions`) also
+- A deployment whose browser owns the auction model (`demo`, `browser-only`, `server-actions`; the
+  fixed pages by their `placements` entry) also
   gets `<script type="application/json" id="mufw:auction">` after `#app`: the record's model as JSON
   (`Schema.fromJsonString(Schema.toCodecJson(Model))`, so an `Option` is plain JSON), with `<`
   written `\u003c` so that no string of the model can close the element. The placement reads it

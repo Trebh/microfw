@@ -2,7 +2,7 @@ import { makePorts } from "@mufw/core"
 import { makeRpc, type RpcTag } from "@mufw/rpc"
 import { Layer } from "effect"
 import { Authentication } from "./authentication.ts"
-import { Auction } from "./domain/Auction.ts"
+import { Auction } from "./auction/Auction.ts"
 import type { CurrentBidder } from "./domain/CurrentBidder.ts"
 import { layerWhoamiHandlers, WhoamiRpcs } from "./whoami.ts"
 

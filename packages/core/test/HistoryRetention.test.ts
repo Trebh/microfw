@@ -8,7 +8,9 @@ import {
   HistoryRetainedSize,
   layerLoopLocal,
   makePorts,
-  NoSuchStep
+  NoSuchStep,
+  noIntent,
+  unchanged
 } from "../src/index.ts"
 import { Counter, Ports as CounterPorts } from "./fixtures/Counter.ts"
 import { collect } from "./support.ts"
@@ -21,12 +23,14 @@ const Ledger = define({
   intent: Schema.TaggedStruct("Add", { value: Schema.Int }),
   representation: Schema.Struct({ controlState: Schema.Literals(["open"]), size: Schema.Int })
 })({
-  controlStates: ["open"],
   initial: { entries: [] },
-  acceptors: [(model, proposal) => (proposal._tag === "Add" ? { entries: [...model.entries, proposal.value] } : model)],
+  acceptors: {
+    Add: (model, proposal) => ({ entries: [...model.entries, proposal.value] }),
+    Noop: unchanged
+  },
   reactors: [],
   state: (model) => ({ controlState: "open", size: model.entries.length }),
-  nap: () => Option.none(),
+  nap: { open: noIntent },
   actions: { Add: (intent) => Effect.succeed({ _tag: "Add", value: intent.value }) }
 })
 const Ports = makePorts(Ledger)

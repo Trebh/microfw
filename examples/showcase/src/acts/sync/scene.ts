@@ -1,7 +1,7 @@
 import { Option } from "effect"
 import type { Representation, SeatView } from "../../domain/BoxOffice.ts"
-import { type Checkpoint, HORATIO, LEASE_TIMEOUT_MILLIS, OPHELIA, type Side, Synced } from "./house.ts"
-import { Stagehand, type Representation as StageRepresentation } from "./stagehand.ts"
+import { type Checkpoint, HORATIO, LEASE_TIMEOUT_MILLIS, OPHELIA, type Side, Synced } from "./ticketHouse.ts"
+import { Stagehand, type Representation as StageRepresentation } from "./Stagehand.ts"
 import { append, emptyTape, type Logged, type Tape } from "./tape.ts"
 
 /** Where one window stands in the log: the last entry it applied, the lease epoch it knows, and its model's fingerprint. */

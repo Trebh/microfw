@@ -338,10 +338,10 @@ def items():
         (depth(-62, -R), view_node()),
         (depth(-22, -R), data_node(-22, -R, 0, 32, "Intent", ["Open · PlaceBid", "Tick · Close"], lines_du=-4)),
         (depth(19, -R), function_node(19, -R, 0, "actions", "i ⇒ Effect&lt;p&gt;", "effect", r=10.5, h=11)),
-        (depth(56, -R), data_node(56, -R, 0, 32, "Proposal", ["Bid · BidRejected", "Opened · Tick · Close"])),
+        (depth(56, -R), data_node(56, -R, 0, 36, "Proposal", ["BidPlaced · BidRejected", "Opened · Ticked · Closed"])),
         (depth(-2, 10), function_node(-2, 10, STEP_Z, "nap", "rep ⇒ i?", r=7.5, h=6)),
         (depth(60, R), function_node(60, R, STEP_Z, "acceptors", "(m, p) ⇒ m")),
-        (depth(22, R), data_node(22, R, STEP_Z, 32, "Model", ["status · bids", "endsAt"], stack=3)),
+        (depth(22, R), data_node(22, R, STEP_Z, 32, "Model", ["phase · bids", "endsAt"], stack=3)),
         (depth(-14, R), function_node(-14, R, STEP_Z, "state", "m ⇒ rep")),
         (depth(-54, R), data_node(-54, R, STEP_Z, 38, "Representation", ["controlState", "highest"])),
     ]
@@ -355,7 +355,7 @@ KEY = [
     ("view", PURE, ["A pure function of the", "representation, mounted by an", "adapter. It renders and emits", "intents; it never decides."]),
     ("acceptors", PURE, ["Decide what the model becomes.", "A business “no” is a proposal", "(BidRejected), never an error."]),
     ("Model", DATA, ["Mutated only in layerModelLocal,", "under its permit. The slabs", "behind it are the history:", "one record per proposal."]),
-    ("state", PURE, ["Derives the control state,", "never declared: opening · open", "· closing · sold."]),
+    ("state", PURE, ["Derives the representation and", "its control state from the", "model: opening · open ·", "closing · sold."]),
     ("nap", PURE, ["At most one automatic intent,", "skipped while its intentKey is", "in flight. It joins after Submit,", "so it never crosses that wire."]),
     ("seams", SEAM, ["Each pane is a port a remote", "adapter from @mufw/rpc can cut.", "Italics: the placements that", "wire it. The domain never changes."]),
 ]

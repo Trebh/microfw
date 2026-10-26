@@ -1,7 +1,7 @@
 import { render } from "uhtml"
 import { makeLabels } from "./labels.ts"
 import { CREATE_COUNT, CREATE_LOTS_COUNT, type Row, swapRows, updateEveryTenth, withLabels } from "./rows.ts"
-import { type Handlers, tableView } from "./table.ts"
+import { type Handlers, tableView } from "./Table.view.ts"
 
 const TITLE = "uhtml4-\"keyed\""
 

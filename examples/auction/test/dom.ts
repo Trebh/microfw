@@ -5,10 +5,10 @@ import { layerMount, type Render } from "@mufw/view-uhtml"
 import { type Duration, Effect, Layer } from "effect"
 import { TestClock } from "effect/testing"
 import type { html as Html } from "uhtml"
-import type { Auction, Intent } from "../src/domain/Auction.ts"
+import type { Auction, Intent } from "../src/auction/Auction.ts"
 import { Ports } from "../src/ports.ts"
-import { makeViewWith } from "../src/viewTemplate.ts"
-import { auctionModel, clockedIntentDriver, clockFor, intentFor, Local, named } from "./drivers.ts"
+import { makeAuctionViewWith } from "../src/auction/Auction.view.ts"
+import { auctionModel, clockedIntentDriver, clockFor, intentFor, Local, named } from "./auction/Auction.pathModel.ts"
 
 /** What the test touches; uhtml's fake elements and real elements both have it. */
 export interface DomNode {
@@ -100,7 +100,7 @@ const showsIn = (root: DomNode) => (node: string) => {
 
 /** Replays every shortest and simple path of the auction through its rendered view. */
 export const describeDomPaths = (harness: Harness) => {
-  const view = makeViewWith(harness.html)("dom")
+  const view = makeAuctionViewWith(harness.html)("dom")
   const runInDom = (path: Path<typeof Auction>) =>
     Effect.gen(function*() {
       const painted = yield* makePainted

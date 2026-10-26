@@ -1,9 +1,9 @@
 import { Option } from "effect"
 import { html } from "uhtml"
 import type { Intent as SeatIntent, SeatView } from "../../domain/BoxOffice.ts"
-import { LEASE_TIMEOUT_MILLIS, type Side } from "./house.ts"
+import { LEASE_TIMEOUT_MILLIS, type Side } from "./ticketHouse.ts"
 import { agreement, type Agreement, chairHolder, type Scene, silenceMillis, silenceShare, type WindowScene } from "./scene.ts"
-import { type Intent as StageIntent, raceableSeat } from "./stagehand.ts"
+import { type Intent as StageIntent, raceableSeat } from "./Stagehand.ts"
 import { type Row, verdictFor } from "./tape.ts"
 
 /** What a hand on the page can do: an intent for one window's loop, or one for the stage manager's. */

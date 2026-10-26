@@ -157,13 +157,13 @@ def oracle():
             '<linearGradient id="pill" x1="0" x2="1"><stop offset="0" stop-color="#1f2436"/><stop offset="1" stop-color="#2d3452"/></linearGradient>'
             '</defs>')
     graph = ""
-    edges = [(46, 66, "Opened"), (104, 124, "Tick"), (162, 182, "Close")]
+    edges = [(46, 66, "Opened"), (104, 124, "Ticked"), (162, 182, "Closed")]
     for x0, x1, label in edges:
         graph += f'<line x1="{x0 + 0.6}" y1="15.25" x2="{x1 - 1}" y2="15.25" stroke="{INK}" stroke-width=".6" marker-end="url(#ah3)"/>'
         graph += text((x0 + x1) / 2, 13.2, label, 2.4, 600, MUTED, family=MONO)
     for x in (66, 124):
         graph += f'<path d="M{x + 12},{9.8} C{x + 9},2.2 {x + 29},2.2 {x + 26},9.4" stroke="{INK}" stroke-width=".6" fill="none" marker-end="url(#ah3)"/>'
-        graph += text(x + 19, 2.6, "Bid · BidRejected · Tick", 2.3, 600, MUTED, family=MONO)
+        graph += text(x + 19, 2.6, "BidPlaced · BidRejected · Ticked", 2.3, 600, MUTED, family=MONO)
     for name, x in STATES:
         graph += state_box(name, x, terminal=name == "sold")
     graph += text(201, 26.4, "terminal", 2.3, 600, DATA, extra='font-style="italic"')
@@ -220,7 +220,7 @@ def history():
            '<linearGradient id="rec" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#f1eaff"/></linearGradient>'
            '<linearGradient id="recHot" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8b5cf6"/><stop offset="1" stop-color="#6d28d9"/></linearGradient>'
            '</defs>')
-    tags = ["init", "Opened", "Bid", "Bid", "Tick", "Bid"]
+    tags = ["init", "Opened", "BidPlaced", "BidPlaced", "Ticked", "BidPlaced"]
     for i, tag in enumerate(tags):
         x = 1 + i * 13.3
         hot = i == 2

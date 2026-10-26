@@ -24,7 +24,7 @@ import { Config, Console, Deferred, Effect, Layer, Schema, type Scope, Stream } 
 import { arch, cpus, platform, totalmem } from "node:os"
 import { layerCreditCheckPermissive } from "../src/adapters/creditCheckPermissive.ts"
 import { layerCurrentBidderFixed } from "../src/adapters/currentBidderFixed.ts"
-import { Auction, type Proposal as AuctionProposal } from "../src/domain/Auction.ts"
+import { Auction, type Proposal as AuctionProposal } from "../src/auction/Auction.ts"
 import { Amount, Bidder } from "../src/domain/Values.ts"
 import { Counter, CounterPorts } from "./bench/counter.ts"
 import { LIST_ROWS, List, ListPorts } from "./bench/list.ts"
@@ -305,7 +305,7 @@ const opened: AuctionProposal = { _tag: "Opened", at: 1_000 }
 
 /** Update `index` is a bid that is always valid after the opening (the minimum increment is 5). */
 const bidNumber = (index: number): AuctionProposal => ({
-  _tag: "Bid",
+  _tag: "BidPlaced",
   bidder: Bidder.make(`x${index}x`),
   amount: Amount.make(5 * (index + 1)),
   at: 1_000 + index

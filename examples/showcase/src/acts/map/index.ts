@@ -5,12 +5,12 @@ import { render } from "uhtml"
 import type { Act } from "../../act.ts"
 import { Deck, DeckPorts } from "../../deck/Deck.ts"
 import type { BoxOffice } from "../../domain/BoxOffice.ts"
-import { type Chart, surveyStage } from "./Chart.ts"
-import { forwardWalk, layerFollowStage } from "./Follow.ts"
+import { type Chart, surveyStage } from "./chart.ts"
+import { forwardWalk, layerFollowStage } from "./follow.ts"
 import "./style.css"
 import { script } from "./script.ts"
 import { makeSurvey } from "./Survey.ts"
-import { makeMapView } from "./View.ts"
+import { makeMapView } from "./Survey.view.ts"
 
 const island = (root: HTMLElement, chart: Chart) => {
   const survey = makeSurvey(chart.ways)

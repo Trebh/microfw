@@ -1,7 +1,7 @@
 import { makeSsr, type Ssr } from "@mufw/view-uhtml/ssr"
 import { Effect, Schema, Stream } from "effect"
 import { HttpRouter, HttpServerResponse } from "effect/http"
-import { Auction, type Representation } from "./domain/Auction.ts"
+import { Auction, type Representation } from "./auction/Auction.ts"
 import { ServerPorts } from "./serverPorts.ts"
 import { renderApp } from "./ssr.ts"
 

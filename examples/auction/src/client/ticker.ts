@@ -2,9 +2,9 @@ import { BrowserRuntime } from "@effect/platform-browser"
 import type { ModelPort } from "@mufw/core"
 import { layerInputScheduler, layerMountReadOnly } from "@mufw/view-uhtml"
 import { Layer, type Schema } from "effect"
-import type { Auction } from "../domain/Auction.ts"
+import type { Auction } from "../auction/Auction.ts"
 import { Ports } from "../ports.ts"
-import { makeTickerView } from "../tickerView.ts"
+import { makeTickerView } from "../auction/Ticker.view.dom.ts"
 
 /**
  * Where a ticker reads the server's auction from: a placement that provides the remote `ModelPort`

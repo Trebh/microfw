@@ -10,7 +10,7 @@ import { SessionToken } from "../src/domain/Values.ts"
 import { Ports, Rpc } from "../src/ports.ts"
 import { layerRefusalNoticeWith } from "../src/client/refusalNotice.ts"
 import { layerRefusals, Refusals } from "../src/client/refusals.ts"
-import { makeViewWith } from "../src/viewTemplate.ts"
+import { makeAuctionViewWith } from "../src/auction/Auction.view.ts"
 import { clientWith } from "./serverSide.ts"
 
 interface DomNode {
@@ -103,7 +103,7 @@ const pageOver = (authentication: typeof layerAuthenticationAnonymous, app: DomN
   return Layer.merge(
     layerMount(Ports, {
       root: app as unknown as Element,
-      view: makeViewWith(html)("test"),
+      view: makeAuctionViewWith(html)("test"),
       render,
       onRefused: (refused) => Refusals.use((refusals) => refusals.report(refused))
     }),

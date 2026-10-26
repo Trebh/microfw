@@ -5,10 +5,10 @@ written twice with the same markup:
 
 | Entry | What it is |
 |---|---|
-| `mufw` (`src/mufw.ts`, `src/definition.ts`) | idiomatic µFW: a `SamDefinition` (`define(schemas)(behaviour)`), mounted with `layerMount` over `layerLoopLocal`, `layerInputScheduler` provided last |
+| `mufw` (`src/mufw.ts`, `src/Table.ts`) | idiomatic µFW: a `SamDefinition` (`define(schemas)(behaviour)`), mounted with `layerMount` over `layerLoopLocal`, `layerInputScheduler` provided last |
 | `uhtml4` (`src/uhtml4.ts`) | the control: plain uhtml 4, one state variable, one `render` per click, no µFW. The difference between the two is the cost of µFW itself, not of the renderer |
 
-Both render through `src/table.ts` (one template for the page and the rows) and share the pure row
+Both render through `src/Table.view.ts` (one template for the page and the rows) and share the pure row
 operations of `src/rows.ts` and the word lists of `src/labels.ts`.
 
 ```sh

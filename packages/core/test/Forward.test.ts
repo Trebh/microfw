@@ -1,7 +1,16 @@
 import { assert, describe, it } from "@effect/vitest"
 import { Effect, Layer, Option, Stream } from "effect"
 import { AutoActions, define, DispatchRefused, type Forward, layerForward, layerLoopLocal, makePorts } from "../src/index.ts"
-import { Counter, Intent, Model, Ports, Proposal, Representation } from "./fixtures/Counter.ts"
+import {
+  Counter,
+  counterAcceptors,
+  counterNap,
+  Intent,
+  Model,
+  Ports,
+  Proposal,
+  Representation
+} from "./fixtures/Counter.ts"
 import { awaitFirst, captureLogs, collect, settle } from "./support.ts"
 
 /** The Counter's behaviour under another name, so both loops can live in one context. */
@@ -12,12 +21,11 @@ const Tally = define({
   intent: Intent,
   representation: Representation
 })({
-  controlStates: Counter.controlStates,
   initial: Counter.initial,
-  acceptors: Counter.acceptors,
+  acceptors: counterAcceptors,
   reactors: Counter.reactors,
   state: Counter.state,
-  nap: Counter.nap,
+  nap: counterNap,
   actions: Counter.actions
 })
 const TallyPorts = makePorts(Tally)

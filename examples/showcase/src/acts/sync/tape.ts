@@ -3,7 +3,7 @@ import { applyLease, Lease, type LeaseOutcome, type LeaseState, leaseOutcome, no
 import { Cause, Effect, Option, Schema } from "effect"
 import { Event, EventJournal } from "effect/eventlog"
 import { type Model as BoxModel, Proposal } from "../../domain/BoxOffice.ts"
-import { Synced } from "./house.ts"
+import { Synced } from "./ticketHouse.ts"
 
 /** What one log entry says, read from its binary payload with the schemas the log's server decodes it with. */
 export type Body =
@@ -115,8 +115,8 @@ const proposalLabel = (proposal: Proposal): string => {
     case "PaymentDeclined":
       return `${proposal._tag} ${proposal.seat}`
     case "DoorsOpened":
-    case "Tick":
-    case "CurtainUp":
+    case "Ticked":
+    case "CurtainRaised":
       return proposal._tag
   }
 }

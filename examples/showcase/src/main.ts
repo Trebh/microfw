@@ -16,7 +16,7 @@ import { layerPrompterBook } from "./deck/prompterBook.ts"
 import { buildSkeleton } from "./deck/skeleton.ts"
 import { layerSpotlight } from "./deck/spotlight.ts"
 import { layerStageScale } from "./deck/stageScale.ts"
-import { makeDeckView } from "./deck/view.ts"
+import { makeDeckView } from "./deck/Deck.view.ts"
 import { BoxOffice, BoxOfficePorts, Patron } from "./domain/BoxOffice.ts"
 
 const theatre = document.getElementById("theatre")

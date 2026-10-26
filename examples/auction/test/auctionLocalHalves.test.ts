@@ -13,7 +13,7 @@ describe("misplacedLocalHalves", () => {
   it("flags a page that builds the auction's local model", () => {
     const text = [
       `import { layerModelLocal } from "@mufw/core"`,
-      `import { Auction } from "../domain/Auction.ts"`,
+      `import { Auction } from "../auction/Auction.ts"`,
       `import { Ports } from "../ports.ts"`,
       `export const model = layerModelLocal(Auction, Ports)`
     ].join("\n")
@@ -24,7 +24,7 @@ describe("misplacedLocalHalves", () => {
   it("flags a page that builds the auction's local action runner", () => {
     const text = [
       `import { layerActionRunnerLocal } from "@mufw/core"`,
-      `import { Auction } from "../../domain/Auction.ts"`,
+      `import { Auction } from "../../auction/Auction.ts"`,
       `import { Ports } from "../../ports.ts"`,
       `export const runner = layerActionRunnerLocal(Auction, Ports)`
     ].join("\n")
@@ -35,7 +35,7 @@ describe("misplacedLocalHalves", () => {
   it("flags a page that builds the auction's local loop", () => {
     const text = [
       `import { layerLoopLocal } from "@mufw/core"`,
-      `import { Auction } from "../domain/Auction.ts"`,
+      `import { Auction } from "../auction/Auction.ts"`,
       `import { ServerPorts } from "../serverPorts.ts"`,
       `export const loop = layerLoopLocal(Auction, ServerPorts)`
     ].join("\n")
@@ -46,7 +46,7 @@ describe("misplacedLocalHalves", () => {
   it("flags a builder and a definition imported under another name", () => {
     const text = [
       `import { layerModelLocal as local } from "@mufw/core"`,
-      `import { Auction as TheAuction } from "../domain/Auction.ts"`,
+      `import { Auction as TheAuction } from "../auction/Auction.ts"`,
       `export const model = local(TheAuction, Ports)`
     ].join("\n")
 
@@ -56,7 +56,7 @@ describe("misplacedLocalHalves", () => {
   it("flags a builder and a definition reached through namespace imports", () => {
     const text = [
       `import * as core from "@mufw/core"`,
-      `import * as auction from "../domain/Auction.ts"`,
+      `import * as auction from "../auction/Auction.ts"`,
       `export const model = core.layerModelLocal(auction.Auction, Ports)`
     ].join("\n")
 
@@ -66,7 +66,7 @@ describe("misplacedLocalHalves", () => {
   it("flags a definition held in a const", () => {
     const text = [
       `import { layerModelLocal } from "@mufw/core"`,
-      `import { Auction } from "../domain/Auction.ts"`,
+      `import { Auction } from "../auction/Auction.ts"`,
       `const definition = Auction`,
       `export const model = layerModelLocal(definition, Ports)`
     ].join("\n")
@@ -77,7 +77,7 @@ describe("misplacedLocalHalves", () => {
   it("flags a half built inside a nested function", () => {
     const text = [
       `import { layerModelLocal } from "@mufw/core"`,
-      `import { Auction } from "../domain/Auction.ts"`,
+      `import { Auction } from "../auction/Auction.ts"`,
       `export const model = (ports: unknown) => Layer.unwrap(Effect.sync(() => layerModelLocal(Auction, ports)))`
     ].join("\n")
 
@@ -100,7 +100,7 @@ describe("misplacedLocalHalves", () => {
   it("does not flag the wallet's loop", () => {
     const text = [
       `import { layerLoopLocal } from "@mufw/core"`,
-      `import { Wallet } from "../../domain/Wallet.ts"`,
+      `import { Wallet } from "../../wallet/Wallet.ts"`,
       `export const wallet = layerLoopLocal(Wallet, WalletPorts)`
     ].join("\n")
 
@@ -120,7 +120,7 @@ describe("misplacedLocalHalves", () => {
   it("does not flag the server, which composes its own halves", () => {
     const text = [
       `import { layerLoopLocal } from "@mufw/core"`,
-      `import { Auction } from "./domain/Auction.ts"`,
+      `import { Auction } from "./auction/Auction.ts"`,
       `export const loop = layerLoopLocal(Auction, ServerPorts)`
     ].join("\n")
 

@@ -1,4 +1,4 @@
-import { ActionFailure, define, type HistoryPort, type IntentPort, makePorts } from "@mufw/core"
+import { ActionFailure, define, type HistoryPort, type IntentPort, makePorts, type Nap, type WithTag } from "@mufw/core"
 import { Effect, Option, Schema } from "effect"
 import {
   BoxOffice,
@@ -77,49 +77,45 @@ export const initial: Model = {
   note: Option.none()
 }
 
+
 /** A travel that reaches the reel answers a pending return, so the prompter does not ask for it twice. */
-export const acceptRecorded = (model: Model, proposal: Proposal): Model => {
-  if (proposal._tag !== "Recorded") return model
+export const acceptRecorded = (model: Model, proposal: WithTag<Proposal, "Recorded">): Model => {
   const { record } = proposal
   if (model.records.some((known) => known.seq === record.seq)) return model
   const answered = record.kind === "travel"
   return { ...model, records: [...model.records, record], pendingStart: model.pendingStart && !answered }
 }
 
-export const acceptSelected = (model: Model, proposal: Proposal): Model => {
-  if (proposal._tag !== "Selected") return model
+export const acceptSelected = (model: Model, proposal: WithTag<Proposal, "Selected">): Model => {
   const exists = model.records.some((record) => record.seq === proposal.seq)
   return exists ? { ...model, selected: Option.some(proposal.seq) } : model
 }
 
-export const acceptTravelled = (model: Model, proposal: Proposal): Model =>
-  proposal._tag === "Travelled"
-    ? { ...model, selected: Option.none(), pendingStart: false, note: Option.none(), travels: model.travels + 1 }
-    : model
+export const acceptTravelled = (model: Model): Model => ({
+  ...model,
+  selected: Option.none(),
+  pendingStart: false,
+  note: Option.none(),
+  travels: model.travels + 1
+})
 
-export const acceptTravelRefused = (model: Model, proposal: Proposal): Model =>
-  proposal._tag === "TravelRefused"
-    ? {
-      ...model,
-      selected: Option.none(),
-      pendingStart: false,
-      note: Option.some(`The stage no longer has frame ${proposal.seq}, so it can't go back there.`)
-    }
-    : model
+export const acceptTravelRefused = (model: Model, proposal: WithTag<Proposal, "TravelRefused">): Model => ({
+  ...model,
+  selected: Option.none(),
+  pendingStart: false,
+  note: Option.some(`The stage no longer has frame ${proposal.seq}, so it can't go back there.`)
+})
 
 /** Going back to the doors needs a frame where they opened; without one the request is answered with a note. */
-export const acceptReturnRequested = (model: Model, proposal: Proposal): Model => {
-  if (proposal._tag !== "ReturnRequested") return model
+export const acceptReturnRequested = (model: Model): Model => {
   if (Option.isSome(doorsOf(model.records))) return { ...model, pendingStart: true }
   return { ...model, note: Option.some("Nothing has happened on the stage yet. Open the doors and hold a seat, then go back.") }
 }
 
-export const acceptExportRequested = (model: Model, proposal: Proposal): Model =>
-  proposal._tag === "ExportRequested" ? { ...model, exports: model.exports + 1 } : model
+export const acceptExportRequested = (model: Model): Model => ({ ...model, exports: model.exports + 1 })
 
 /** A new scene on the stage makes any earlier note stale. */
-export const acceptHandedToStage = (model: Model, proposal: Proposal): Model =>
-  proposal._tag === "HandedToStage" ? { ...model, note: Option.none() } : model
+export const acceptHandedToStage = (model: Model): Model => ({ ...model, note: Option.none() })
 
 /** A hold keeps an `AwaitExpiry` waiting offstage; a travel interrupts it and no `nap` runs until the next proposal. */
 const holdWaitOf = (newest: BoxRecord | undefined): Representation["holdWait"] => {
@@ -161,10 +157,16 @@ export const state = (model: Model): Representation => {
 }
 
 /** The prompter's whisper: once going back is requested and there is a frame to go back to, go. */
-export const nap = (representation: Representation): Option.Option<Intent> =>
+const goBackWhenAsked = (representation: Representation): Option.Option<Intent> =>
   representation.pendingStart
     ? Option.map(representation.doors, (seq) => ({ _tag: "TravelTo", seq }) as const)
     : Option.none()
+
+const nap: Nap<Representation, Intent> = {
+  blank: goBackWhenAsked,
+  recording: goBackWhenAsked,
+  rewound: goBackWhenAsked
+}
 
 const handToStage = Effect.fn("handToStage")(function*(intent: StageIntent) {
   const stage = yield* BoxOfficePorts.IntentPort
@@ -190,17 +192,16 @@ export const Rewind = define({
   intent: Intent,
   representation: Representation
 })<HistoryPort<typeof BoxOffice> | IntentPort<typeof BoxOffice>>({
-  controlStates: ["blank", "recording", "rewound"],
   initial,
-  acceptors: [
-    acceptRecorded,
-    acceptSelected,
-    acceptTravelled,
-    acceptTravelRefused,
-    acceptReturnRequested,
-    acceptExportRequested,
-    acceptHandedToStage
-  ],
+  acceptors: {
+    Recorded: acceptRecorded,
+    Selected: acceptSelected,
+    Travelled: acceptTravelled,
+    TravelRefused: acceptTravelRefused,
+    ReturnRequested: acceptReturnRequested,
+    ExportRequested: acceptExportRequested,
+    HandedToStage: acceptHandedToStage
+  },
   reactors: [],
   state,
   nap,

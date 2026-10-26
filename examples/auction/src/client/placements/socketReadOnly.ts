@@ -1,6 +1,6 @@
 import { Layer } from "effect"
 import { layerAuthenticationAnonymous } from "../../authentication.ts"
-import { Auction } from "../../domain/Auction.ts"
+import { Auction } from "../../auction/Auction.ts"
 import { Rpc } from "../../ports.ts"
 import { transport } from "./transport.ts"
 

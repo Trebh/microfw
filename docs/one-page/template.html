@@ -214,16 +214,16 @@
     <section class="card s-data">
       <h3>A definition <small>schemas first, then behaviour</small></h3>
       <div class="editor">
-        <div class="bar"><i></i><i></i><i></i>examples/auction/src/domain/Auction.ts</div>
+        <div class="bar"><i></i><i></i><i></i>examples/auction/src/auction/Auction.ts</div>
 <pre><span class="k">export const</span> Auction = <span class="p">define</span>({
   name: <span class="s">"auction"</span>, model: <span class="t">Model</span>, proposal: <span class="t">Proposal</span>,
   intent: <span class="t">Intent</span>, representation: <span class="t">Representation</span>   <span class="c">// the cut points</span>
 })({
-  controlStates: [<span class="s">"opening"</span>, <span class="s">"open"</span>, <span class="s">"closing"</span>, <span class="s">"sold"</span>],
   initial,
-  acceptors: [acceptOpened, acceptBid, acceptRejection, acceptTick, acceptClose],
-  reactors: [], state, nap,                         <span class="c">// pure</span>
-  actions: { Open: …, PlaceBid: …, Tick: …, Close: … } <span class="c">// effectful</span>
+  acceptors: { Opened: acceptOpened, BidPlaced: acceptBidPlaced, … },     <span class="c">// one per tag</span>
+  reactors: [], state,                                                     <span class="c">// pure</span>
+  nap: { opening: napOpening, open: napOpen, closing: napClosing, sold: noIntent },
+  actions: { Open: …, PlaceBid: …, Tick: …, Close: … }                     <span class="c">// effectful</span>
 })
 <span class="k">const</span> Ports = <span class="p">makePorts</span>(Auction)
 <span class="k">const</span> Loop  = <span class="p">layerLoopLocal</span>(Auction, Ports)   <span class="c">// or the @mufw/rpc remote layers</span></pre>

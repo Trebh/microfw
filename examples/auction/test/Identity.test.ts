@@ -5,7 +5,7 @@ import { expectTypeOf } from "vitest"
 import { layerCreditCheckTable } from "../src/adapters/creditCheckTable.ts"
 import { layerCurrentBidderFixed } from "../src/adapters/currentBidderFixed.ts"
 import { layerAuthenticationAnonymous, layerAuthenticationClient } from "../src/authentication.ts"
-import { Auction, type Representation } from "../src/domain/Auction.ts"
+import { Auction, type Representation } from "../src/auction/Auction.ts"
 import type { CurrentBidder } from "../src/domain/CurrentBidder.ts"
 import { Amount, Bidder, SessionToken } from "../src/domain/Values.ts"
 import { Whoami } from "../src/domain/Whoami.ts"
@@ -56,7 +56,7 @@ describe("an RPC that runs actions", () => {
     Effect.gen(function*() {
       const proposal = yield* Rpc.Client.use((client) => client.Dispatch(placeBid(101)))
 
-      assert.deepStrictEqual(proposal, { _tag: "Bid", bidder: Bidder.make("bob"), amount: Amount.make(101), at: 0 })
+      assert.deepStrictEqual(proposal, { _tag: "BidPlaced", bidder: Bidder.make("bob"), amount: Amount.make(101), at: 0 })
     }).pipe(Effect.provide(withSession("demo-bob"))))
 
   it.effect("Dispatch ignores a bidder the client puts in the payload", () =>
@@ -65,7 +65,7 @@ describe("an RPC that runs actions", () => {
 
       const proposal = yield* Rpc.Client.use((client) => client.Dispatch(forged))
 
-      assert.deepStrictEqual(proposal, { _tag: "Bid", bidder: Bidder.make("bob"), amount: Amount.make(101), at: 0 })
+      assert.deepStrictEqual(proposal, { _tag: "BidPlaced", bidder: Bidder.make("bob"), amount: Amount.make(101), at: 0 })
     }).pipe(Effect.provide(withSession("demo-bob"))))
 
   it.live("Submit runs the server's action as the session's bidder", () =>

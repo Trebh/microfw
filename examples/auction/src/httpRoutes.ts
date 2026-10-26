@@ -4,7 +4,7 @@ import { HttpRouter } from "effect/http"
 import { RpcSerialization, RpcServer } from "effect/rpc"
 import { layerAuthenticationServer } from "./adapters/authenticationServer.ts"
 import { layerSessionsTable } from "./adapters/sessionsTable.ts"
-import { Auction } from "./domain/Auction.ts"
+import { Auction } from "./auction/Auction.ts"
 import { samHttpPath } from "./samPath.ts"
 import { ServerRpc } from "./serverPorts.ts"
 

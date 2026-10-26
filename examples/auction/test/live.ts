@@ -4,11 +4,11 @@ import { createTestModel } from "@mufw/test"
 import { Config, Console, Effect, Layer, Option, Stream } from "effect"
 import { RpcClient, RpcSerialization } from "effect/rpc"
 import { layerAuthenticationAnonymous, layerAuthenticationClient } from "../src/authentication.ts"
-import { Auction } from "../src/domain/Auction.ts"
+import { Auction } from "../src/auction/Auction.ts"
 import { Amount, SessionToken } from "../src/domain/Values.ts"
 import { Ports, Rpc } from "../src/ports.ts"
 import { samPath } from "../src/samPath.ts"
-import { auctionTestModel } from "./model.ts"
+import { auctionTestModel } from "./auction/Auction.pathModel.ts"
 
 /**
  * Replays the auction's shortest paths against a live server, then checks that it takes the bidder

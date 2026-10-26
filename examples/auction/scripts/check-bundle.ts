@@ -2,6 +2,7 @@ import { NodeRuntime } from "@effect/platform-node"
 import { Console, Effect, Schema } from "effect"
 import { basename } from "node:path"
 import type { Rollup } from "vite"
+import { type Placement, placements } from "../src/deployments.ts"
 import { clientSources, misplacedLocalHalves } from "./auctionLocalHalves.ts"
 import { buildDeployment, buildEntry } from "./build.ts"
 
@@ -27,7 +28,7 @@ const AUCTION_LOOP_LOCAL = "auctionLoopLocal"
 const WALLET_LOCAL = "walletBrowserOnly"
 
 /** The auction's view, which every page but `devtools` mounts (`runPage`): the control for its absence from `devtools`. */
-const AUCTION_VIEW = "makeView"
+const AUCTION_VIEW = "makeAuctionView"
 
 /** The panels of `@mufw/devtools`: the `devtools` deployment ships the list without travel, no other one does. */
 const HISTORY_LIST = "layerHistoryList"
@@ -39,38 +40,34 @@ interface Shipped {
   readonly absent: ReadonlyArray<string>
 }
 
+interface Expectation extends Shipped {
+  readonly deployment: string
+  readonly worker?: Shipped & { readonly entry: string }
+}
+
+/**
+ * A fixed page ships an auction local half exactly when `placements` puts that side in the browser,
+ * so its expectations come from the table and not from a second copy of it here. Every such page
+ * keeps the wallet and the auction view, and none ships the time-travel list.
+ */
+const placedPage = (deployment: string, placement: Placement): Expectation => {
+  const halves = [
+    { name: AUCTION_MODEL_LOCAL, side: placement.model },
+    { name: AUCTION_ACTION_RUNNER_LOCAL, side: placement.actions }
+  ]
+  const local = halves.filter(({ side }) => side === "client").map(({ name }) => name)
+  const remote = halves.filter(({ side }) => side === "server").map(({ name }) => name)
+  return { deployment, present: [WALLET_LOCAL, AUCTION_VIEW, ...local], absent: [...remote, HISTORY_LIST] }
+}
+
 /**
  * What each deployment must and must not ship. The `present` entries are the control: a deployment
  * that does run the half locally must show it, otherwise the check would pass on a stale name.
  * A page's build emits its worker as an opaque file, so a deployment with a `worker` is checked
  * twice: the page's own bundle, and the worker's module graph built from its entry.
  */
-const expectations: ReadonlyArray<
-  Shipped & {
-    readonly deployment: string
-    readonly worker?: Shipped & { readonly entry: string }
-  }
-> = [
-  {
-    deployment: "server-owned",
-    present: [WALLET_LOCAL, AUCTION_VIEW],
-    absent: [AUCTION_MODEL_LOCAL, AUCTION_ACTION_RUNNER_LOCAL, HISTORY_LIST]
-  },
-  {
-    deployment: "browser-only",
-    present: [WALLET_LOCAL, AUCTION_VIEW, AUCTION_MODEL_LOCAL, AUCTION_ACTION_RUNNER_LOCAL],
-    absent: [HISTORY_LIST]
-  },
-  {
-    deployment: "server-model",
-    present: [WALLET_LOCAL, AUCTION_VIEW, AUCTION_ACTION_RUNNER_LOCAL],
-    absent: [AUCTION_MODEL_LOCAL, HISTORY_LIST]
-  },
-  {
-    deployment: "server-actions",
-    present: [WALLET_LOCAL, AUCTION_VIEW, AUCTION_MODEL_LOCAL],
-    absent: [AUCTION_ACTION_RUNNER_LOCAL, HISTORY_LIST]
-  },
+const expectations: ReadonlyArray<Expectation> = [
+  ...Object.entries(placements).map(([deployment, placement]) => placedPage(deployment, placement)),
   {
     deployment: "devtools",
     present: [HISTORY_LIST],

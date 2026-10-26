@@ -18,7 +18,8 @@ Status: **proof of concept**. APIs move freely; there is no build step and nothi
   exports to and imports from JSON, and replays from any seq with its recorded proposals.
 - **Model-based testing.** `@mufw/test` explores the control-state graph from the definition and
   replays each generated path against the real system, in-process or over the wire, or by clicking
-  the rendered UI and reading the DOM.
+  the rendered UI and reading the DOM. Each definition with an explore function also gets a committed
+  behaviour card (`<Unit>.behaviour.md`), regenerated from the same exploration and kept current by a test.
 - **Devtools.** A time-travel panel, a read-only history list, JSON export of a history, and an adapter for the
   [Stately inspector](https://stately.ai/docs/inspector) that draws the state and sequence diagrams.
 
@@ -124,7 +125,7 @@ applies whatever proposal the page presents anyway, so the page states its own i
 `?bidder=` (default `alice`) at its composition root. A server that serves only `Submit`,
 `Representations` and `History` never believes a visitor about who is bidding.
 
-Every auction page (all but `/devtools.html`) also mounts a second island beside the auction: a wallet (`src/domain/Wallet.ts`, credit
+Every auction page (all but `/devtools.html`) also mounts a second island beside the auction: a wallet (`src/wallet/Wallet.ts`, credit
 100) with its own loop, root and placement, always in the browser. `layerForward` feeds it from
 the auction: when the leading bid is the page's bidder's, the wallet reserves its amount, and when
 another bidder leads it releases. The wallet follows the bidder its page says it is (`Whoami`): where the actions run in the
@@ -289,7 +290,7 @@ The client is built per deployment, not as one bundle:
 | Command | Does |
 |---|---|
 | `pnpm build:client` | one `vite build --mode <deployment>` per page into `examples/auction/dist/<deployment>` (`browser-only`, `server-owned`, `server-model`, `server-actions`, `devtools`, `worker` with its worker file in `assets/`, and `demo` with all four browser/server placements), then `check:bundle` |
-| `pnpm --filter @mufw/example-auction check:bundle` | first fails on a module under `src/client` other than `placements/auctionLocal.ts` that calls `layerModelLocal`, `layerActionRunnerLocal` or `layerLoopLocal` with the auction's definition (a source scan, also run by `pnpm test`); then fails if a page that imports only the local loop (`scripts/bench/pages/counter-mufw.ts`) bundles a module of `effect/eventlog` or `effect/encoding` beyond the ones `Schema` itself needs; then fails if a deployment ships a local half of the auction it should not (a `server-owned` bundle with its local model or action runner; a `devtools` bundle with any of them, the auction view, the wallet or the travel panel; a `worker` page bundle with any of them, or whose worker file holds the wallet or the view) or lacks one it should; every bundle but `devtools` keeps the wallet's local loop |
+| `pnpm --filter @mufw/example-auction check:bundle` | first fails on a module under `src/client` other than `placements/auctionLocal.ts` that calls `layerModelLocal`, `layerActionRunnerLocal` or `layerLoopLocal` with the auction's definition (a source scan, also run by `pnpm test`); then fails if a page that imports only the local loop (`scripts/bench/pages/counter-mufw.ts`) bundles a module of `effect/eventlog` or `effect/encoding` beyond the ones `Schema` itself needs; then fails if a deployment ships a local half of the auction it should not (the four fixed pages' expectations come from `placements` in `src/deployments.ts`, the table the footers read too: a `server-owned` bundle with its local model or action runner; a `devtools` bundle with any of them, the auction view, the wallet or the travel panel; a `worker` page bundle with any of them, or whose worker file holds the wallet or the view) or lacks one it should; every bundle but `devtools` keeps the wallet's local loop |
 | `pnpm --filter @mufw/example-auction compare:transports` | starts a server of its own on a free port from 4700 to 4799, builds and serves the two bundled ticker pages, and prints first paint and update latency (median, p95) and client JS size for the websocket, HTTP (NDJSON) and HTML stream in headless Chromium; needs `pnpm exec playwright install chromium` once; `MUFW_COMPARE_LOADS`, `MUFW_COMPARE_UPDATES`, `MUFW_COMPARE_WARMUP` set the sample sizes |
 | `pnpm --filter @mufw/example-auction bench:bundle` | builds in memory, minified, the Effect floors, the four bench pages (`scripts/bench/pages/`: a counter and a 1000-row list, each in plain uhtml and in µFW) and every deployment, and prints raw, gzip and brotli size per entry, the minified size per origin (Effect module, `@mufw/*`, uhtml, Stately, app) and the 20 largest modules |
 | `pnpm --filter @mufw/example-auction bench:loop` | in Node, the cost of one step (plain reducer, `applyProposal`, `ModelPort.present`, `IntentPort.dispatch` to its record) for the bench counter, the bench list and the auction, concurrent presenters, representation subscribers, schema and JSON boundary costs, heap per history record; `BENCH_SECONDS`, `BENCH_OPS`, `BENCH_WARMUP_SECONDS` |
@@ -346,15 +347,17 @@ export const Counter = define({
   intent: Schema.Union([Schema.TaggedStruct("Inc", { by: Schema.Int }), Schema.TaggedStruct("AutoReset", {})]),
   representation: Schema.Struct({ controlState: Schema.Literals(["low", "high"]), count: Schema.Int })
 })({
-  controlStates: ["low", "high"],
   initial: { count: 0 },
-  acceptors: [
-    (model, proposal) => (proposal._tag === "Inc" ? { count: model.count + proposal.by } : model),
-    (model, proposal) => (proposal._tag === "Reset" ? { count: 0 } : model)
-  ],
+  acceptors: {
+    Inc: (model, proposal) => ({ count: model.count + proposal.by }),
+    Reset: () => ({ count: 0 })
+  },
   reactors: [],
   state: (model) => ({ controlState: model.count >= 3 ? "high" : "low", count: model.count }),
-  nap: (representation) => (representation.count >= 3 ? Option.some({ _tag: "AutoReset" }) : Option.none()),
+  nap: {
+    low: noIntent,
+    high: () => Option.some({ _tag: "AutoReset" })
+  },
   actions: {
     Inc: (intent) => Effect.succeed({ _tag: "Inc", by: intent.by }),
     AutoReset: () => Effect.sleep("1 second").pipe(Effect.as({ _tag: "Reset" }))
@@ -364,6 +367,12 @@ export const Counter = define({
 const Ports = makePorts(Counter)
 const Everything = layerLoopLocal(Counter, Ports)      // or swap in @mufw/rpc's remote layers
 ```
+
+`acceptors` is a record with one entry per proposal tag (`Tag: unchanged` for a tag the definition
+ignores) and `nap` a record with one entry per control state (`noIntent` for a state with no
+automatic intent). `define` types both from the schemas and compiles them into the `SamDefinition`
+every consumer reads, with `controlStates` derived from `nap`'s keys, so a missing or extra acceptor
+key, or a missing `nap` key, does not compile.
 
 `nest(parent, child, options?)` composes two definitions into one (a wizard around a form): the
 model is `{ parent, child }`, the child's proposals and intents are wrapped as `{ _tag: "Child", … }`,

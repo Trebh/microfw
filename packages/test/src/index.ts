@@ -20,6 +20,8 @@ import {
 } from "@mufw/core"
 import { Clock, Effect, Option, Schema, Stream } from "effect"
 
+export * from "./Behaviour.ts"
+
 export type StateAssertions<D extends AnyDefinition> = {
   readonly [S in RepresentationOf<D>["controlState"]]: (representation: RepresentationOf<D>) => void
 }

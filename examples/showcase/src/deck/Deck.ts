@@ -1,4 +1,4 @@
-import { define, makePorts } from "@mufw/core"
+import { define, makePorts, type Nap, noIntent, type WithTag } from "@mufw/core"
 import { Effect, Option, Schema } from "effect"
 import type { ActScript } from "../act.ts"
 
@@ -111,27 +111,23 @@ export const jump = (model: Model, actId: string, cue: number): Model => {
   return { ...model, actIndex, cue: Math.min(lastCueOf(target), Math.max(0, cue)) }
 }
 
-export const acceptAdvanced = (model: Model, proposal: Proposal): Model =>
-  proposal._tag === "Advanced" ? advance(model) : model
 
-export const acceptRetreated = (model: Model, proposal: Proposal): Model =>
-  proposal._tag === "Retreated" ? retreat(model) : model
+export const acceptAdvanced = (model: Model): Model => advance(model)
 
-export const acceptJumped = (model: Model, proposal: Proposal): Model =>
-  proposal._tag === "Jumped" ? jump(model, proposal.actId, proposal.cue) : model
+export const acceptRetreated = (model: Model): Model => retreat(model)
 
-export const acceptAutoplayToggled = (model: Model, proposal: Proposal): Model =>
-  proposal._tag === "AutoplayToggled" ? { ...model, autoplay: !model.autoplay } : model
+export const acceptJumped = (model: Model, proposal: WithTag<Proposal, "Jumped">): Model =>
+  jump(model, proposal.actId, proposal.cue)
 
-export const acceptInterrupted = (model: Model, proposal: Proposal): Model =>
-  proposal._tag === "Interrupted" ? { ...model, autoplay: false } : model
+export const acceptAutoplayToggled = (model: Model): Model => ({ ...model, autoplay: !model.autoplay })
 
 /** A reading that ends after the audience moved on, or after autoplay stopped, changes nothing. */
-export const acceptCueElapsed = (model: Model, proposal: Proposal): Model => {
-  if (proposal._tag !== "CueElapsed") return model
+export const acceptCueElapsed = (model: Model, proposal: WithTag<Proposal, "CueElapsed">): Model => {
   const isStillUp = currentAct(model).id === proposal.act && model.cue === proposal.cue
   return model.autoplay && isStillUp ? advance(model) : model
 }
+
+export const acceptInterrupted = (model: Model): Model => ({ ...model, autoplay: false })
 
 const controlStateOf = (model: Model): Representation["controlState"] => {
   if (isAtEnd(model)) return "ended"
@@ -161,16 +157,20 @@ export const state = (model: Model): Representation => {
   }
 }
 
+const whisperReading = (representation: Representation): Option.Option<Intent> =>
+  Option.some({
+    _tag: "AwaitCue",
+    act: representation.actId,
+    cue: representation.cue,
+    millis: representation.readingMillis
+  })
+
 /** The prompter: while the show runs by itself, whisper the reading of the cue that is up. */
-export const nap = (representation: Representation): Option.Option<Intent> =>
-  representation.controlState === "autoplay"
-    ? Option.some({
-      _tag: "AwaitCue",
-      act: representation.actId,
-      cue: representation.cue,
-      millis: representation.readingMillis
-    })
-    : Option.none()
+const nap: Nap<Representation, Intent> = {
+  presenting: noIntent,
+  autoplay: whisperReading,
+  ended: noIntent
+}
 
 export const Deck = define({
   name: "Deck",
@@ -179,16 +179,15 @@ export const Deck = define({
   intent: Intent,
   representation: Representation
 })({
-  controlStates: ["presenting", "autoplay", "ended"],
   initial: { acts: [], actIndex: 0, cue: 0, autoplay: false },
-  acceptors: [
-    acceptAdvanced,
-    acceptRetreated,
-    acceptJumped,
-    acceptAutoplayToggled,
-    acceptInterrupted,
-    acceptCueElapsed
-  ],
+  acceptors: {
+    Advanced: acceptAdvanced,
+    Retreated: acceptRetreated,
+    Jumped: acceptJumped,
+    AutoplayToggled: acceptAutoplayToggled,
+    CueElapsed: acceptCueElapsed,
+    Interrupted: acceptInterrupted
+  },
   reactors: [],
   state,
   nap,

@@ -1,6 +1,6 @@
 import type { AnyDefinition } from "@mufw/core"
 import { Effect, Schema } from "effect"
-import { Auction, Model } from "./domain/Auction.ts"
+import { Auction, Model } from "./auction/Auction.ts"
 
 /** The model as JSON text; `toCodecJson` writes an `Option` as plain JSON, which `JSON.stringify` of the model would not. */
 const ModelJson = Schema.fromJsonString(Schema.toCodecJson(Model))

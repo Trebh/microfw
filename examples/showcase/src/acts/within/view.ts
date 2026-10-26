@@ -7,8 +7,8 @@ import type {
   Representation as BoxRepresentation,
   SeatView
 } from "../../domain/BoxOffice.ts"
-import { LIGHTS } from "./house.ts"
-import type { Representation as MarqueeRepresentation, Sign } from "./marquee.ts"
+import { LIGHTS } from "./House.ts"
+import type { Representation as MarqueeRepresentation, Sign } from "./Marquee.ts"
 import type { Playhouse } from "./playhouse.ts"
 
 type Send = (intent: BoxIntent) => void

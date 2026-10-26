@@ -1,8 +1,8 @@
 import { makePorts } from "@mufw/core"
 import { makeRpc } from "@mufw/rpc"
 import { Authentication } from "./authentication.ts"
-import { Auction } from "./domain/Auction.ts"
-import { Wallet } from "./domain/Wallet.ts"
+import { Auction } from "./auction/Auction.ts"
+import { Wallet } from "./wallet/Wallet.ts"
 
 export const Ports = makePorts(Auction)
 export const WalletPorts = makePorts(Wallet)

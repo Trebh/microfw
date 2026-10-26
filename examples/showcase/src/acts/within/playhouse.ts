@@ -1,8 +1,8 @@
 import { makePorts, nest } from "@mufw/core"
 import { Option } from "effect"
 import { company, type Representation as BoxRepresentation } from "../../domain/BoxOffice.ts"
-import { House, LIGHTS } from "./house.ts"
-import { Marquee } from "./marquee.ts"
+import { House, LIGHTS } from "./House.ts"
+import { Marquee } from "./Marquee.ts"
 
 /** The box office staged inside the house: the play within the play. */
 export const Mousetrap = company("Mousetrap")
@@ -23,7 +23,7 @@ const HOUSE_AND_PLAY = LIGHTS.flatMap((lights) => PLAY_STATES.map((play) => `${l
  */
 export const Playhouse = nest(House, Mousetrap, {
   toParent: (proposal) =>
-    proposal._tag === "CurtainUp" ? Option.some({ _tag: "LightsDimmed", at: proposal.at }) : Option.none(),
+    proposal._tag === "CurtainRaised" ? Option.some({ _tag: "LightsDimmed", at: proposal.at }) : Option.none(),
   toChild: (proposal) =>
     proposal._tag === "LightsDimmed" ? Option.some({ _tag: "DoorsOpened", at: proposal.at }) : Option.none(),
   controlState: (house, play) => `${house.controlState}/${play.controlState}` as const,

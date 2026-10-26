@@ -1,4 +1,4 @@
-import { Effect, Option, Schema, SchemaAST } from "effect"
+import { Effect, Option, Schema } from "effect"
 import {
   type AnyDefinition,
   type Codec,
@@ -11,6 +11,7 @@ import {
   type ServicesOf,
   type Tagged
 } from "./Definition.ts"
+import { tagsOf } from "./Tags.ts"
 
 /** Wrapper tag of every child proposal and child intent in the nested definition. */
 const CHILD_TAG = "Child"
@@ -94,23 +95,6 @@ interface LooseOptions {
 }
 
 const isChild = (value: Tagged) => value._tag === CHILD_TAG
-
-/** The `_tag` literals of a union of tagged structs; other shapes contribute none. */
-const shapeTags = (type: SchemaAST.AST): ReadonlyArray<string> => {
-  if (SchemaAST.isUnion(type)) return type.types.flatMap(shapeTags)
-  if (!SchemaAST.isObjects(type)) return []
-  const tag = type.propertySignatures.find((signature) => signature.name === "_tag")?.type
-  return tag !== undefined && SchemaAST.isLiteral(tag) ? [String(tag.literal)] : []
-}
-
-/**
- * The tags a schema can carry on either side. A class (`Schema.TaggedClass`) is a declaration on
- * the type side and a struct only on the encoded side, so both are read.
- */
-const tagsOf = (ast: SchemaAST.AST): ReadonlyArray<string> => [
-  ...shapeTags(SchemaAST.toType(ast)),
-  ...shapeTags(SchemaAST.toEncoded(ast))
-]
 
 const assertNoChildTag = (parent: AnyDefinition) => {
   const taken = [...tagsOf(parent.proposal.ast), ...tagsOf(parent.intent.ast)].includes(CHILD_TAG)

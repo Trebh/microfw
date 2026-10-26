@@ -1,6 +1,6 @@
 import { Layer } from "effect"
 import { layerAuthenticationClient } from "../../authentication.ts"
-import { Auction } from "../../domain/Auction.ts"
+import { Auction } from "../../auction/Auction.ts"
 import type { SessionToken } from "../../domain/Values.ts"
 import { Rpc } from "../../ports.ts"
 import { layerWhoamiRemote } from "../../whoami.ts"

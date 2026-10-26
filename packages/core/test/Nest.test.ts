@@ -1,6 +1,15 @@
 import { assert, describe, it } from "@effect/vitest"
 import { Effect, Option, Schema } from "effect"
-import { ActionFailure, applyProposal, define, intentKeyOf, nest, proposalLabel } from "../src/index.ts"
+import {
+  ActionFailure,
+  applyProposal,
+  define,
+  intentKeyOf,
+  nest,
+  noIntent,
+  proposalLabel,
+  unchanged
+} from "../src/index.ts"
 import { Counter } from "./fixtures/Counter.ts"
 import { NestedCounter } from "./fixtures/NestedCounter.ts"
 
@@ -73,12 +82,11 @@ describe("nest reactors", () => {
     intent: Schema.TaggedStruct("Add", { by: Schema.Int }),
     representation: Schema.Struct({ controlState: Schema.Literal("any") })
   })({
-    controlStates: ["any"],
     initial: { count: 0 },
-    acceptors: [(model, proposal) => ({ count: model.count + proposal.by })],
+    acceptors: { Add: (model, proposal) => ({ count: model.count + proposal.by }) },
     reactors: [(model) => ({ count: Math.min(model.count, 10) })],
     state: () => ({ controlState: "any" }),
-    nap: () => Option.none(),
+    nap: { any: noIntent },
     actions: { Add: (intent) => Effect.succeed({ _tag: "Add", by: intent.by }) }
   })
   const Clamping = nest(Clamped, Counter)
@@ -214,12 +222,11 @@ describe("nest naming and authoring", () => {
       intent: Schema.TaggedStruct("Go", {}),
       representation: Schema.Struct({ controlState: Schema.Literal("any") })
     })({
-      controlStates: ["any"],
       initial: {},
-      acceptors: [],
+      acceptors: { Child: unchanged },
       reactors: [],
       state: () => ({ controlState: "any" }),
-      nap: () => Option.none(),
+      nap: { any: noIntent },
       actions: { Go: () => Effect.succeed({ _tag: "Child" }) }
     })
 
@@ -234,12 +241,11 @@ describe("nest naming and authoring", () => {
       intent: Schema.TaggedStruct("Child", {}),
       representation: Schema.Struct({ controlState: Schema.Literal("any") })
     })({
-      controlStates: ["any"],
       initial: {},
-      acceptors: [],
+      acceptors: { Go: unchanged },
       reactors: [],
       state: () => ({ controlState: "any" }),
-      nap: () => Option.none(),
+      nap: { any: noIntent },
       actions: { Child: () => Effect.succeed({ _tag: "Go" }) }
     })
 
@@ -255,12 +261,11 @@ describe("nest naming and authoring", () => {
       intent: Schema.TaggedStruct("Go", {}),
       representation: Schema.Struct({ controlState: Schema.Literal("any") })
     })({
-      controlStates: ["any"],
       initial: {},
-      acceptors: [],
+      acceptors: { Child: unchanged, Go: unchanged },
       reactors: [],
       state: () => ({ controlState: "any" }),
-      nap: () => Option.none(),
+      nap: { any: noIntent },
       actions: { Go: () => Effect.succeed(new ChildClass({})) }
     })
 

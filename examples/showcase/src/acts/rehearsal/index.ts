@@ -5,10 +5,11 @@ import { render } from "uhtml"
 import type { Act } from "../../act.ts"
 import { type Deck, DeckPorts } from "../../deck/Deck.ts"
 import { type Intent, Rehearsal, RehearsalPorts } from "./Rehearsal.ts"
+import { sheetView } from "./Rehearsal.view.ts"
 import "./style.css"
 import { script } from "./script.ts"
 import { honestPorts, layerUnderstudies, sabotagedPorts } from "./understudy.ts"
-import { houseView, sheetView, shell } from "./views.ts"
+import { houseView, shell } from "./view.ts"
 
 const dismiss: Intent = { _tag: "Dismiss" }
 const rehearseHonest: Intent = { _tag: "Rehearse", understudy: "honest" }

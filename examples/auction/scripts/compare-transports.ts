@@ -11,7 +11,7 @@ import { gzipSync } from "node:zlib"
 import { type Browser, chromium, type Page } from "playwright"
 import { build, preview, type Rollup } from "vite"
 import { layerAuthenticationAnonymous } from "../src/authentication.ts"
-import { Auction, type Proposal } from "../src/domain/Auction.ts"
+import { Auction, type Proposal } from "../src/auction/Auction.ts"
 import { Amount, Bidder } from "../src/domain/Values.ts"
 import { Ports, Rpc } from "../src/ports.ts"
 import { samPath, samStreamPath } from "../src/samPath.ts"
@@ -338,7 +338,7 @@ const opened: Proposal = { _tag: "Opened", at: 1_000 }
  * Update 0 is the auction as it is when the page loads.
  */
 const bidNumber = (index: number): Proposal => ({
-  _tag: "Bid",
+  _tag: "BidPlaced",
   bidder: Bidder.make(`x${index}x`),
   amount: Amount.make(5 * (index + 1)),
   at: 1_000 + index

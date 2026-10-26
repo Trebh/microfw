@@ -4,7 +4,7 @@ import { Effect, FileSystem, Option, Path, Schema, Stream, SubscriptionRef } fro
 import type { PlatformError } from "effect"
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/http"
 import type { Deployment } from "./deployments.ts"
-import type { Auction } from "./domain/Auction.ts"
+import type { Auction } from "./auction/Auction.ts"
 import { ServerPorts } from "./serverPorts.ts"
 import { AssetPath, type MissingAppRoot, renderPage, ssrPages } from "./ssr.ts"
 

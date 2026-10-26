@@ -2,10 +2,11 @@ import type { StepRecord } from "@mufw/core"
 import type { Ssr } from "@mufw/view-uhtml/ssr"
 import { Effect, Option, Schema } from "effect"
 import { pageLabels } from "./client/labels.ts"
-import type { Deployment } from "./deployments.ts"
-import type { Auction, Representation } from "./domain/Auction.ts"
+import { placements } from "./deployments.ts"
+import type { Deployment, PlacedDeployment } from "./deployments.ts"
+import type { Auction, Representation } from "./auction/Auction.ts"
 import { AUCTION_SNAPSHOT_ID, encodeSnapshot } from "./snapshot.ts"
-import { makeViewWith } from "./viewTemplate.ts"
+import { makeAuctionViewWith } from "./auction/Auction.view.ts"
 
 /** What the server knows about a deployment's built page besides its label. */
 interface SsrPage {
@@ -15,12 +16,18 @@ interface SsrPage {
   readonly embedsModel: boolean
 }
 
+/** A page with a fixed placement carries the snapshot exactly when its model lives in the browser. */
+const placedPage = (deployment: PlacedDeployment, file: string): SsrPage => ({
+  file,
+  embedsModel: placements[deployment].model === "client"
+})
+
 export const ssrPages: Readonly<Record<Deployment, SsrPage>> = {
   "demo": { file: "index.html", embedsModel: true },
-  "browser-only": { file: "browser-only.html", embedsModel: true },
-  "server-owned": { file: "server-owned.html", embedsModel: false },
-  "server-model": { file: "server-model.html", embedsModel: false },
-  "server-actions": { file: "server-actions.html", embedsModel: true }
+  "browser-only": placedPage("browser-only", "browser-only.html"),
+  "server-owned": placedPage("server-owned", "server-owned.html"),
+  "server-model": placedPage("server-model", "server-model.html"),
+  "server-actions": placedPage("server-actions", "server-actions.html")
 }
 
 /** Where the view goes: the empty root every page declares. */
@@ -44,7 +51,7 @@ export type AssetPath = typeof AssetPath.Type
 
 /** The markup of the auction view for `representation`, as the browser renders it first. */
 export const renderApp = (ssr: Ssr, label: string, representation: Representation): string =>
-  ssr.toString(makeViewWith(ssr.html)(label)(representation, () => {}))
+  ssr.toString(makeAuctionViewWith(ssr.html)(label)(representation, () => {}))
 
 /** The `<script>` element that carries the model; its text is escaped so no model string can leave it. */
 const snapshotScript = (record: StepRecord<typeof Auction>) =>

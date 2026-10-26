@@ -6,7 +6,12 @@ Living document. Source of truth: `packages/core/src/Definition.ts`, `Step.ts`, 
 
 ```ts
 define({ name, model, proposal, intent, representation })({
-  controlStates, initial, acceptors, reactors, state, nap, actions
+  initial,
+  acceptors: { [proposalTag]: (model, proposal) => model },
+  reactors,
+  state,
+  nap: { [controlState]: (representation) => Option<intent> },
+  actions
 })
 ```
 
@@ -14,16 +19,26 @@ define({ name, model, proposal, intent, representation })({
 |---|---|---|
 | `model`, `proposal`, `intent`, `representation` | `Schema` without decoding/encoding services | every cut point is serializable and recordable |
 | `representation["Type"]` | must contain `controlState: string` | SAM's control state; also the Stately `value` |
-| `controlStates` | `ReadonlyArray<string>` | the states the test model must reach |
 | `initial` | model value | seq 0 of the history |
-| `acceptors` | `(model, proposal) => model`, pure | folded in declared order; each handles its tags and returns the model unchanged otherwise |
+| `acceptors` | record keyed by proposal tag, `(model, WithTag<proposal, tag>) => model`, pure | one entry per tag, so a tag the definition ignores is written `Tag: unchanged`; each acceptor sees only the proposals of its own tag |
 | `reactors` | `(model) => model`, pure | folded after the acceptors |
 | `state` | `(model) => representation`, pure | derives the control state |
-| `nap` | `(representation) => Option<intent>`, pure | the next automatic action |
+| `nap` | record keyed by control state, `(representation) => Option<intent>`, pure | the next automatic action; one entry per control state, `noIntent` for a state with none |
 | `intentKey` | `(intent) => string`, pure, optional (default `intent._tag`) | automatic intents with the same key are not run concurrently: the drain skips one while another of its key is in flight |
 | `actions` | `{ [intentTag]: (intent) => Effect<proposal, ActionFailure, R> }` | the only effectful part; `R` is the services they need |
 
-`applyProposal(def, model, proposal)` is the whole pure step: acceptors, then reactors.
+`controlStates`, the states the test model must reach, is not written: it is the keys of `nap`.
+The curried `define` types both records from the schemas, so a missing or an extra acceptor key,
+or a missing `nap` key, does not compile. `unchanged`, `noIntent` and `WithTag<U, T>` (the member of a
+tagged union by tag) come from `@mufw/core`.
+
+`define` compiles the behaviour into the `SamDefinition` that every consumer reads: `controlStates`
+(the keys of `nap`, in order), `acceptors` as an array with one wrapper per key that applies its
+acceptor only to a proposal of its tag, and `nap` as one function that looks the representation's
+control state up. `applyProposal`, the step, `nest`, the layers and the graph work on that compiled
+form.
+
+`applyProposal(def, model, proposal)` is the whole pure step: acceptors in key order, then reactors.
 
 ## One step
 
@@ -77,7 +92,7 @@ page) into that model is the caller's job, at its composition root.
 
 **Rule: `travelTo` interrupts every automatic action in flight; none of them presents afterwards.**
 An automatic action is computed from a state the travel has just left, so its proposal is stale by
-construction (a pending `Tick` would move `now` back to wall time). The model does this itself,
+construction (a pending `Ticked` proposal would move `now` back to wall time). The model does this itself,
 under its permit, before it appends the `travel` record: the bus owns the fibers of automatic
 actions (`IntentBus.runAuto`) and the model calls `IntentBus.interruptAuto`. A `travelTo` that
 fails with `NoSuchStep` interrupts nothing.
@@ -479,6 +494,10 @@ failed write is logged, not fatal).
 `nest(parent, child, options?)` (`Nest.ts`) is a pure function from two definitions to one, for
 wizards and forms: the result is an ordinary `SamDefinition`, so one loop, one history and one
 graph cover both sides, and every placement and tool takes it unchanged.
+
+`nest` reads the compiled forms of its two arguments and builds a compiled definition directly, so
+its states are the `controlStates` option and not `nap` keys; `tagsOf(ast)` (`Tags.ts`, exported from
+`@mufw/core`) lists the `_tag` literals a schema can carry, which is how it finds a `Child` clash.
 
 | Part of the result | Contract |
 |---|---|

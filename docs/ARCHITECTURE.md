@@ -115,6 +115,14 @@ Each entry states the choice and the constraint behind it.
 - **`define(schemas)(behaviour)` is curried.** TypeScript only types the behaviour's literals
   (`_tag`, control states) from the schemas once the schemas are fixed by a first call; a single
   call widens them to `string`.
+- **Acceptors are a record keyed by proposal tag and `nap` a record keyed by control state; consumers
+  read the compiled form.** The curried `define` types both keys from the schemas, so a proposal tag
+  without an acceptor, an acceptor for a tag the schema lacks, or a control state without a `nap`
+  entry does not compile; `unchanged` and `noIntent` make ignoring a tag or having no automatic
+  intent an explicit entry, and `controlStates` is derived from `nap`'s keys, not written a second
+  time. `define` compiles the record into the `SamDefinition` the step, the layers, the graph and
+  `nest` read (an acceptor array, one `nap` function, `controlStates`), so none of them knows the
+  authoring shape and `nest` builds compiled definitions directly.
 - **Ports are function-style service keys with per-definition identifiers** (`IntentBus<D>` …),
   so their types can be named and the same framework can host several definitions.
 - **Placement is per deployment, not per request.** Each page has its own entry point that calls

@@ -17,7 +17,7 @@ import { layerCreditCheckTable } from "../src/adapters/creditCheckTable.ts"
 import { layerSessionsTable } from "../src/adapters/sessionsTable.ts"
 import { layerAuthenticationAnonymous } from "../src/authentication.ts"
 import { layerClientOverHttp, layerModelOverHttp } from "../src/client/placements/httpReadOnly.ts"
-import { Auction, type Representation } from "../src/domain/Auction.ts"
+import { Auction, type Representation } from "../src/auction/Auction.ts"
 import { Amount, Bidder } from "../src/domain/Values.ts"
 import { layerHttpHandlers, layerHttpRoutes } from "../src/httpRoutes.ts"
 import { Ports, Rpc } from "../src/ports.ts"
@@ -112,7 +112,7 @@ describe("representations over HTTP", () => {
       const first = yield* Queue.take(seen)
       yield* server.present({ _tag: "Opened", at: 1000 })
       const second = yield* Queue.take(seen)
-      yield* server.present({ _tag: "Bid", bidder: Bidder.make("alice"), amount: Amount.make(10), at: 2000 })
+      yield* server.present({ _tag: "BidPlaced", bidder: Bidder.make("alice"), amount: Amount.make(10), at: 2000 })
       const third = yield* Queue.take(seen)
 
       assert.deepStrictEqual(
@@ -161,7 +161,7 @@ describe("the representations the HTTP route serves", () => {
       yield* server.present({ _tag: "Opened", at: 1000 })
       yield* Effect.forEach(
         Array.from({ length: 40 }, (_, index) => (index + 1) * 10),
-        (amount) => server.present({ _tag: "Bid", bidder: Bidder.make("bob"), amount: Amount.make(amount), at: 2000 }),
+        (amount) => server.present({ _tag: "BidPlaced", bidder: Bidder.make("bob"), amount: Amount.make(amount), at: 2000 }),
         { discard: true }
       )
       yield* Effect.yieldNow.pipe(Effect.repeat({ times: 50 }))

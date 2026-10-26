@@ -1,13 +1,13 @@
 import { assert, describe, it } from "@effect/vitest"
 import { layerIntentBus } from "@mufw/core"
 import { Effect, Layer, Option, Stream } from "effect"
-import { Auction, initial } from "../src/domain/Auction.ts"
+import { Auction, initial } from "../src/auction/Auction.ts"
 import { Amount, Bidder } from "../src/domain/Values.ts"
 import { Ports } from "../src/ports.ts"
 import { auctionModelLocal } from "../src/client/placements/auctionLocal.ts"
 
 const SERVER_SNAPSHOT =
-  "{\"item\":\"Vintage synth\",\"minIncrement\":5,\"highest\":{\"_tag\":\"Some\",\"value\":{\"bidder\":\"alice\",\"amount\":10,\"at\":500}},\"bids\":[{\"bidder\":\"alice\",\"amount\":10,\"at\":500}],\"endsAt\":61000,\"now\":1000,\"status\":\"open\",\"lastRejection\":{\"_tag\":\"None\"}}"
+  "{\"item\":\"Vintage synth\",\"minIncrement\":5,\"highest\":{\"_tag\":\"Some\",\"value\":{\"bidder\":\"alice\",\"amount\":10,\"at\":500}},\"bids\":[{\"bidder\":\"alice\",\"amount\":10,\"at\":500}],\"endsAt\":61000,\"now\":1000,\"phase\":\"open\",\"lastRejection\":{\"_tag\":\"None\"}}"
 
 const bid = { bidder: Bidder.make("alice"), amount: Amount.make(10), at: 500 }
 
@@ -22,7 +22,7 @@ describe("auctionModelLocal", () => {
       const first = yield* seqZero
 
       assert.deepStrictEqual(
-        [first.seq, first.kind, first.model.status, first.model.bids, first.representation.controlState],
+        [first.seq, first.kind, first.model.phase, first.model.bids, first.representation.controlState],
         [0, "init", "open", [bid], "open"]
       )
     }).pipe(Effect.provide(seededWith(Option.some(SERVER_SNAPSHOT)))))

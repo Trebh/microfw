@@ -1,5 +1,5 @@
-import { define, makePorts } from "@mufw/core"
-import { Effect, Option, Schema } from "effect"
+import { define, makePorts, noIntent } from "@mufw/core"
+import { Effect, Schema } from "effect"
 
 /**
  * Whether the prompter's book is open. It is a loop of its own, not a field of the deck's model:
@@ -26,12 +26,6 @@ export const Representation = Schema.Struct({
 })
 export type Representation = typeof Representation.Type
 
-export const acceptToggled = (model: Model, proposal: Proposal): Model =>
-  proposal._tag === "BookToggled" ? { open: !model.open } : model
-
-export const acceptClosed = (model: Model, proposal: Proposal): Model =>
-  proposal._tag === "BookClosed" ? { open: false } : model
-
 export const state = (model: Model): Representation => ({
   controlState: model.open ? "open" : "closed",
   open: model.open
@@ -44,12 +38,11 @@ export const Book = define({
   intent: Intent,
   representation: Representation
 })({
-  controlStates: ["closed", "open"],
   initial: { open: false },
-  acceptors: [acceptToggled, acceptClosed],
+  acceptors: { BookToggled: (model) => ({ open: !model.open }), BookClosed: () => ({ open: false }) },
   reactors: [],
   state,
-  nap: () => Option.none(),
+  nap: { closed: noIntent, open: noIntent },
   actions: {
     ToggleBook: () => Effect.succeed({ _tag: "BookToggled" }),
     CloseBook: () => Effect.succeed({ _tag: "BookClosed" })

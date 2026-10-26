@@ -1,8 +1,8 @@
-import { layerActionsDrain, layerIntentBus } from "@mufw/core"
+import { layerLoopWith } from "@mufw/core"
 import { Layer } from "effect"
 import { layerWhoamiFixed } from "../../adapters/whoamiFixed.ts"
 import { layerAuthenticationAnonymous } from "../../authentication.ts"
-import { Auction } from "../../domain/Auction.ts"
+import { Auction } from "../../auction/Auction.ts"
 import type { Bidder } from "../../domain/Values.ts"
 import { Ports, Rpc } from "../../ports.ts"
 import { auctionActionRunnerLocal } from "./auctionLocal.ts"
@@ -18,9 +18,7 @@ export const serverModel = (bidder: Bidder) => {
   const remoteModel = Layer.merge(Rpc.layerModelRemote, Rpc.layerHistoryRemote).pipe(
     Layer.provideMerge(transport(Auction, client))
   )
-  return layerActionsDrain(Auction, Ports).pipe(
-    Layer.provideMerge(Layer.merge(remoteModel, auctionActionRunnerLocal(bidder))),
-    Layer.provideMerge(layerIntentBus(Auction, Ports)),
+  return layerLoopWith(Auction, Ports, { model: remoteModel, runner: auctionActionRunnerLocal(bidder) }).pipe(
     Layer.provideMerge(layerWhoamiFixed(bidder))
   )
 }

@@ -1,4 +1,4 @@
-import { define, makePorts } from "@mufw/core"
+import { define, makePorts, type Nap, noIntent, type WithTag } from "@mufw/core"
 import type { PathFailure } from "@mufw/test"
 import { Effect, Option, Schema } from "effect"
 import { callSheet } from "./sheet.ts"
@@ -82,20 +82,16 @@ const begin = (model: Model, understudy: UnderstudyName): Model => ({
   results: model.results.map(() => pending)
 })
 
-export const acceptCalled = (model: Model, proposal: Proposal): Model =>
-  proposal._tag === "Called" ? begin(model, proposal.understudy) : model
+
+export const acceptCalled = (model: Model, proposal: WithTag<Proposal, "Called">): Model => begin(model, proposal.understudy)
 
 /** A rehearsal already on this understudy, running or finished, is left as it is. */
-export const acceptSettled = (model: Model, proposal: Proposal): Model => {
-  if (proposal._tag !== "Settled") return model
+export const acceptSettled = (model: Model, proposal: WithTag<Proposal, "Settled">): Model => {
   const alreadyThere = model.phase !== "idle" && model.understudy === proposal.understudy
   return alreadyThere ? model : begin(model, proposal.understudy)
 }
 
-export const acceptDismissed = (model: Model, proposal: Proposal): Model =>
-  proposal._tag === "Dismissed"
-    ? { ...begin(model, "honest"), phase: "idle" }
-    : model
+export const acceptDismissed = (model: Model): Model => ({ ...begin(model, "honest"), phase: "idle" })
 
 /** A result counts only for the rehearsal it was run for, and only for a path still waiting. */
 const recorded = (model: Model, round: number, index: number, result: Result): Model => {
@@ -106,13 +102,11 @@ const recorded = (model: Model, round: number, index: number, result: Result): M
   return { ...model, phase: finished ? "done" : "rehearsing", results }
 }
 
-export const acceptPathPassed = (model: Model, proposal: Proposal): Model =>
-  proposal._tag === "PathPassed" ? recorded(model, proposal.round, proposal.index, { _tag: "Passed" }) : model
+export const acceptPathPassed = (model: Model, proposal: WithTag<Proposal, "PathPassed">): Model =>
+  recorded(model, proposal.round, proposal.index, { _tag: "Passed" })
 
-export const acceptPathFailed = (model: Model, proposal: Proposal): Model =>
-  proposal._tag === "PathFailed"
-    ? recorded(model, proposal.round, proposal.index, { _tag: "Failed", failure: proposal.failure })
-    : model
+export const acceptPathFailed = (model: Model, proposal: WithTag<Proposal, "PathFailed">): Model =>
+  recorded(model, proposal.round, proposal.index, { _tag: "Failed", failure: proposal.failure })
 
 const lineOf = (result: Result, index: number, runningIndex: number): Line => {
   switch (result._tag) {
@@ -150,9 +144,7 @@ export const state = (model: Model): Representation => {
   }
 }
 
-/** The prompter calls the next line of the call sheet. */
-export const nap = (representation: Representation): Option.Option<Intent> => {
-  if (representation.controlState !== "rehearsing") return Option.none()
+const callNextLine = (representation: Representation): Option.Option<Intent> => {
   const next = Option.fromNullishOr(representation.lines.find((line) => line.status === "running"))
   return Option.map(
     next,
@@ -164,6 +156,14 @@ export const nap = (representation: Representation): Option.Option<Intent> => {
         understudy: representation.understudy
       }) as const
   )
+}
+
+/** The prompter calls the next line of the call sheet while a rehearsal is on. */
+const nap: Nap<Representation, Intent> = {
+  idle: noIntent,
+  rehearsing: callNextLine,
+  clean: noIntent,
+  flawed: noIntent
 }
 
 /** A beat before each path, so the line lights before the house moves. */
@@ -182,7 +182,7 @@ const failedProposal = (round: number, index: number, failure: PathFailure): Pro
   }
 })
 
-const runPath = (intent: Extract<Intent, { readonly _tag: "RunPath" }>) => {
+const runPath = (intent: WithTag<Intent, "RunPath">) => {
   const { round, index, understudy } = intent
   return Option.match(Option.fromNullishOr(callSheet[index]), {
     onNone: () => Effect.die(`the call sheet has no line ${index}`),
@@ -207,9 +207,14 @@ export const Rehearsal = define({
   intent: Intent,
   representation: Representation
 })({
-  controlStates: ["idle", "rehearsing", "clean", "flawed"],
   initial,
-  acceptors: [acceptCalled, acceptSettled, acceptDismissed, acceptPathPassed, acceptPathFailed],
+  acceptors: {
+    Called: acceptCalled,
+    Settled: acceptSettled,
+    Dismissed: acceptDismissed,
+    PathPassed: acceptPathPassed,
+    PathFailed: acceptPathFailed
+  },
   reactors: [],
   state,
   nap,

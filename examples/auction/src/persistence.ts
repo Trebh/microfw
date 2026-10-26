@@ -4,7 +4,7 @@ import type { PlatformError } from "effect"
 import { Effect, FileSystem, Layer, Option, Path } from "effect"
 import type { Schema } from "effect"
 import { KeyValueStore } from "effect/persistence"
-import { Auction } from "./domain/Auction.ts"
+import { Auction } from "./auction/Auction.ts"
 import { ServerPorts } from "./serverPorts.ts"
 
 /** The store cannot be opened, or holds a model the auction cannot decode. */

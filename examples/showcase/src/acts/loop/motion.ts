@@ -1,6 +1,6 @@
 import { Clock, Effect, Layer, Option, Stream } from "effect"
 import { HOLD_MILLIS } from "../../domain/BoxOffice.ts"
-import { LoopBoardPorts, type Representation } from "./board.ts"
+import { LoopBoardPorts, type Representation } from "./LoopBoard.ts"
 import { firedStations, type Scene, settlesPayment, STATIONS } from "./scene.ts"
 
 /** The light's hop from one station to the next. */

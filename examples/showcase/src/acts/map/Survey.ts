@@ -1,4 +1,4 @@
-import { define, type SamDefinition } from "@mufw/core"
+import { define, type Nap, noIntent, type SamDefinition, type WithTag } from "@mufw/core"
 import { Effect, Option, Schema } from "effect"
 
 /** One step of a route, or of a crossing: a proposal tag taking the stage from one place to another. */
@@ -118,11 +118,10 @@ export const initialSurvey = (ways: ReadonlyArray<Way>): Model => ({
   standing: ""
 })
 
-export const acceptStarted = (model: Model, proposal: Proposal): Model =>
-  proposal._tag === "Started" ? { ...model, phase: "walking", way: 0, leg: 0 } : model
 
-export const acceptRested = (model: Model, proposal: Proposal): Model =>
-  proposal._tag === "Rested" ? { ...model, phase: "resting", way: 0, leg: 0 } : model
+export const acceptStarted = (model: Model): Model => ({ ...model, phase: "walking", way: 0, leg: 0 })
+
+export const acceptRested = (model: Model): Model => ({ ...model, phase: "resting", way: 0, leg: 0 })
 
 const advance = (model: Model): Model => {
   const taken = model.taken + 1
@@ -132,22 +131,22 @@ const advance = (model: Model): Model => {
 }
 
 /** A step that lands after the walk was stopped or finished changes nothing. */
-export const acceptStepped = (model: Model, proposal: Proposal): Model =>
-  proposal._tag === "Stepped" && model.phase === "walking" ? advance(model) : model
+export const acceptStepped = (model: Model): Model => (model.phase === "walking" ? advance(model) : model)
 
 const countCrossing = (crossings: ReadonlyArray<Crossing>, leg: Leg, missed: boolean): ReadonlyArray<Crossing> =>
   crossings.some((crossing) => sameLeg(crossing, leg))
     ? crossings.map((crossing) => (sameLeg(crossing, leg) ? { ...crossing, count: crossing.count + 1 } : crossing))
     : [...crossings, { ...leg, count: 1, missed }]
 
-export const acceptCrossed = (model: Model, proposal: Proposal): Model => {
-  if (proposal._tag !== "Crossed") return model
+export const acceptCrossed = (model: Model, proposal: WithTag<Proposal, "Crossed">): Model => {
   const leg = { from: proposal.from, tag: proposal.tag, to: proposal.to }
   return { ...model, crossings: countCrossing(model.crossings, leg, proposal.missed), latest: groupKey(leg) }
 }
 
-export const acceptStood = (model: Model, proposal: Proposal): Model =>
-  proposal._tag === "Stood" ? { ...model, standing: proposal.place } : model
+export const acceptStood = (model: Model, proposal: WithTag<Proposal, "Stood">): Model => ({
+  ...model,
+  standing: proposal.place
+})
 
 export const state = (model: Model): Representation => ({
   controlState: model.phase,
@@ -160,11 +159,11 @@ export const state = (model: Model): Representation => ({
   standing: model.standing
 })
 
-/** The prompter: while the walk is on, whisper the next step, and how long to wait before taking it. */
-export const nap = (representation: Representation): Option.Option<Intent> =>
-  representation.controlState === "walking"
-    ? Option.some({ _tag: "Walk", millis: legMillis(representation) })
-    : Option.none()
+/** While the walk is on, whisper the next step, and how long to wait before taking it. */
+const whisperStep = (representation: Representation): Option.Option<Intent> =>
+  Option.some({ _tag: "Walk", millis: legMillis(representation) })
+
+const nap: Nap<Representation, Intent> = { resting: noIntent, walking: whisperStep, done: noIntent }
 
 export type Survey = SamDefinition<typeof Model, typeof Proposal, typeof Intent, typeof Representation, never>
 
@@ -175,9 +174,14 @@ export type Survey = SamDefinition<typeof Model, typeof Proposal, typeof Intent,
  */
 export const makeSurvey = (ways: ReadonlyArray<Way>): Survey =>
   define({ name: "Survey", model: Model, proposal: Proposal, intent: Intent, representation: Representation })({
-    controlStates: ["resting", "walking", "done"],
     initial: initialSurvey(ways),
-    acceptors: [acceptStarted, acceptRested, acceptStepped, acceptCrossed, acceptStood],
+    acceptors: {
+      Started: acceptStarted,
+      Rested: acceptRested,
+      Stepped: acceptStepped,
+      Crossed: acceptCrossed,
+      Stood: acceptStood
+    },
     reactors: [],
     state,
     nap,

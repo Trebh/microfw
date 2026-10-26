@@ -1,15 +1,12 @@
 import { Effect, Option, Schema, SchemaTransformation } from "effect"
+import { type Placement, Side } from "../deployments.ts"
 import { Bidder, SessionToken } from "../domain/Values.ts"
-
-const Side = Schema.Literals(["client", "server"])
-export type Side = typeof Side.Type
 
 const DEFAULT_SIDE: Side = "client"
 
 const sideOrDefault = Side.pipe(Schema.withDecodingDefaultTypeKey(Effect.succeed(DEFAULT_SIDE)))
 
-const Placement = Schema.Struct({ model: sideOrDefault, actions: sideOrDefault })
-export type Placement = typeof Placement.Type
+const PlacementQuerySides = Schema.Struct({ model: sideOrDefault, actions: sideOrDefault })
 
 const DEFAULT_PLACEMENT: Placement = { model: DEFAULT_SIDE, actions: DEFAULT_SIDE }
 const DEFAULT_BIDDER = Bidder.make("alice")
@@ -21,7 +18,7 @@ const PlacementParam = Schema.String.pipe(
     Schema.Record(Schema.String, Schema.String),
     SchemaTransformation.splitKeyValue({ separator: ",", keyValueSeparator: ":" })
   ),
-  Schema.decodeTo(Placement)
+  Schema.decodeTo(PlacementQuerySides)
 )
 
 const PlacementQuery = Schema.fromURLSearchParams(Schema.Struct({

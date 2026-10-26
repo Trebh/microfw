@@ -1,40 +1,67 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, Option, Schema } from "effect"
-import { applyProposal, define } from "../src/index.ts"
+import { applyProposal, define, noIntent, unchanged } from "../src/index.ts"
 
 const Traced = define({
   name: "traced",
   model: Schema.Struct({ trace: Schema.Array(Schema.String) }),
-  proposal: Schema.Union([Schema.TaggedStruct("Mark", {}), Schema.TaggedStruct("Unknown", {})]),
+  proposal: Schema.Union([
+    Schema.TaggedStruct("Marked", {}),
+    Schema.TaggedStruct("Noted", {}),
+    Schema.TaggedStruct("Ignored", {})
+  ]),
   intent: Schema.TaggedStruct("Mark", {}),
-  representation: Schema.Struct({ controlState: Schema.Literal("any") })
+  representation: Schema.Struct({ controlState: Schema.Literals(["settled", "marked"]) })
 })({
-  controlStates: ["any"],
   initial: { trace: [] },
-  acceptors: [
-    (model, proposal) => (proposal._tag === "Mark" ? { trace: [...model.trace, "first acceptor"] } : model),
-    (model, proposal) => (proposal._tag === "Mark" ? { trace: [...model.trace, "second acceptor"] } : model)
-  ],
+  acceptors: {
+    Marked: (model) => ({ trace: [...model.trace, "marked acceptor"] }),
+    Noted: (model) => ({ trace: [...model.trace, "noted acceptor"] }),
+    Ignored: unchanged
+  },
   reactors: [
-    (model) => (model.trace.at(-1) === "second acceptor" ? { trace: [...model.trace, "reactor"] } : model)
+    (model) => (model.trace.at(-1) === "marked acceptor" ? { trace: [...model.trace, "reactor"] } : model)
   ],
-  state: () => ({ controlState: "any" }),
-  nap: () => Option.none(),
-  actions: { Mark: () => Effect.succeed({ _tag: "Mark" }) }
+  state: (model) => ({ controlState: model.trace.length === 0 ? "settled" : "marked" }),
+  nap: {
+    settled: noIntent,
+    marked: () => Option.some({ _tag: "Mark" })
+  },
+  actions: { Mark: () => Effect.succeed({ _tag: "Marked" }) }
 })
 
 describe("applyProposal", () => {
-  it("runs the acceptors in declared order, then the reactors", () => {
-    const next = applyProposal(Traced, { trace: [] }, { _tag: "Mark" })
+  it("runs the acceptor of the proposal's tag, then the reactors", () => {
+    const next = applyProposal(Traced, { trace: [] }, { _tag: "Marked" })
 
-    expect(next).toEqual({ trace: ["first acceptor", "second acceptor", "reactor"] })
+    expect(next).toEqual({ trace: ["marked acceptor", "reactor"] })
   })
 
-  it("leaves the model unchanged for a proposal no acceptor handles", () => {
+  it("runs no acceptor of another tag", () => {
+    const next = applyProposal(Traced, { trace: [] }, { _tag: "Noted" })
+
+    expect(next).toEqual({ trace: ["noted acceptor"] })
+  })
+
+  it("leaves the model unchanged for a tag set as unchanged", () => {
     const model = { trace: ["before"] }
 
-    const next = applyProposal(Traced, model, { _tag: "Unknown" })
+    const next = applyProposal(Traced, model, { _tag: "Ignored" })
 
-    expect(next).toEqual({ trace: ["before"] })
+    expect(next).toBe(model)
+  })
+})
+
+describe("define", () => {
+  it("derives the control states from the nap keys, in key order", () => {
+    expect(Traced.controlStates).toEqual(["settled", "marked"])
+  })
+
+  it("naps with the entry of the representation's control state", () => {
+    const settled = Traced.nap({ controlState: "settled" })
+    const marked = Traced.nap({ controlState: "marked" })
+
+    expect(settled).toEqual(Option.none())
+    expect(marked).toEqual(Option.some({ _tag: "Mark" }))
   })
 })

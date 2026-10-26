@@ -8,10 +8,10 @@ import {
   acceptJumped,
   acceptRetreated,
   advance,
+  Deck,
   initialModel,
   jump,
   type Model,
-  nap,
   programOf,
   type ProgramAct,
   readingMillis,
@@ -75,15 +75,11 @@ describe("jump", () => {
 
 describe("acceptors", () => {
   it("accept an Advanced proposal by advancing", () => {
-    assert.deepStrictEqual(acceptAdvanced(at(0, 2), { _tag: "Advanced" }), at(1, 0))
-  })
-
-  it("ignore a proposal that is not their own", () => {
-    assert.deepStrictEqual(acceptAdvanced(at(0, 2), { _tag: "Retreated" }), at(0, 2))
+    assert.deepStrictEqual(acceptAdvanced(at(0, 2)), at(1, 0))
   })
 
   it("accept a Retreated proposal by retreating", () => {
-    assert.deepStrictEqual(acceptRetreated(at(1, 0), { _tag: "Retreated" }), at(0, 2))
+    assert.deepStrictEqual(acceptRetreated(at(1, 0)), at(0, 2))
   })
 
   it("accept a Jumped proposal by jumping", () => {
@@ -91,11 +87,11 @@ describe("acceptors", () => {
   })
 
   it("toggle autoplay", () => {
-    assert.deepStrictEqual(acceptAutoplayToggled(at(0, 0), { _tag: "AutoplayToggled" }), at(0, 0, true))
+    assert.deepStrictEqual(acceptAutoplayToggled(at(0, 0)), at(0, 0, true))
   })
 
   it("stop autoplay when interrupted", () => {
-    assert.deepStrictEqual(acceptInterrupted(at(0, 1, true), { _tag: "Interrupted" }), at(0, 1, false))
+    assert.deepStrictEqual(acceptInterrupted(at(0, 1, true)), at(0, 1, false))
   })
 })
 
@@ -152,17 +148,17 @@ describe("state", () => {
 describe("nap", () => {
   it("whispers the reading of the current cue while autoplay is on", () => {
     assert.deepStrictEqual(
-      nap(state(at(1, 1, true))),
+      Deck.nap(state(at(1, 1, true))),
       Option.some({ _tag: "AwaitCue", act: "loop", cue: 1, millis: 8000 })
     )
   })
 
   it("stays silent while autoplay is off", () => {
-    assert.deepStrictEqual(nap(state(at(1, 1))), Option.none())
+    assert.deepStrictEqual(Deck.nap(state(at(1, 1))), Option.none())
   })
 
   it("stays silent at the end even with autoplay on", () => {
-    assert.deepStrictEqual(nap(state(at(2, 0, true))), Option.none())
+    assert.deepStrictEqual(Deck.nap(state(at(2, 0, true))), Option.none())
   })
 })
 

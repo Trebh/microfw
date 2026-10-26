@@ -1,5 +1,5 @@
 import { Effect, Option, Schema } from "effect"
-import { define } from "../../src/index.ts"
+import { define, noIntent } from "../../src/index.ts"
 
 /** Two independent automatic actions: `ClearA` takes ten seconds, `ClearB` is instant. */
 export const Clears = define({
@@ -18,19 +18,18 @@ export const Clears = define({
     b: Schema.Boolean
   })
 })({
-  controlStates: ["idle", "busy"],
   initial: { a: false, b: false },
-  acceptors: [
-    (model, proposal) => (proposal._tag === "ArmA" ? { ...model, a: true } : model),
-    (model, proposal) => (proposal._tag === "ArmB" ? { ...model, b: true } : model),
-    (model, proposal) => (proposal._tag === "ClearedA" ? { ...model, a: false } : model),
-    (model, proposal) => (proposal._tag === "ClearedB" ? { ...model, b: false } : model)
-  ],
+  acceptors: {
+    ArmA: (model) => ({ ...model, a: true }),
+    ArmB: (model) => ({ ...model, b: true }),
+    ClearedA: (model) => ({ ...model, a: false }),
+    ClearedB: (model) => ({ ...model, b: false })
+  },
   reactors: [],
   state: (model) => ({ controlState: model.a || model.b ? "busy" : "idle", a: model.a, b: model.b }),
-  nap: (representation) => {
-    if (representation.b) return Option.some({ _tag: "ClearB" })
-    return representation.a ? Option.some({ _tag: "ClearA" }) : Option.none()
+  nap: {
+    idle: noIntent,
+    busy: (representation) => Option.some({ _tag: representation.b ? "ClearB" : "ClearA" })
   },
   actions: {
     ClearA: () => Effect.sleep("10 seconds").pipe(Effect.as({ _tag: "ClearedA" })),

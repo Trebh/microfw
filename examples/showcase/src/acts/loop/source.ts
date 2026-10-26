@@ -10,14 +10,13 @@ export interface Quote {
 
 const acceptDoorsOpened: Quote = {
   name: "acceptDoorsOpened",
-  code: `export const acceptDoorsOpened = (model: Model, proposal: Proposal): Model =>
-  proposal._tag === "DoorsOpened" && model.phase === "dark" ? { ...model, phase: "selling", now: proposal.at } : model`
+  code: `export const acceptDoorsOpened = (model: Model, proposal: Proposed<"DoorsOpened">): Model =>
+  model.phase === "dark" ? { ...model, phase: "selling", now: proposal.at } : model`
 }
 
 const acceptSeatHeld: Quote = {
   name: "acceptSeatHeld",
-  code: `export const acceptSeatHeld = (model: Model, proposal: Proposal): Model => {
-  if (proposal._tag !== "SeatHeld") return model
+  code: `export const acceptSeatHeld = (model: Model, proposal: Proposed<"SeatHeld">): Model => {
   const closed = closedReason(model)
   if (Option.isSome(closed)) return refuse(model, closed.value)
   const place = placeOf(model, proposal.seat)
@@ -33,8 +32,7 @@ const acceptSeatHeld: Quote = {
 
 const acceptSeatSold: Quote = {
   name: "acceptSeatSold",
-  code: `export const acceptSeatSold = (model: Model, proposal: Proposal): Model => {
-  if (proposal._tag !== "SeatSold") return model
+  code: `export const acceptSeatSold = (model: Model, proposal: Proposed<"SeatSold">): Model => {
   const closed = closedReason(model)
   if (Option.isSome(closed)) return refuse(model, closed.value)
   const heldByBuyer = Option.exists(
@@ -49,21 +47,21 @@ const acceptSeatSold: Quote = {
 
 const acceptPaymentDeclined: Quote = {
   name: "acceptPaymentDeclined",
-  code: `export const acceptPaymentDeclined = (model: Model, proposal: Proposal): Model =>
-  proposal._tag === "PaymentDeclined" ? refuse(model, \`\${proposal.seat} was declined: \${proposal.reason}\`) : model`
+  code: `export const acceptPaymentDeclined = (model: Model, proposal: Proposed<"PaymentDeclined">): Model =>
+  refuse(model, \`\${proposal.seat} was declined: \${proposal.reason}\`)`
 }
 
-const acceptTick: Quote = {
-  name: "acceptTick",
-  code: `export const acceptTick = (model: Model, proposal: Proposal): Model =>
-  proposal._tag === "Tick" && model.phase !== "dark" ? { ...model, now: Math.max(model.now, proposal.now) } : model`
+const acceptTicked: Quote = {
+  name: "acceptTicked",
+  code: `export const acceptTicked = (model: Model, proposal: Proposed<"Ticked">): Model =>
+  model.phase !== "dark" ? { ...model, now: Math.max(model.now, proposal.now) } : model`
 }
 
-const acceptCurtainUp: Quote = {
-  name: "acceptCurtainUp",
+const acceptCurtainRaised: Quote = {
+  name: "acceptCurtainRaised",
   code: `/** The curtain rising lets go of every hold: nobody can pay once it is up. */
-export const acceptCurtainUp = (model: Model, proposal: Proposal): Model =>
-  proposal._tag === "CurtainUp" && model.phase === "selling"
+export const acceptCurtainRaised = (model: Model, proposal: Proposed<"CurtainRaised">): Model =>
+  model.phase === "selling"
     ? { ...model, phase: "curtain", now: Math.max(model.now, proposal.at), seats: model.seats.map(release) }
     : model`
 }
@@ -74,8 +72,8 @@ export const acceptorFor: Readonly<Record<StageProposal["_tag"], Quote>> = {
   SeatHeld: acceptSeatHeld,
   SeatSold: acceptSeatSold,
   PaymentDeclined: acceptPaymentDeclined,
-  Tick: acceptTick,
-  CurtainUp: acceptCurtainUp
+  Ticked: acceptTicked,
+  CurtainRaised: acceptCurtainRaised
 }
 
 export const reactor: Quote = {

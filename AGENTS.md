@@ -17,6 +17,7 @@ packages/devtools    @mufw/devtools    time-travel panel, history list, Stately 
 packages/test        @mufw/test        model-based path testing
 examples/auction     @mufw/example-auction
 examples/showcase    @mufw/example-showcase    a presentation of µFW as a theatre play: the deck is a definition, each act runs µFW live; browser only
+examples/jfb         @mufw/example-jfb         the js-framework-benchmark keyed table in µFW and in plain uhtml 4, built into directories a js-framework-benchmark checkout can serve
 docs/                ARCHITECTURE.md, architecture/*.md, TODO.md
 ```
 
@@ -130,7 +131,7 @@ Code stays in `Effect`/`Stream`/`Layer` through every layer of the application. 
 
 | Boundary | Place |
 |---|---|
-| Process entry point | `runPage` in `examples/auction/src/client/app.ts`, `runTicker` in `client/ticker.ts`, `runStreamFrame` in `client/streamEmbed.ts`, `client/devtools.ts`, `client/auctionWorker.ts` (the web worker), `server.ts`, `test/live.ts`, `test/walletLive.ts`, `test/syncLive.ts`, `test/syncRestartLive.ts`, `test/syncFailoverLive.ts`, the `scripts/`; `examples/showcase/src/main.ts` and `examples/showcase/src/acts/tour/company.worker.ts` (the web worker) |
+| Process entry point | `runPage` in `examples/auction/src/client/app.ts`, `runTicker` in `client/ticker.ts`, `runStreamFrame` in `client/streamEmbed.ts`, `client/devtools.ts`, `client/auctionWorker.ts` (the web worker), `server.ts`, `test/live.ts`, `test/walletLive.ts`, `test/syncLive.ts`, `test/syncRestartLive.ts`, `test/syncFailoverLive.ts`, the `scripts/`; `examples/showcase/src/main.ts` and `examples/showcase/src/acts/tour/company.worker.ts` (the web worker); `examples/jfb/src/mufw.ts` |
 | DOM event handler | `layerMount` dispatch, `layerPanel` and `layerHistoryList` row and export clicks, the showcase's key presses, hash changes and spotlight observers (`examples/showcase/src/deck/keys.ts`, `hash.ts`, `spotlight.ts`) and Act VII's window controls (`src/acts/sync/index.ts`), through a `FiberSet.makeRuntime` runner captured from the layer |
 | Test harness | `it.effect` / `layer` from `@effect/vitest` |
 
@@ -142,8 +143,11 @@ transport loss is turned into a defect, in `@mufw/rpc`.
 
 - Acceptors, reactors, `state` and `nap` are pure and synchronous: no `Effect`, no clock, no I/O,
   no randomness. Put anything effectful in an action and pass its result in the proposal.
-- Each acceptor handles its own tags and returns the model unchanged otherwise.
-- The representation always carries `controlState`; `controlStates` lists every value it can take.
+- One acceptor per proposal tag: `acceptors` is a record keyed by tag, and a tag the definition
+  ignores is `Tag: unchanged`. A missing or extra key does not compile.
+- The representation always carries `controlState`. One `nap` entry per control state, keyed by it,
+  `noIntent` for a state with no automatic intent; `controlStates` is derived from those keys and
+  never written (only `nest` takes a `controlStates` option).
 - `nap` returns at most one intent; automatic intents with an `intentKey` (default their tag) already in flight are skipped. In a synced loop `nap` runs on every instance and only the holder of the log's lease runs its intents, so an automatic action must be safe to interrupt when the instance loses the lease.
 - Model mutation happens only in `layerModelLocal`, under its permit.
 
@@ -152,9 +156,12 @@ transport loss is turned into a defect, in `@mufw/rpc`.
 - `@effect/vitest` (`it.effect`, `assert`), `TestClock` from `effect/testing` for time.
 - One behaviour per test, a name that states the rule, Arrange–Act–Assert, literal expectations
   worked out by hand, no `if`/`for` in a test body.
-- Domain logic is tested as pure functions with literal models (`examples/auction/test/Auction.test.ts`).
+- Domain logic is tested as pure functions with literal models (`examples/auction/test/auction/Auction.rules.test.ts`).
 - Behaviour across states is tested with `@mufw/test`: a test model next to the definition, run
   with `AutoActions` false over the local loop and over `Rpc.layerClientTest`.
+- Each definition with an explore function has a committed `<Unit>.behaviour.md` beside it, pinned by
+  a `<Unit>.behaviour.test.ts` (`toMatchFileSnapshot`): it fails when stale, `vitest -u` rewrites it.
+  The card shows only the proposals exploration sampled; its blind-spot ledger lists what no sample tried.
 - Substitute dependencies with layers at real boundaries (transport, credit check, clock); never
   mock the model or the ports' internals.
 - The shared counter fixture is `packages/core/test/fixtures/Counter.ts`.
@@ -165,6 +172,25 @@ transport loss is turned into a defect, in `@mufw/rpc`.
 - TypeScript strict, `verbatimModuleSyntax`, `noUncheckedIndexedAccess`; import with the `.ts`
   extension; type-only imports with `import type`.
 - `define(schemas)(behaviour)`: keep the two calls, they are what types the behaviour's literals.
+- Names in application code: an intent is an imperative verb phrase (`PlaceBid`, `Tick`); a proposal
+  is a past-tense fact that never equals an intent tag of the same definition (`BidPlaced`,
+  `Ticked`); an acceptor is `accept<ProposalTag>` exactly; a predicate a view reads is `can…` or
+  `is…`, never `accept…`; the coarse lifecycle field of a model is `phase`. Tags are wire and
+  stored data: a rename updates every fixture, stored JSON and literal that carries it. A test driver
+  maps a proposal to an intent with an exhaustive switch, never by reusing its tag.
+- Files: `<Unit>.ts` (PascalCase) holds exactly one `define(...)`; a lowercase file holds none. The
+  unit's other roles are `<Unit>.<role>.ts`: `.view.ts` (the pure view, taking uhtml's `html` as a
+  parameter, importing no uhtml runtime), `.view.dom.ts` (binds uhtml's `html`; the only module of
+  the unit that imports uhtml's entry), `.explore.ts` (`explore` and `serialize`, shared by devtools
+  and path tests), others named by what they are (`.feed.ts`). A definition never imports its view.
+  In `examples/auction` each unit has a folder under `src/` and its tests mirror it under `test/`,
+  named `<Unit>.<what>.test.ts`; shared ports and values stay in `src/domain/`, adapters in
+  `src/adapters/`.
+- Reading order of a definition file: vocabulary (schemas and their types); rules on the model (one
+  acceptor per proposal tag, in the order of the `Proposal` union; a rule that only reads the model
+  is a guard returning `Option<string>`, such as `bidRefusal`, that its acceptor uses); derivations
+  (`state`, control-state derivation, `nap` entries, view predicates); actions, one per intent in
+  intent order, each carrying the "why" only it needs; `define(...)` last, names only.
 - Small, single-purpose functions; guard clauses over nesting; named intermediate values over dense
   one-liners; no boolean parameter that selects behaviour.
 - Comments state a present-tense choice and its reason (an external constraint, a "why not"). No
@@ -183,6 +209,7 @@ code as it is. Update the affected document in the same change that makes it fal
 | user-facing behaviour, commands, packages | README.md |
 | direction, principles, non-goals | VISION.md |
 | a port, layer, contract, boundary or design decision | docs/ARCHITECTURE.md and the matching page |
+| a change to a definition (its schemas, acceptors, `nap`, explore function or samples) | its `<Unit>.behaviour.md`, regenerated with `vitest -u` and reviewed as part of the diff |
 | a change that moves a measured cost (bundle, startup, step, interaction, server) | docs/architecture/performance.md, with the figures of a fresh run of the `bench:*` script that measures it |
 | a gap found or closed | docs/TODO.md (add it, or delete the item) |
 | a rule for contributors | AGENTS.md |

@@ -1,7 +1,7 @@
 import { assert, describe, it } from "@effect/vitest"
-import { Context, Effect, Layer, Option, Schema } from "effect"
+import { Context, Effect, Layer, Schema } from "effect"
 import { expectTypeOf } from "vitest"
-import { AutoActions, define, type IntentBus, layerLoopLocal, makePorts } from "../src/index.ts"
+import { AutoActions, define, type IntentBus, layerLoopLocal, makePorts, noIntent } from "../src/index.ts"
 import { awaitFirst } from "./support.ts"
 
 class Caller extends Context.Service<Caller, string>()("test/Caller") {}
@@ -13,12 +13,11 @@ const Greeter = define({
   intent: Schema.TaggedStruct("Greet", {}),
   representation: Schema.Struct({ controlState: Schema.Literal("idle"), lastCaller: Schema.String })
 })({
-  controlStates: ["idle"],
   initial: { lastCaller: "nobody" },
-  acceptors: [(_, proposal) => ({ lastCaller: proposal.caller })],
+  acceptors: { Greeted: (_, proposal) => ({ lastCaller: proposal.caller }) },
   reactors: [],
   state: (model) => ({ controlState: "idle", lastCaller: model.lastCaller }),
-  nap: () => Option.none(),
+  nap: { idle: noIntent },
   actions: {
     Greet: () => Caller.use((caller) => Effect.succeed({ _tag: "Greeted", caller } as const))
   }

@@ -5,10 +5,10 @@ import { Cause, Deferred, Effect, Layer, Option, Stream } from "effect"
 import { Connection, type ConnectionState } from "../src/client/connection.ts"
 import { workerPorts } from "../src/client/placements/worker.ts"
 import { workerHost } from "../src/client/placements/workerHost.ts"
-import type { Representation } from "../src/domain/Auction.ts"
+import type { Representation } from "../src/auction/Auction.ts"
 import { Amount, Bidder } from "../src/domain/Values.ts"
 import { Ports, Rpc } from "../src/ports.ts"
-import { auctionModel as model, clockedIntentDriver, named } from "./drivers.ts"
+import { auctionModel as model, clockedIntentDriver, named } from "./auction/Auction.pathModel.ts"
 
 /** What the page and the worker each hold of one message channel: the structured-clone boundary of a real worker. */
 const channel = Effect.sync(() => new MessageChannel())

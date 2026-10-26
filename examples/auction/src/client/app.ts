@@ -12,11 +12,12 @@ import { createBrowserInspector } from "@statelyai/inspect"
 import { Effect, Layer, Option, type Schema } from "effect"
 import type { WorkerError } from "effect/workers/WorkerError"
 import { html, render } from "uhtml"
-import { Auction, exploreAuction, serializeAuction } from "../domain/Auction.ts"
+import { exploreAuction, serializeAuction } from "../auction/Auction.explore.ts"
+import { Auction } from "../auction/Auction.ts"
+import { makeAuctionView } from "../auction/Auction.view.dom.ts"
 import type { Whoami } from "../domain/Whoami.ts"
 import { Ports, WalletPorts } from "../ports.ts"
-import { makeView } from "../view.ts"
-import { makeWalletView } from "../walletView.ts"
+import { makeWalletView } from "../wallet/Wallet.view.dom.ts"
 import { layerConnectionBanner } from "./connectionBanner.ts"
 import { layerHeldNoticeWith } from "./heldNotice.ts"
 import { walletBrowserOnly } from "./placements/walletBrowserOnly.ts"
@@ -105,7 +106,7 @@ export const runPage = (placement: PagePorts, label: string, devtools: PageDevto
   const page = Layer.mergeAll(
     layerMount(Ports, {
       root: root("app"),
-      view: makeView(label),
+      view: makeAuctionView(label),
       onRefused: (refused) => Refusals.use((refusals) => refusals.report(refused))
     }),
     layerWallet,

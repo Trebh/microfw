@@ -6,13 +6,12 @@ import { layerPaymentTheatrical } from "../../adapters/paymentTheatrical.ts"
 import {
   type BoxOffice,
   company,
-  exploreBoxOffice,
   type Model,
   Patron,
   type Representation,
-  serializeBoxOffice,
   state
 } from "../../domain/BoxOffice.ts"
+import { exploreBoxOffice, serializeBoxOffice } from "../../domain/BoxOffice.explore.ts"
 
 /** Which of the two understudies a rehearsal is run on. */
 export const UnderstudyName = Schema.Literals(["honest", "sabotaged"])

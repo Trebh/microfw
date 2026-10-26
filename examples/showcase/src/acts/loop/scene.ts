@@ -1,12 +1,6 @@
 import { applyProposal, type StepRecord } from "@mufw/core"
 import { Option, Schema } from "effect"
 import {
-  acceptCurtainUp,
-  acceptDoorsOpened,
-  acceptPaymentDeclined,
-  acceptSeatHeld,
-  acceptSeatSold,
-  acceptTick,
   BoxOffice,
   Intent as StageIntent,
   type Model as StageModel,
@@ -42,25 +36,14 @@ export const Scene = Schema.Struct({
 })
 export type Scene = typeof Scene.Type
 
-type Acceptor = (typeof BoxOffice.acceptors)[number]
-
-const acceptorNames = new Map<Acceptor, string>([
-  [acceptDoorsOpened, "acceptDoorsOpened"],
-  [acceptSeatHeld, "acceptSeatHeld"],
-  [acceptSeatSold, "acceptSeatSold"],
-  [acceptPaymentDeclined, "acceptPaymentDeclined"],
-  [acceptTick, "acceptTick"],
-  [acceptCurtainUp, "acceptCurtainUp"]
-])
-
 /** The intent whose action brings back each proposal; exhaustive, so a new proposal cannot be forgotten. */
 const intentBehind: Readonly<Record<StageProposal["_tag"], StageIntent["_tag"]>> = {
   DoorsOpened: "OpenDoors",
   SeatHeld: "Hold",
   SeatSold: "Pay",
   PaymentDeclined: "Pay",
-  Tick: "AwaitExpiry",
-  CurtainUp: "RaiseCurtain"
+  Ticked: "AwaitExpiry",
+  CurtainRaised: "RaiseCurtain"
 }
 
 /** Intents that NAP, not the audience, asks for. */
@@ -85,18 +68,9 @@ const intentLabel = (proposal: StageProposal): string => {
   return Option.match(seatOf(proposal), { onNone: () => tag, onSome: (seat) => `${tag} ${seat}` })
 }
 
-/** The acceptors that returned a model other than the one they were given, in order. */
-export const acceptorsThatMoved = (before: StageModel, proposal: StageProposal): ReadonlyArray<string> => {
-  const folded = BoxOffice.acceptors.reduce(
-    (state, accept) => {
-      const next = accept(state.model, proposal)
-      if (next === state.model) return state
-      return { model: next, movers: [...state.movers, acceptorNames.get(accept) ?? "an acceptor"] }
-    },
-    { model: before, movers: [] as ReadonlyArray<string> }
-  )
-  return folded.movers
-}
+/** The acceptor that returned a model other than the one it was given, if any: only the one named after the proposal's tag can. */
+export const acceptorsThatMoved = (before: StageModel, proposal: StageProposal): ReadonlyArray<string> =>
+  BoxOffice.acceptors.some((accept) => accept(before, proposal) !== before) ? [`accept${proposal._tag}`] : []
 
 const withoutReactors: typeof BoxOffice = { ...BoxOffice, reactors: [] }
 

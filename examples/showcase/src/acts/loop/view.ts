@@ -2,7 +2,7 @@ import type { View } from "@mufw/view-uhtml"
 import { Option } from "effect"
 import { type Hole, html } from "uhtml"
 import type { Intent as StageIntent, Representation as StageRepresentation, SeatView } from "../../domain/BoxOffice.ts"
-import type { Intent, Representation } from "./board.ts"
+import type { Intent, Representation } from "./LoopBoard.ts"
 import { firedStations, proposalText, type Scene, STATIONS, type StationId } from "./scene.ts"
 import { acceptorFor, firstAcceptor, type Quote, reactor, SOURCE_FILE, type Token, tokenize } from "./source.ts"
 

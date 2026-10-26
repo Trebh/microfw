@@ -2,7 +2,7 @@ import { layerLoopLocal } from "@mufw/core"
 import type { RpcTag } from "@mufw/rpc"
 import { Layer } from "effect"
 import { RpcSerialization, RpcServer } from "effect/rpc"
-import { Wallet } from "./domain/Wallet.ts"
+import { Wallet } from "./wallet/Wallet.ts"
 import { WalletPorts, WalletRpc } from "./ports.ts"
 import { samPath } from "./samPath.ts"
 

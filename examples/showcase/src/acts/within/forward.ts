@@ -2,7 +2,7 @@ import type { Forward } from "@mufw/core"
 import { Option } from "effect"
 import type { Deck, Representation as DeckRepresentation } from "../../deck/Deck.ts"
 import type { BoxOffice, Representation as BoxRepresentation } from "../../domain/BoxOffice.ts"
-import type { Marquee, Sign } from "./marquee.ts"
+import type { Marquee, Sign } from "./Marquee.ts"
 import type { FrontOfHouse, Playhouse } from "./playhouse.ts"
 import { script } from "./script.ts"
 
