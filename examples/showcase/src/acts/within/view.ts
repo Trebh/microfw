@@ -32,11 +32,11 @@ const slot = (className: string, spot?: string): HTMLElement => {
 
 export const makeSlots = (): Slots => ({
   play: slot("within__slot"),
-  playHistory: slot("within__hist within__hist--nest", "history-nest"),
+  playHistory: slot("hist hist--stacked", "history-nest"),
   front: slot("within__slot"),
-  frontHistory: slot("within__hist"),
+  frontHistory: slot("hist"),
   sign: slot("within__slot"),
-  signHistory: slot("within__hist")
+  signHistory: slot("hist")
 })
 
 const intentFor = (seat: SeatView): Option.Option<BoxIntent> => {

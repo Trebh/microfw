@@ -31,7 +31,7 @@ const hint = ([keys, does]: (typeof hints)[number]) =>
 const playbill = () =>
   html`<div class="overture">
     <header class="overture__masthead">
-      <p class="overture__kicker marquee">Tonight · a play in seven acts</p>
+      <p class="overture__kicker marquee">Tonight · a play in eight acts</p>
       <h1 class="overture__title" data-spot="title">µFW</h1>
       <p class="overture__subtitle" data-spot="subtitle">one model, on any stage</p>
     </header>

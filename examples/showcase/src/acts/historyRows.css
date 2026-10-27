@@ -1,0 +1,113 @@
+/* History lists sit below the live panels: newest first, older rows fading into the past. */
+
+.hist {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  padding-block-start: var(--space-2);
+  border-block-start: 1px solid var(--chalk-faint);
+}
+
+.hist__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding-block-end: var(--space-1);
+  font-size: var(--text-xs);
+}
+
+.hist__title { font-weight: 500; color: var(--chalk); }
+.hist__kind { font-weight: 400; color: var(--chalk-dim); }
+.hist__count { color: var(--chalk-dim); }
+
+.hist__records {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.hist__record {
+  display: grid;
+  grid-template-columns: 2.7em minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 0.5em;
+  padding: 0.2em 0.3em;
+  border-block-end: 1px dotted var(--chalk-faint);
+  font-size: var(--text-xs);
+  color: var(--chalk);
+}
+
+.hist__seq { color: var(--chalk-dim); }
+.hist__label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--chalk); }
+.hist__record[data-origin="inner"] .hist__label { color: var(--standby-blue); }
+.hist__record:first-child .hist__label { color: var(--limelight); }
+.hist__record:first-child[data-origin="inner"] .hist__label { color: var(--standby-blue); }
+
+.hist__parts {
+  font-size: var(--text-s);
+  white-space: nowrap;
+}
+
+.hist__part + .hist__part::before {
+  content: "/";
+  margin-inline: 0.15em;
+  font-weight: 400;
+  color: var(--chalk-dim);
+}
+
+.hist__part {
+  font-weight: 400;
+}
+
+.hist__part[data-changed="true"] {
+  box-shadow: inset 0 -2px 0 color-mix(in oklab, var(--limelight) 60%, transparent);
+}
+
+.hist__record:first-child {
+  color: var(--paper);
+  background: color-mix(in oklab, var(--limelight) 8%, transparent);
+}
+
+.hist__record:first-child[data-parity="0"] { animation: record-in-a var(--dur-base) var(--ease-line) both; }
+.hist__record:first-child[data-parity="1"] { animation: record-in-b var(--dur-base) var(--ease-line) both; }
+
+.hist__record:nth-child(n + 2) .hist__parts { font-family: "Redaction 10", var(--face-body); }
+.hist__record:nth-child(n + 4) .hist__parts { font-family: "Redaction 35", var(--face-body); }
+.hist__record:nth-child(n + 7) .hist__parts { color: var(--chalk-dim); }
+
+.hist__record:nth-child(n + 4) { opacity: 0.8; }
+.hist__record:nth-child(n + 7) { opacity: 0.6; }
+.hist__record:nth-child(n + 10) { opacity: 0.42; }
+
+/* A stacked list has room: label above, every part of the control state below. */
+.hist--stacked .hist__record {
+  grid-template-columns: 2.7em minmax(0, 1fr);
+  row-gap: 0.1em;
+  padding-block: 0.4em;
+}
+
+.hist--stacked .hist__parts { grid-column: 2; }
+
+@keyframes record-in-a {
+  from { translate: 0 -0.6rem; opacity: 0; }
+}
+
+@keyframes record-in-b {
+  from { translate: 0 -0.6rem; opacity: 0; }
+}
+
+@media (max-width: 68rem) {
+  .hist__records {
+    flex: 0 0 auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hist__record:first-child {
+    animation: none;
+  }
+}

@@ -9,6 +9,7 @@ import { loopAct } from "./loop/index.ts"
 import { mapAct } from "./map/index.ts"
 import { overtureAct } from "./overture/index.ts"
 import { rehearsalAct } from "./rehearsal/index.ts"
+import { repertoryAct } from "./repertory/index.ts"
 import { rewindAct } from "./rewind/index.ts"
 import { syncAct } from "./sync/index.ts"
 import { tourAct } from "./tour/index.ts"
@@ -34,6 +35,7 @@ export const acts: ReadonlyArray<Act<StageServices>> = [
   rehearsalAct,
   tourAct,
   withinAct,
+  repertoryAct,
   syncAct,
   finaleAct
 ]

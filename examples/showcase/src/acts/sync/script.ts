@@ -11,7 +11,7 @@ export const CLOSE_CUE = 7
 
 export const script: ActScript = {
   id: "sync",
-  numeral: "VII",
+  numeral: "VIII",
   title: "Two Box Offices",
   subtitle: "two windows, one house, one shared log",
   feature: "@mufw/core/sync · layerLoopSynced · SyncLog · the lease",

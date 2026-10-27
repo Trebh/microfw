@@ -412,108 +412,6 @@
 #act-within .within__tok--string { color: var(--chalk); }
 #act-within .within__tok--arg { color: var(--paper); }
 
-/* History lists sit below the live panels: newest first, older rows fading into the past. */
-
-#act-within .within__hist {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  min-height: 0;
-  padding-block-start: var(--space-2);
-  border-block-start: 1px solid var(--chalk-faint);
-}
-
-#act-within .within__hist-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--space-2);
-  padding-block-end: var(--space-1);
-  font-size: var(--text-xs);
-}
-
-#act-within .within__hist-title { font-weight: 500; color: var(--chalk); }
-#act-within .within__hist-kind { font-weight: 400; color: var(--chalk-dim); }
-#act-within .within__hist-count { color: var(--chalk-dim); }
-
-#act-within .within__records {
-  display: flex;
-  flex: 1 1 0;
-  flex-direction: column;
-  min-height: 0;
-  overflow: hidden;
-}
-
-#act-within .within__record {
-  display: grid;
-  grid-template-columns: 2.7em minmax(0, 1fr) auto;
-  align-items: baseline;
-  gap: 0.5em;
-  padding: 0.2em 0.3em;
-  border-block-end: 1px dotted var(--chalk-faint);
-  font-size: var(--text-xs);
-  color: var(--chalk);
-}
-
-#act-within .within__seq { color: var(--chalk-dim); }
-#act-within .within__label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--chalk); }
-#act-within .within__record[data-origin="inner"] .within__label { color: var(--standby-blue); }
-#act-within .within__record:first-child .within__label { color: var(--limelight); }
-#act-within .within__record:first-child[data-origin="inner"] .within__label { color: var(--standby-blue); }
-
-#act-within .within__parts {
-  font-size: var(--text-s);
-  white-space: nowrap;
-}
-
-#act-within .within__part + .within__part::before {
-  content: "/";
-  margin-inline: 0.15em;
-  font-weight: 400;
-  color: var(--chalk-dim);
-}
-
-#act-within .within__part {
-  font-weight: 400;
-}
-
-#act-within .within__part[data-changed="true"] {
-  box-shadow: inset 0 -2px 0 color-mix(in oklab, var(--limelight) 60%, transparent);
-}
-
-#act-within .within__record:first-child {
-  color: var(--paper);
-  background: color-mix(in oklab, var(--limelight) 8%, transparent);
-}
-
-#act-within .within__record:first-child[data-parity="0"] { animation: record-in-a var(--dur-base) var(--ease-line) both; }
-#act-within .within__record:first-child[data-parity="1"] { animation: record-in-b var(--dur-base) var(--ease-line) both; }
-
-#act-within .within__record:nth-child(n + 2) .within__parts { font-family: "Redaction 10", var(--face-body); }
-#act-within .within__record:nth-child(n + 4) .within__parts { font-family: "Redaction 35", var(--face-body); }
-#act-within .within__record:nth-child(n + 7) .within__parts { color: var(--chalk-dim); }
-
-#act-within .within__record:nth-child(n + 4) { opacity: 0.8; }
-#act-within .within__record:nth-child(n + 7) { opacity: 0.6; }
-#act-within .within__record:nth-child(n + 10) { opacity: 0.42; }
-
-/* Nest's list has room: label above, both halves of the control state below. */
-#act-within .within__hist--nest .within__record {
-  grid-template-columns: 2.7em minmax(0, 1fr);
-  row-gap: 0.1em;
-  padding-block: 0.4em;
-}
-
-#act-within .within__hist--nest .within__parts { grid-column: 2; }
-
-@keyframes record-in-a {
-  from { translate: 0 -0.6rem; opacity: 0; }
-}
-
-@keyframes record-in-b {
-  from { translate: 0 -0.6rem; opacity: 0; }
-}
-
 #act-within .within__histories {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -579,10 +477,6 @@
     grid-template-rows: auto;
   }
 
-  #act-within .within__records {
-    flex: 0 0 auto;
-  }
-
   #act-within .within__compare {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -591,8 +485,7 @@
 @media (prefers-reduced-motion: reduce) {
   #act-within .within__sign .within__sign-text,
   #act-within .within__bulbs::before,
-  #act-within .within__bulbs::after,
-  #act-within .within__record:first-child {
+  #act-within .within__bulbs::after {
     animation: none;
   }
 }

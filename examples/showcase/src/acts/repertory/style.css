@@ -1,0 +1,256 @@
+/* Act VII. The season's bill on the left, one box office per night on it, the loop's one history beside them. */
+
+#act-repertory .repertory {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: var(--space-4) var(--space-5);
+  height: 100%;
+}
+
+#act-repertory .repertory__slot {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+#act-repertory .repertory__stage {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  gap: var(--space-4);
+  align-items: start;
+  min-height: 0;
+}
+
+/* The bill: a sheet of paper listing the nights. */
+
+#act-repertory .repertory__bill {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4) var(--space-4);
+}
+
+#act-repertory .repertory__bill-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+#act-repertory .repertory__bill-title {
+  font-size: var(--text-m);
+  color: var(--velvet);
+}
+
+#act-repertory .repertory__bill-state {
+  font-size: var(--text-xs);
+}
+
+#act-repertory .repertory__programme {
+  display: grid;
+  gap: var(--space-1);
+  min-height: 3.6em;
+  font-size: var(--text-s);
+}
+
+#act-repertory .repertory__programme li::before {
+  content: "— ";
+  color: var(--velvet);
+}
+
+#act-repertory .repertory__played {
+  font-size: var(--text-xs);
+}
+
+#act-repertory .repertory__model {
+  display: grid;
+  gap: var(--space-2);
+  padding-block-start: var(--space-2);
+  border-block-start: 1px dashed color-mix(in oklab, var(--ink) 35%, transparent);
+  font-size: var(--text-xs);
+}
+
+#act-repertory .repertory__model b {
+  font-weight: 500;
+  color: var(--velvet);
+}
+
+#act-repertory .repertory__bill-controls {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+/* The nights: one box office each, side by side. */
+
+#act-repertory .repertory__nights {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
+  align-items: start;
+  min-width: 0;
+}
+
+#act-repertory .repertory__empty {
+  grid-column: 1 / -1;
+  padding: var(--space-4);
+  border: 1px dashed var(--chalk-faint);
+  font-size: var(--text-s);
+  color: var(--chalk-dim);
+  text-align: center;
+}
+
+#act-repertory .repertory__night {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: var(--space-2) var(--space-3) var(--space-3);
+  border: 1px solid var(--chalk-faint);
+  background: color-mix(in oklab, var(--stage-black) 72%, var(--wing-grey));
+}
+
+#act-repertory .repertory__night-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+#act-repertory .repertory__night-name {
+  font-size: var(--text-xs);
+  font-weight: 500;
+  color: var(--standby-blue);
+}
+
+#act-repertory .repertory__chip {
+  font-size: var(--text-xs);
+  color: var(--chalk-dim);
+}
+
+#act-repertory .repertory__seats {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 0.25rem;
+}
+
+#act-repertory .repertory__seat {
+  height: 32px;
+  padding: 0;
+  border: 1px solid var(--chalk-faint);
+  background: transparent;
+  color: var(--chalk);
+  font-size: var(--text-xs);
+  cursor: pointer;
+  transition:
+    background-color var(--dur-fast) ease,
+    color var(--dur-fast) ease,
+    border-color var(--dur-fast) ease;
+}
+
+#act-repertory .repertory__seat:hover:not(:disabled) {
+  border-color: var(--limelight);
+  color: var(--limelight);
+}
+
+#act-repertory .repertory__seat[data-status="held"] {
+  border-color: var(--limelight-deep);
+  background: color-mix(in oklab, var(--limelight) 26%, transparent);
+  color: var(--limelight);
+}
+
+#act-repertory .repertory__seat[data-status="sold"] {
+  border-color: var(--velvet-lit);
+  background: var(--velvet);
+  color: var(--paper);
+  cursor: default;
+}
+
+#act-repertory .repertory__tally {
+  min-height: 1.4em;
+  font-size: 0.7rem;
+  color: var(--chalk);
+}
+
+#act-repertory .repertory__tally--refused {
+  color: var(--alarm);
+}
+
+#act-repertory .repertory__controls {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+#act-repertory .repertory__ticket {
+  justify-content: center;
+  padding-block: 0.4em;
+  font-size: var(--text-xs);
+}
+
+/* The loop's one history, beside the stage. */
+
+#act-repertory .hist {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+/* The comparison card. */
+
+#act-repertory .repertory__compare {
+  display: grid;
+  grid-column: 1 / -1;
+  filter: brightness(0.86);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-5);
+  padding: var(--space-2) var(--space-5);
+}
+
+#act-repertory .repertory__verdict {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  margin-block-end: var(--space-1);
+}
+
+#act-repertory .repertory__verdict code {
+  font-size: var(--text-xs);
+  font-weight: 500;
+  color: var(--velvet);
+}
+
+#act-repertory .repertory__verdict .marquee {
+  font-size: var(--text-s);
+}
+
+#act-repertory .repertory__compare ul {
+  display: grid;
+  gap: var(--space-1);
+  font-size: var(--text-xs);
+  line-height: var(--leading-body);
+}
+
+#act-repertory .repertory__compare li::before {
+  content: "— ";
+  color: var(--velvet);
+}
+
+@media (max-width: 68rem) {
+  #act-repertory .repertory,
+  #act-repertory .repertory__stage,
+  #act-repertory .repertory__compare {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  #act-repertory .repertory {
+    grid-template-rows: auto;
+    height: auto;
+  }
+
+  #act-repertory .hist {
+    grid-column: auto;
+    grid-row: auto;
+  }
+}

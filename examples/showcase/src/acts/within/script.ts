@@ -36,7 +36,7 @@ export const script: ActScript = {
       spot: "histories"
     },
     {
-      line: "Use nest for parts that must change together. Use layerForward when one program only watches another, or when they run in different places.",
+      line: "Use nest for two parts that must change together. Use layerForward when one program only watches another, or when they run in different places. For more parts than two, or a number of them decided while the program runs: the next act.",
       spot: "compare"
     }
   ]

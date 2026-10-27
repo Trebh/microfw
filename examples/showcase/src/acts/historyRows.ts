@@ -1,12 +1,13 @@
 import { type AnyDefinition, type Ports, proposalLabel, type StepKind, type StepRecord } from "@mufw/core"
 import { Effect, Layer, Option, Stream } from "effect"
 import { html, render } from "uhtml"
+import "./historyRows.css"
 
 /** One line of a history list: what the record is called, and the control state it left the loop in. */
 export interface Row {
   readonly seq: number
   readonly kind: StepKind
-  /** The proposal's tag; `Child/…` for a proposal of the nested play. */
+  /** The proposal's label: its tag, or the wrapper path of a part's proposal. */
   readonly label: string
   /** The control state, one entry per half when a nested definition joins two with `/`. */
   readonly parts: ReadonlyArray<string>
@@ -37,24 +38,24 @@ const remember = (limit: number) => (rows: ReadonlyArray<Row>, row: Row): Readon
   [row, ...rows].slice(0, limit)
 
 const part = (value: string, index: number, older: Row | undefined) =>
-  html`<b class="within__part" data-changed=${String(older !== undefined && older.parts[index] !== value)}>${value}</b>`
+  html`<b class="hist__part" data-changed=${String(older !== undefined && older.parts[index] !== value)}>${value}</b>`
 
-/** A record of the nested play is `Child/…`; every other label belongs to the loop that owns the list. */
-const originOf = (label: string): string => (label.startsWith("Child/") ? "inner" : "own")
+/** A part's record is labelled through its wrapper (`Child/…`, `Nights[Fri]/…`); every other label belongs to the loop's own definition. */
+const originOf = (label: string): string => (label.includes("/") ? "inner" : "own")
 
 const recordRow = (row: Row, older: Row | undefined) =>
-  html`<li class="within__record" data-origin=${originOf(row.label)} data-kind=${row.kind} data-parity=${String(row.seq % 2)}>
-    <span class="within__seq mono">#${row.seq}</span>
-    <span class="within__label mono">${row.label}</span>
-    <span class="within__parts">${row.parts.map((value, index) => part(value, index, older))}</span>
+  html`<li class="hist__record" data-origin=${originOf(row.label)} data-kind=${row.kind} data-parity=${String(row.seq % 2)}>
+    <span class="hist__seq mono">#${row.seq}</span>
+    <span class="hist__label mono">${row.label}</span>
+    <span class="hist__parts">${row.parts.map((value, index) => part(value, index, older))}</span>
   </li>`
 
 const historyList = (title: string, rows: ReadonlyArray<Row>) =>
-  html`<header class="within__hist-head">
-      <h3 class="within__hist-title mono">${title} <span class="within__hist-kind">history</span></h3>
-      <span class="within__hist-count mono">${rows.length === 0 ? "…" : `step #${rows[0]?.seq ?? 0}`}</span>
+  html`<header class="hist__head">
+      <h3 class="hist__title mono">${title} <span class="hist__kind">history</span></h3>
+      <span class="hist__count mono">${rows.length === 0 ? "…" : `step #${rows[0]?.seq ?? 0}`}</span>
     </header>
-    <ol class="within__records">${rows.map((row, index) => recordRow(row, rows[index + 1]))}</ol>`
+    <ol class="hist__records">${rows.map((row, index) => recordRow(row, rows[index + 1]))}</ol>`
 
 /**
  * One list over a loop's `HistoryPort`: its newest `limit` records, as the loop wrote them. The list

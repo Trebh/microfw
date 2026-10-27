@@ -93,7 +93,7 @@ Code stays inside `Effect`/`Stream`/`Layer` across every package. Effects are ru
 | Web worker | `examples/auction/src/client/auctionWorker.ts`, the worker's composition root | `BrowserRuntime.runMain(Layer.launch(workerHost.pipe(Layer.provide(BrowserWorkerRunner.layer))))` |
 | Showcase web worker | `examples/showcase/src/acts/tour/company.worker.ts`, the worker's composition root, started by Act V with `{ type: "module" }` | `BrowserRuntime.runMain(Layer.launch(served), { teardown: reportFailureToPage })`: a failure is raised to the page |
 | Live tests and scripts | `examples/auction/test/live.ts`, `test/walletLive.ts`, `test/syncLive.ts`, `test/syncRestartLive.ts`, `test/syncFailoverLive.ts`, `scripts/*.ts` | `NodeRuntime.runMain(program)` |
-| DOM events | `layerMount` dispatch, `layerPanel` and `layerHistoryList` row click and export click, the showcase's key presses, hash changes and spotlight observers (`examples/showcase/src/deck/keys.ts`, `hash.ts`, `spotlight.ts`) and Act VII's window controls (`src/acts/sync/index.ts`) | `FiberSet.makeRuntime` captured in the layer: the fiber inherits the layer's services and references (the `Scheduler` among them) and is interrupted with its scope |
+| DOM events | `layerMount` dispatch, `layerPanel` and `layerHistoryList` row click and export click, the showcase's key presses, hash changes and spotlight observers (`examples/showcase/src/deck/keys.ts`, `hash.ts`, `spotlight.ts`) and Act VIII's window controls (`src/acts/sync/index.ts`) | `FiberSet.makeRuntime` captured in the layer: the fiber inherits the layer's services and references (the `Scheduler` among them) and is interrupted with its scope |
 | Tests | every `*.test.ts` | `@effect/vitest` `it.effect` |
 
 ## Data at the edges
