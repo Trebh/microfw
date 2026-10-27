@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <title>µFW — one-page design</title>
 <style>
+{{FONTS}}
   @page { size: 594mm 420mm; margin: 0; }
 
   :root {
@@ -23,9 +24,9 @@
     --g2: linear-gradient(135deg, #d6336c, #e8590c);
     --g3: linear-gradient(135deg, #2f9e44, #0ca678);
     --shadow: 0 .3mm .8mm rgba(27,31,42,.06), 0 2.4mm 7mm rgba(27,31,42,.07);
-    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
-    --sans: -apple-system, "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif;
-    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    --serif: "IBM Plex Serif", serif;
+    --sans: "IBM Plex Sans", sans-serif;
+    --mono: "IBM Plex Mono", monospace;
   }
 
   * { box-sizing: border-box; }
@@ -56,10 +57,12 @@
 
   /* Header */
   header { display: grid; grid-template-columns: 118mm 1fr 236mm; gap: 11mm; align-items: center; }
-  .brand h1 { display: inline-block; padding-right: 1mm; font-size: 31mm; line-height: .86; letter-spacing: -.03em;
+  /* The gradient paints only inside the box, and line-height .86 leaves the µ's descender below it:
+     the bottom padding extends the box over the descender. */
+  .brand h1 { display: inline-block; padding: 0 1mm .15em 0; font-size: 31mm; line-height: .86; letter-spacing: -.03em;
               background: linear-gradient(100deg, #2563eb 0%, #7c3aed 38%, #d6336c 70%, #e8590c 100%);
               -webkit-background-clip: text; background-clip: text; color: transparent; }
-  .brand p { font-size: 4.4mm; margin-top: 3mm; color: var(--muted); }
+  .brand p { font-size: 4.4mm; margin-top: 1.5mm; color: var(--muted); }
   .brand p b { color: var(--ink); }
   .problem p { font-family: var(--serif); font-size: 5.5mm; line-height: 1.3; }
   .problem p em { font-style: normal; background: linear-gradient(transparent 60%, rgba(214,51,108,.22) 60%); }
@@ -127,7 +130,7 @@
   pre .c { color: #8b93a7; } pre .k { color: #ffb37a; } pre .s { color: #a6e3a1; } pre .p { color: #8fb8ff; } pre .t { color: #d4b8ff; }
   .split { display: grid; grid-template-columns: 1fr; gap: 1.5mm; }
   .nongoals li { color: var(--muted); }
-  .nongoals li::before { content: "✕"; color: var(--seam); font-size: 2.6mm; }
+  .nongoals li::before { content: "×"; color: var(--seam); font-size: 2.6mm; }
   .criteria li::before { content: "✓"; color: var(--ok); font-weight: 900; }
   .strip .note { margin-top: 1.2mm; color: var(--muted); }
   .sub-h { font-weight: 800; font-size: 2.6mm; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); margin: 2.4mm 0 1.2mm; }
@@ -202,7 +205,7 @@
           <span class="num">3</span>
           <div>
             <h2>Every path, replayed on the real system</h2>
-            <p>The step is pure, so the control-state graph is explored offline. Each generated path runs against the system, asserting the representation at every node.</p>
+            <p>The step is pure, so the control-state graph is explored offline. Each generated path runs against the system, asserting the representation at every node; the same exploration writes the definition's committed behaviour card.</p>
           </div>
         </div>
         {{ORACLE}}
@@ -220,7 +223,7 @@
   intent: <span class="t">Intent</span>, representation: <span class="t">Representation</span>   <span class="c">// the cut points</span>
 })({
   initial,
-  acceptors: { Opened: acceptOpened, BidPlaced: acceptBidPlaced, … },     <span class="c">// one per tag</span>
+  acceptors: { BidPlaced: acceptBidPlaced, … },                            <span class="c">// one per tag</span>
   reactors: [], state,                                                     <span class="c">// pure</span>
   nap: { opening: napOpening, open: napOpen, closing: napClosing, sold: noIntent },
   actions: { Open: …, PlaceBid: …, Tick: …, Close: … }                     <span class="c">// effectful</span>
@@ -246,7 +249,7 @@
       <ul>
         <li><b>Time travel:</b> <code>travelTo(seq)</code> restores any retained record and appends a <code>travel</code> record; <code>nap</code> does not run. A history exports to JSON and replays its proposals.</li>
         <li><b>Diagrams are derived:</b> the Stately inspector draws state and sequence diagrams from the definition.</li>
-        <li><b>Beyond one process:</b> the model persists through a <code>KeyValueStore</code> port; instances agree by applying one ordered log of proposals.</li>
+        <li><b>Beyond one process:</b> the model persists through a <code>KeyValueStore</code> port; instances agree by applying one ordered log of proposals, and a lease picks the one that runs automatic actions.</li>
       </ul>
     </section>
 
@@ -258,14 +261,15 @@
         <li><b>Effects all the way down;</b> run only at the edges.</li>
         <li><b>Boring and small:</b> a pure function over a service, a service over a feature.</li>
         <li><b>Observable by default.</b></li>
+        <li><b>Honest about cost:</b> measured against plain baselines.</li>
       </ul>
       <div class="sub-h">Not doing</div>
       <ul class="nongoals">
         <li>A general-purpose UI framework</li>
         <li>Hiding Effect from its users</li>
         <li>Statecharts as the source of truth</li>
+        <li>Winning benchmarks or the smallest bundle</li>
       </ul>
-      <p class="note">Then: XState's ground — modelling, visualisation, model-based testing — with the domain kept as data and pure functions.</p>
     </section>
 
     <section class="card p3">
@@ -277,9 +281,11 @@
       </ul>
       <div class="sub-h">Next</div>
       <ul>
-        <li>A sync log cut at snapshots, with fenced automatic actions</li>
+        <li>Sync logs that survive restores and late resends</li>
         <li>Installable packages</li>
+        <li>Measuring how coding agents fare with µFW</li>
       </ul>
+      <p class="note">Then: XState's ground — modelling, visualisation, model-based testing — with the domain kept as data and pure functions.</p>
     </section>
   </div>
 

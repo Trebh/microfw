@@ -2,8 +2,8 @@
 
 INK, MUTED, FAINT = "#1b1f2a", "#5b6372", "#9aa1ad"
 PURE, EFFECT, DATA, SEAM, ADAPTER, OK = "#2563eb", "#e8590c", "#7c3aed", "#d6336c", "#64748b", "#2f9e44"
-MONO = "ui-monospace, 'SF Mono', Menlo, monospace"
-SANS = "-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif"
+MONO = "'IBM Plex Mono', monospace"
+SANS = "'IBM Plex Sans', sans-serif"
 
 
 def text(x, y, s, size=3, weight=400, fill=INK, anchor="middle", family=None, extra=""):

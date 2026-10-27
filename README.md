@@ -1,5 +1,7 @@
 # µFW
 
+[![µFW on one page: the SAM loop and its seams, five placements of one definition, and every path replayed on the real system](docs/one-page.png)](docs/one-page.png)
+
 µFW (`@mufw/*`) is a small TypeScript framework that implements the
 [SAM pattern](https://sam.js.org/) (State–Action–Model) on [Effect 4](https://effect.website).
 Which parts of the SAM loop run in the browser and which on the server is decided per deployment
@@ -429,7 +431,9 @@ These are living documents: they are updated in the same change that makes them 
 
 - [VISION.md](VISION.md) — why µFW exists and where it is going
 - [docs/one-page.html](docs/one-page.html) — the design on one A2 sheet (print at 100 %, landscape),
-  built from [docs/one-page/](docs/one-page/) with `python3 docs/one-page/build.py`
+  built from [docs/one-page/](docs/one-page/) with `python3 docs/one-page/build.py`, which also
+  renders the image at the top of this page (`docs/one-page.png`; needs
+  `pnpm exec playwright install chromium` once)
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — how it is built, with the detailed pages under
   [docs/architecture/](docs/architecture/)
 - [docs/TODO.md](docs/TODO.md) — known gaps

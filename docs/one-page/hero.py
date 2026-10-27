@@ -16,7 +16,7 @@ COS, SIN = math.cos(TH), math.sin(TH)
 INK = "#1b1f2a"
 MUTED = "#5b6372"
 PURE, EFFECT, DATA, SEAM, ADAPTER = "#2563eb", "#e8590c", "#7c3aed", "#d6336c", "#64748b"
-MONO = "ui-monospace, 'SF Mono', Menlo, monospace"
+MONO = "'IBM Plex Mono', monospace"
 
 
 def P(u, v, z=0.0):
@@ -328,7 +328,7 @@ def view_node():
     u, v = -62, -R
     ring = [P(u + 14 * math.cos(2 * math.pi * i / 48), v + 14 * math.sin(2 * math.pi * i / 48), 0.2) for i in range(48)]
     out = f'<path d="{path_d(ring)}" fill="#ffffff" fill-opacity=".7" stroke="{ADAPTER}" stroke-width=".7" stroke-dasharray="1.8 1.1"/>'
-    out += function_node(u, v, 0, "view", "rep ⇒ html")
+    out += function_node(u, v, 0, "view", "rep → html")
     return out
 
 
@@ -337,12 +337,12 @@ def items():
     scene = [
         (depth(-62, -R), view_node()),
         (depth(-22, -R), data_node(-22, -R, 0, 32, "Intent", ["Open · PlaceBid", "Tick · Close"], lines_du=-4)),
-        (depth(19, -R), function_node(19, -R, 0, "actions", "i ⇒ Effect&lt;p&gt;", "effect", r=10.5, h=11)),
+        (depth(19, -R), function_node(19, -R, 0, "actions", "i → Effect&lt;p&gt;", "effect", r=10.5, h=11)),
         (depth(56, -R), data_node(56, -R, 0, 36, "Proposal", ["BidPlaced · BidRejected", "Opened · Ticked · Closed"])),
-        (depth(-2, 10), function_node(-2, 10, STEP_Z, "nap", "rep ⇒ i?", r=7.5, h=6)),
-        (depth(60, R), function_node(60, R, STEP_Z, "acceptors", "(m, p) ⇒ m")),
+        (depth(-2, 10), function_node(-2, 10, STEP_Z, "nap", "rep → i?", r=7.5, h=6)),
+        (depth(60, R), function_node(60, R, STEP_Z, "acceptors", "(m, p) → m")),
         (depth(22, R), data_node(22, R, STEP_Z, 32, "Model", ["phase · bids", "endsAt"], stack=3)),
-        (depth(-14, R), function_node(-14, R, STEP_Z, "state", "m ⇒ rep")),
+        (depth(-14, R), function_node(-14, R, STEP_Z, "state", "m → rep")),
         (depth(-54, R), data_node(-54, R, STEP_Z, 38, "Representation", ["controlState", "highest"])),
     ]
     for seam in SEAMS:
@@ -389,6 +389,6 @@ def callouts():
 def build():
     body = (defs() + ground() + actions_glow() + ghost_layer() + step_platform() + flows() + rep_to_nap() + items()
             + nap_arc() + "".join(seam_card(s) for s in SEAMS) + callouts() + key_row())
-    return (f'<svg class="fig" viewBox="0 0 330 228" font-family="-apple-system, \'Segoe UI\', Helvetica, Arial, sans-serif" '
+    return (f'<svg class="fig" viewBox="0 0 330 228" font-family="\'IBM Plex Sans\', sans-serif" '
             f'xmlns="http://www.w3.org/2000/svg">{body}</svg>')
 
