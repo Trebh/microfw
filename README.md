@@ -12,6 +12,9 @@
 Which parts of the SAM loop run in the browser and which on the server is decided per deployment
 by composing Effect `Layer`s; the domain code does not change.
 
+**See it live:** [the showcase](https://mufw-showcase.pages.dev), a presentation of µFW as a play in
+eight acts, each running µFW in your browser.
+
 Status: **proof of concept**. APIs move freely; the packages export their TypeScript sources, with no
 build step, and nothing is published to npm.
 
@@ -104,6 +107,19 @@ time-travel panel, the prompter's book. Each act (`src/acts/<id>/`, listed in `s
 runs µFW live on the stage, over one shared box-office loop (`src/domain/BoxOffice.ts`). It is
 browser-only; `examples/auction` stays the tech demo of the placements. Its domain tests are in
 `examples/showcase/test` and run with `pnpm test`.
+
+The showcase is published at https://mufw-showcase.pages.dev by Cloudflare Pages, which builds every
+push to `main` from this repository (Git integration, configured in the Cloudflare dashboard, not in
+the repository):
+
+| Setting | Value |
+|---|---|
+| Root directory | the repository root (the build needs the workspace) |
+| Build command | `pnpm --filter @mufw/example-showcase build` |
+| Build output directory | `examples/showcase/dist` |
+| Environment variables | `NODE_VERSION=24`, `PNPM_VERSION=12` (the build image defaults to Node 22 and pnpm 10, and reads neither version from `package.json` or the lockfile) |
+
+The build is static: the deck routes by location hash, so the host needs no rewrites.
 
 Run the auction example (two terminals):
 
