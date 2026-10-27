@@ -1,18 +1,61 @@
 {
   "name": "@mufw/view-uhtml",
-  "version": "0.0.0",
-  "private": true,
+  "version": "0.1.0",
+  "description": "Mounts a pure uhtml v4 view on a @mufw/core loop; keyed lists, input scheduler, SSR entry",
+  "keywords": [
+    "sam",
+    "effect",
+    "state-management",
+    "typescript",
+    "uhtml"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Trebh/microfw.git",
+    "directory": "packages/view-uhtml"
+  },
+  "homepage": "https://github.com/Trebh/microfw#readme",
+  "bugs": {
+    "url": "https://github.com/Trebh/microfw/issues"
+  },
   "type": "module",
+  "sideEffects": false,
   "exports": {
     ".": "./src/index.ts",
     "./ssr": "./src/ssr.ts"
   },
+  "files": [
+    "dist",
+    "src",
+    "CHANGELOG.md"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "./ssr": {
+        "types": "./dist/ssr.d.ts",
+        "default": "./dist/ssr.js"
+      },
+      "./package.json": "./package.json"
+    }
+  },
   "scripts": {
+    "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit"
   },
-  "dependencies": {
+  "peerDependencies": {
     "effect": "^4.0.5",
-    "@mufw/core": "workspace:*",
+    "@mufw/core": "workspace:^",
+    "uhtml": "^4.7.1"
+  },
+  "devDependencies": {
+    "effect": "^4.0.5",
+    "@mufw/core": "workspace:^",
     "uhtml": "^4.7.1"
   }
 }

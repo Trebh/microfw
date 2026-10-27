@@ -155,15 +155,15 @@ importers:
         version: 8.3.4(@types/node@24.19.2)(esbuild@0.28.2)(tsx@4.23.15)
 
   packages/core:
-    dependencies:
+    devDependencies:
       effect:
         specifier: ^4.0.5
         version: 4.0.5
 
   packages/devtools:
-    dependencies:
+    devDependencies:
       '@mufw/core':
-        specifier: workspace:*
+        specifier: workspace:^
         version: link:../core
       '@statelyai/inspect':
         specifier: ^0.7.2
@@ -174,37 +174,35 @@ importers:
       uhtml:
         specifier: ^4.7.1
         version: 4.7.1
-    devDependencies:
       xstate:
         specifier: ^5.33.3
         version: 5.33.3
 
   packages/rpc:
-    dependencies:
+    devDependencies:
       '@mufw/core':
-        specifier: workspace:*
+        specifier: workspace:^
         version: link:../core
       effect:
         specifier: ^4.0.5
         version: 4.0.5
 
   packages/test:
-    dependencies:
+    devDependencies:
       '@mufw/core':
-        specifier: workspace:*
+        specifier: workspace:^
         version: link:../core
+      '@mufw/rpc':
+        specifier: workspace:^
+        version: link:../rpc
       effect:
         specifier: ^4.0.5
         version: 4.0.5
-    devDependencies:
-      '@mufw/rpc':
-        specifier: workspace:*
-        version: link:../rpc
 
   packages/view-uhtml:
-    dependencies:
+    devDependencies:
       '@mufw/core':
-        specifier: workspace:*
+        specifier: workspace:^
         version: link:../core
       effect:
         specifier: ^4.0.5

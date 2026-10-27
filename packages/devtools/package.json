@@ -1,21 +1,57 @@
 {
   "name": "@mufw/devtools",
-  "version": "0.0.0",
-  "private": true,
+  "version": "0.1.0",
+  "description": "Time-travel panel, history list and Stately inspector adapter for @mufw/core",
+  "keywords": [
+    "sam",
+    "effect",
+    "state-management",
+    "typescript"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Trebh/microfw.git",
+    "directory": "packages/devtools"
+  },
+  "homepage": "https://github.com/Trebh/microfw#readme",
+  "bugs": {
+    "url": "https://github.com/Trebh/microfw/issues"
+  },
   "type": "module",
+  "sideEffects": false,
   "exports": {
     ".": "./src/index.ts"
   },
+  "files": [
+    "dist",
+    "src",
+    "CHANGELOG.md"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "./package.json": "./package.json"
+    }
+  },
   "scripts": {
+    "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit"
   },
-  "dependencies": {
+  "peerDependencies": {
     "effect": "^4.0.5",
-    "@mufw/core": "workspace:*",
-    "uhtml": "^4.7.1",
-    "@statelyai/inspect": "^0.7.2"
+    "@mufw/core": "workspace:^",
+    "uhtml": "^4.7.1"
   },
   "devDependencies": {
+    "effect": "^4.0.5",
+    "@mufw/core": "workspace:^",
+    "uhtml": "^4.7.1",
+    "@statelyai/inspect": "^0.7.2",
     "xstate": "^5.33.3"
   }
 }

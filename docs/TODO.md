@@ -20,11 +20,6 @@ history lives in git). Each item names where the gap is and what done looks like
   sequence and applied twice. Done: a writer's resend is recognised however long it was cut off, or
   refused with a typed failure, tested with a writer cut off across more than one window.
 
-### Tooling
-
-- [ ] **No build or publish.** Packages export TypeScript sources. Done when a consumer outside the
-  workspace needs them: a build to `dist` and `exports` pointing at it.
-
 ### Research
 
 The three items below are one study in stages; each stage starts when the one before it is done.

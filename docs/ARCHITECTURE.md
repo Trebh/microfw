@@ -57,7 +57,7 @@ only the demo page chooses at runtime.
 
 ```mermaid
 flowchart BT
-  core["@mufw/core<br/>(effect only)"]
+  core["@mufw/core<br/>(peer: effect)"]
   rpc["@mufw/rpc"] --> core
   view["@mufw/view-uhtml"] --> core
   devtools["@mufw/devtools"] --> core
@@ -66,7 +66,7 @@ flowchart BT
   showcase["@mufw/example-showcase"] --> rpc & view & devtools & test & core
 ```
 
-- `@mufw/core` depends on `effect` alone and contains no platform, DOM or transport code.
+- `@mufw/core` has `effect` as its only (peer) dependency and contains no platform, DOM or transport code.
   Its synchronisation code (`layerLoopSynced`, the lease, the event-log storage, `layerLoopSyncedPersisted`)
   is a second entry, `@mufw/core/sync`: it needs `effect/eventlog` and `effect/encoding`, which a bundler
   cannot drop from the main entry, so a page that only runs the local loop imports none of it.
@@ -75,8 +75,13 @@ flowchart BT
 - Adapter packages never depend on each other.
 - Platform packages (`@effect/platform-node`, `@effect/platform-browser`) appear only in the examples.
 
-Packages are consumed as TypeScript sources (`exports: { ".": "./src/index.ts" }`, plus `"./sync"` for
-`@mufw/core`); vite, vitest and tsx compile them on the fly. There is no build step.
+Inside the workspace, packages are consumed as TypeScript sources (`exports: { ".": "./src/index.ts" }`,
+plus `"./sync"` for `@mufw/core`); vite, vitest and tsx compile them on the fly. Published packages
+carry `dist/` (plain `tsc` with `tsconfig.build.json`: `rewriteRelativeImportExtensions`, declarations
+and maps) through `publishConfig.exports`, so the workspace and the registry read different fields of
+the same manifest. `effect`, `@mufw/core` and `uhtml` are peer dependencies of the adapters: a consumer
+holds one copy of each, which is what makes the ports' `Context.Service` keys and the schemas' classes
+line up across packages.
 
 ## Where effects are run
 

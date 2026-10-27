@@ -3,3 +3,8 @@ packages:
   - "examples/*"
 allowBuilds:
   esbuild: true
+versioning:
+  fixed:
+    - ["@mufw/core", "@mufw/rpc", "@mufw/view-uhtml", "@mufw/devtools", "@mufw/test"]
+  changelog:
+    storage: repository

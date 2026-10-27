@@ -15,8 +15,8 @@ by composing Effect `Layer`s; the domain code does not change.
 **See it live:** [the showcase](https://microfw.pages.dev/), a presentation of µFW as a play in
 eight acts, each running µFW in your browser.
 
-Status: **proof of concept**. APIs move freely; the packages export their TypeScript sources, with no
-build step, and nothing is published to npm.
+Status: **proof of concept**. APIs move freely before 1.0; the packages are published to npm as
+`@mufw/*` (`0.x`).
 
 ## What you get
 
@@ -89,10 +89,23 @@ measurement with its plain baseline, the machine it ran on and the command that 
 
 Requires Node 24 and pnpm 12.
 
+Install the packages in an application:
+
+```sh
+pnpm add effect @mufw/core
+pnpm add @mufw/rpc                 # remote ports (pick a transport in your app)
+pnpm add uhtml @mufw/view-uhtml    # a uhtml v4 view
+pnpm add @mufw/devtools            # time travel, history, Stately inspector
+pnpm add -D @mufw/test             # model-based path tests
+```
+
+To work on the repository:
+
 ```sh
 pnpm install
 pnpm typecheck
 pnpm test
+pnpm build    # each package's dist/, what npm ships (the workspace itself resolves src/)
 ```
 
 Run the showcase (one terminal, no server), then open http://localhost:5180:

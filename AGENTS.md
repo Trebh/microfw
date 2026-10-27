@@ -26,8 +26,11 @@ docs/                ARCHITECTURE.md, architecture/*.md, TODO.md, logo/ (the log
 | Command | What it does |
 |---|---|
 | `pnpm install` | install; pnpm 12 enforces a minimum release age, so a just-published version is refused |
+| `pnpm build` | `tsc -p tsconfig.build.json` in every `packages/*`, into its `dist/` (what `pnpm publish` ships; the workspace itself resolves `src/`) |
 | `pnpm typecheck` | `tsc --noEmit` in every package, one at a time |
 | `pnpm test` | vitest over `packages/*/test` and `examples/*/test`, except `*.browser.test.ts` |
+| `pnpm change` | records a change intent in `.changeset/` (packages, bump, summary); `pnpm change check` validates the lockstep of `@mufw/*` and runs in CI |
+| `pnpm version -r` | consumes the intents: bumps the fixed group, writes each package's `CHANGELOG.md`; commit the result, and the Release workflow publishes what is not on npm yet |
 | `pnpm test:browser` | the `*.browser.test.ts` files in headless Chromium (once: `pnpm exec playwright install chromium`) |
 | `pnpm test:browser:ui` | the same files in a visible Chromium, one step every 700 ms, in watch mode: re-runs on change, `q` quits |
 | `pnpm dev:server` | demo server on :3001 serving every RPC (`MUFW_AUTO_ACTIONS=off` disables automatic actions) |
@@ -169,6 +172,18 @@ transport loss is turned into a defect, in `@mufw/rpc`.
 - The shared counter fixture is `packages/core/test/fixtures/Counter.ts`.
 - A test must be able to fail: when adding one for a rule, break the rule once and watch it fail.
 
+## Releasing
+
+- `@mufw/core`, `rpc`, `view-uhtml`, `devtools` and `test` release together (`versioning.fixed` in
+  `pnpm-workspace.yaml`). A change a consumer can see gets a `pnpm change` in the same PR.
+- To release: `pnpm version -r`, review the changelogs, commit, push to `main`;
+  `.github/workflows/release.yml` builds, typechecks, tests and runs `pnpm -r publish` through npm
+  trusted publishing (OIDC, no token). It skips versions already on npm, so a push without a bump
+  publishes nothing.
+- `effect`, `@mufw/core` and `uhtml` are peer dependencies of the packages (and dev dependencies for
+  the workspace), never `dependencies`: a consumer must hold one copy of each.
+- The published `exports` live in `publishConfig`; the top-level `exports` keep pointing at `src/`.
+
 ## Code conventions
 
 - TypeScript strict, `verbatimModuleSyntax`, `noUncheckedIndexedAccess`; import with the `.ts`
@@ -214,6 +229,7 @@ code as it is. Update the affected document in the same change that makes it fal
 | a change to a definition (its schemas, acceptors, `nap`, explore function or samples) | its `<Unit>.behaviour.md`, regenerated with `vitest -u` and reviewed as part of the diff |
 | a change that moves a measured cost (bundle, startup, step, interaction, server) | docs/architecture/performance.md, with the figures of a fresh run of the `bench:*` script that measures it, and the rounded figures of README.md's "What it costs" |
 | a gap found or closed | docs/TODO.md (add it, or delete the item) |
+| a release | each package's `CHANGELOG.md`, written by `pnpm version -r` |
 | a rule for contributors | AGENTS.md |
 
 Do not write dates, counts or status lines that nothing keeps current.
