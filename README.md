@@ -31,6 +31,8 @@ build step, and nothing is published to npm.
 - **Devtools.** A time-travel panel, a read-only history list, JSON export of a history, and an adapter for the
   [Stately inspector](https://stately.ai/docs/inspector) that draws the state and sequence diagrams.
 
+  [![The Stately inspector on the browser-only auction page: the state diagram highlights the current control state and the proposals it accepts while the sequence diagram lists each proposal, as bids are placed and the auction goes from open to closing to sold](docs/stately-inspector.gif)](docs/stately-inspector.gif)
+
 ## What it costs
 
 µFW trades bytes, load time and per-step work for a typed, recorded, relocatable loop. The figures
