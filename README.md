@@ -12,7 +12,7 @@
 Which parts of the SAM loop run in the browser and which on the server is decided per deployment
 by composing Effect `Layer`s; the domain code does not change.
 
-**See it live:** [the showcase](https://mufw-showcase.pages.dev), a presentation of µFW as a play in
+**See it live:** [the showcase](https://microfw.pages.dev/), a presentation of µFW as a play in
 eight acts, each running µFW in your browser.
 
 Status: **proof of concept**. APIs move freely; the packages export their TypeScript sources, with no
@@ -108,7 +108,7 @@ runs µFW live on the stage, over one shared box-office loop (`src/domain/BoxOff
 browser-only; `examples/auction` stays the tech demo of the placements. Its domain tests are in
 `examples/showcase/test` and run with `pnpm test`.
 
-The showcase is published at https://mufw-showcase.pages.dev by Cloudflare Pages, which builds every
+The showcase is published at https://microfw.pages.dev/ by Cloudflare Pages, which builds every
 push to `main` from this repository (Git integration, configured in the Cloudflare dashboard, not in
 the repository):
 
