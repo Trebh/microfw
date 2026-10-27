@@ -88,6 +88,22 @@ describe("a page on layerInputScheduler", () => {
     findElement(root as unknown as DomNode, "button")!.dispatchEvent(new Event("click"))
   }
 
+  /**
+   * Resumes once `root` shows its first paint, from a timer posted after that paint. Startup can
+   * spend the scheduler's budget, and the timer that resets it is posted while the startup work
+   * runs, so it has fired by then: the click starts with a full budget. The wait is ordering, not a
+   * duration: `setTimeout(…, 0)` timers fire in posting order, while a `setImmediate` can run
+   * before a pending one. Fake timers would replace the real queue the scheduler posts to.
+   */
+  const firstPaint = (root: Element) =>
+    Effect.callback<void>((resume) => {
+      const check = () => {
+        const next = root.textContent ? () => resume(Effect.void) : check
+        setTimeout(next, 0)
+      }
+      setTimeout(check, 0)
+    })
+
   it.effect("shows the step of a click before the next macrotask", () => {
     const root = document.createElement("div") as unknown as Element
     const page = layerMount(Ports, { root, view, render, onRefused: () => Effect.void }).pipe(
@@ -95,9 +111,7 @@ describe("a page on layerInputScheduler", () => {
       Layer.provide(layerInputScheduler)
     )
     return Effect.gen(function*() {
-      yield* Effect.callback<void>((resume) => {
-        nextMacrotask(() => resume(Effect.void))
-      })
+      yield* firstPaint(root)
       const shownAtMacrotask = Deferred.makeUnsafe<string | null>()
 
       nextMacrotask(() => Deferred.doneUnsafe(shownAtMacrotask, Effect.succeed(root.textContent)))
