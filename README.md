@@ -1,4 +1,9 @@
-# µFW
+<h1>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/logo/lockup-dark.svg">
+    <img alt="µFW — The SAM pattern on Effect 4" src="docs/logo/lockup.svg" width="480">
+  </picture>
+</h1>
 
 [![µFW on one page: the SAM loop and its seams, five placements of one definition, and every path replayed on the real system](docs/one-page.png)](docs/one-page.png)
 
@@ -439,4 +444,6 @@ These are living documents: they are updated in the same change that makes them 
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — how it is built, with the detailed pages under
   [docs/architecture/](docs/architecture/)
 - [docs/TODO.md](docs/TODO.md) — known gaps
+- [docs/logo/](docs/logo/README.md) — the logo: mark, lockups, favicon, app icon, their colours and
+  geometry
 - [AGENTS.md](AGENTS.md) — rules for anyone (human or agent) changing the code

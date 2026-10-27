@@ -18,7 +18,7 @@ packages/test        @mufw/test        model-based path testing
 examples/auction     @mufw/example-auction
 examples/showcase    @mufw/example-showcase    a presentation of µFW as a theatre play: the deck is a definition, each act runs µFW live; browser only
 examples/jfb         @mufw/example-jfb         the js-framework-benchmark keyed table in µFW and in plain uhtml 4, built into directories a js-framework-benchmark checkout can serve
-docs/                ARCHITECTURE.md, architecture/*.md, TODO.md
+docs/                ARCHITECTURE.md, architecture/*.md, TODO.md, logo/ (the logo's SVGs and how to use them)
 ```
 
 ## Commands
